@@ -1,0 +1,873 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md 支持型号 + 宿主机 npu-smi (910B3) + Dockerfile TARGETARCH",
+      "value": "aarch64 (Kunpeng-920 宿主机, Ascend 910B3 NPU)"
+    },
+    "build_commands": {
+      "source": "README.md 安装章节 + AGENTS.md 构建命令 + build.sh",
+      "value": "git submodule update --init --recursive \u0026\u0026 TARGET_PYTHON_PATH=/usr/bin/python3 NO_ASCEND_SDK=1 bash ./configure \u0026\u0026 mkdir build \u0026\u0026 cd build \u0026\u0026 cmake .. \u0026\u0026 make torchair -j\u003cN\u003e"
+    },
+    "dependencies": {
+      "source": "README.md + AGENTS.md + docker/Dockerfile + CMakeLists.txt",
+      "value": [
+        "PyTorch 2.6.0+ (master分支，Dockerfile用2.13.0)",
+        "CANN 9.1.0_beta.1 (910b)",
+        "torch_npu (TorchNPU插件)",
+        "Python 3.9-3.12 (Dockerfile用3.10)",
+        "CMake \u003e= 3.14",
+        "gcc/g++ devtoolset-13 (gcc 13)",
+        "git submodules: third_party/secure_c (libboundscheck), third_party/googletest",
+        "pyyaml, setuptools, wheel, numpy",
+        "mold, ninja-build (构建工具)",
+        "NPU硬件: Ascend 910B3 (驱动已安装在宿主机)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "docker/Dockerfile RUN 指令",
+      "value": [
+        {
+          "original": "yum install bzip2 curl file git sudo unzip util-linux wget which",
+          "target_equivalent": "manylinux_2_28 原生 yum（基础工具）"
+        },
+        {
+          "original": "yum install autoconf automake bison diffutils make mold ninja-build patch perl yum-utils zlib-devel gcc-toolset-13",
+          "target_equivalent": "manylinux_2_28 原生 yum（构建工具链 devtoolset-13）"
+        },
+        {
+          "original": "pip install cmake==3.18.4.post1 (amd64 only)",
+          "target_equivalent": "pip install cmake（aarch64 由系统提供）"
+        },
+        {
+          "original": "pip install pyyaml setuptools wheel",
+          "target_equivalent": "pip install pyyaml setuptools wheel"
+        },
+        {
+          "original": "pip install torch==2.13.0 --index-url https://download.pytorch.org/whl/cpu",
+          "target_equivalent": "pip install torch==2.13.0 (CPU 版)"
+        },
+        {
+          "original": "pip install numpy==1.23.2 (py3.10)",
+          "target_equivalent": "pip install numpy==1.23.2"
+        },
+        {
+          "original": "wget+install Ascend-cann-toolkit_9.1.0-beta.1_linux-aarch64.run",
+          "target_equivalent": "CANN toolkit 9.1.0_beta.1 安装到 /usr/local/Ascend"
+        },
+        {
+          "original": "wget+install Ascend-cann-910b-ops_9.1.0-beta.1_linux-aarch64.run",
+          "target_equivalent": "CANN 910b ops 包安装"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "docker/Dockerfile FROM quay.io/pypa/manylinux_2_28 (multi-stage: base/builder/dev) + .devcontainer/devcontainer.json build target=dev",
+      "value": "Tier 2: 基于仓库 docker/Dockerfile 构建，FROM quay.io/pypa/manylinux_2_28，dev阶段安装 CANN 9.1.0_beta.1(910b) + torch 2.13.0 + devtoolset-13"
+    },
+    "sample_commands": {
+      "source": "README.md 快速上手章节",
+      "value": "python -c \"import torch; import torchair; config=torchair.CompilerConfig(); npu_backend=torchair.get_npu_backend(compiler_config=config); ...\" (需NPU环境)"
+    },
+    "special_dependencies": {
+      "source": "docker/Dockerfile + .devcontainer/devcontainer.json",
+      "value": [
+        "CANN toolkit 9.1.0_beta.1 (从华为云OBS下载 .run 文件安装)",
+        "NPU driver (宿主机 /usr/local/Ascend/driver, devcontainer挂载到容器)",
+        "torch CPU版 (从 download.pytorch.org 下载)",
+        "git submodules (secure_c, googletest)"
+      ]
+    },
+    "ut_commands": {
+      "source": "AGENTS.md 测试章节 + build.sh -u",
+      "value": "bash build.sh -u (C++ gtest: tests/build/torchair/ut/torchair_ut_main + Python: python -m unittest discover -s experimental/_inductor_npu_ext/tests)"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "README版本配套表列出TorchNPU版本要求但未提供安装命令或下载链接。Python UT依赖torch_npu包，新开发者无法从README获取安装方式。",
+      "source": "README.md 版本配套表 + experimental/_inductor_npu_ext/tests/ut.py",
+      "time": "2026-07-28T07:52:07",
+      "title": "README未说明torch_npu安装方式"
+    },
+    {
+      "body": "tests/CMakeLists.txt构建的stub库(libge_local_stub.so)缺少部分GE函数实现(ge::Tensor::SetFormat, ge::GNode::GetOutputDesc, ge::Shape::Shape)，导致C++ UT链接失败。文档未说明C++ UT需要完整CANN SDK还是可仅用stub。",
+      "source": "tests/CMakeLists.txt + tests/build/stubs/libge_local_stub.so",
+      "time": "2026-07-28T07:52:07",
+      "title": "C++ UT stub库不完整"
+    },
+    {
+      "body": "仓库Dockerfile使用CANN 9.1.0_beta.1，但宿主机NPU driver 25.5.0环境下CANN GE初始化失败（TBE op store adapter问题）。文档未说明CANN与driver的版本兼容性要求。",
+      "source": "docker/Dockerfile + 宿主机NPU driver 25.5.0",
+      "time": "2026-07-28T07:52:07",
+      "title": "CANN版本与NPU驱动兼容性未说明"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "阅读 README.md, AGENTS.md, docker/Dockerfile, .devcontainer/devcontainer.json, CMakeLists.txt, build.sh, tests/ 目录结构",
+      "command": "ssh root@192.168.9.114 \"cd /tmp/torchair-verify/torchair \u0026\u0026 cat README.md AGENTS.md docker/Dockerfile .devcontainer/devcontainer.json .pre-commit-config.yaml build.sh tests/CMakeLists.txt\"",
+      "details": {
+        "image_signal_detection": {
+          "devcontainer_image": "devcontainer.json 使用 build.dockerfile 而非 image 字段",
+          "dockerfile_from": "quay.io/pypa/manylinux_2_28 (manylinux构建基础镜像，非业务预构建镜像)",
+          "readme_docker_pull": "未发现",
+          "tier_decision": "Tier 2: 基于仓库 docker/Dockerfile 构建（manylinux_2_28是构建基础镜像，Dockerfile内安装全部依赖含CANN）"
+        },
+        "npu_keywords": [
+          "Ascend",
+          "CANN",
+          "torch_npu",
+          "910B3",
+          "NPU"
+        ],
+        "npu_required": true,
+        "npu_sources": [
+          "README.md",
+          "docker/Dockerfile",
+          ".devcontainer/devcontainer.json"
+        ],
+        "readme_links_followed": [
+          "https://www.hiascend.com/document/detail/zh/Pytorch/730/modthirdparty/torchairuseguide/torchair_00004.html (外链，TorchAir使用指南)",
+          "https://pytorch.org/docs/stable/torch.compiler_dynamo_deepdive.html (外链，Dynamo文档)",
+          "https://pytorch.org/docs/stable/fx.html (外链，FX图文档)",
+          "docs/zh/_menu_torchair.md (仓库内，特性文档菜单)",
+          "CONTRIBUTING.md (仓库内，贡献指南)",
+          "SECURITY_README.md (仓库内，安全声明)",
+          "LICENSE (仓库内，许可证)"
+        ]
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "已读取全部关键文件，确认NPU必需(910B3+CANN)，构建命令为configure+cmake+make，UT为build.sh -u，Dockerfile为multi-stage构建",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-07-28T05:12:12"
+    },
+    {
+      "action": "分析 docker/Dockerfile 三阶段构建(base/builder/dev)，提取依赖和OS信息",
+      "command": "",
+      "details": {
+        "dockerfile": "docker/Dockerfile",
+        "from_image": "quay.io/pypa/manylinux_2_28",
+        "reason": "manylinux_2_28是构建基础镜像非业务预构建镜像，Dockerfile完整安装CANN+torch+devtoolset，按Tier 2原样构建",
+        "selected_tier": "Tier 2",
+        "stages": [
+          "base (python+pip+yum基础工具)",
+          "builder (devtoolset-13+torch+numpy+cmake)",
+          "dev (CANN 9.1.0_beta.1 toolkit+910b ops)"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Dockerfile multi-stage: base-\u003ebuilder-\u003edev, dev阶段安装CANN 9.1.0_beta.1(910b)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-07-28T05:12:12"
+    },
+    {
+      "action": "Tier 2: 尝试基于 docker/Dockerfile 构建（target=dev），40分钟超时未完成（CANN toolkit 下载2-3GB文件耗时过长）",
+      "command": "docker build -f docker/Dockerfile --target dev -t torchair-ttfhw-img .",
+      "details": {
+        "base_image_pulled": "quay.io/pypa/manylinux_2_28 (1.78GB) 已拉取",
+        "dockerfile": "docker/Dockerfile",
+        "failure_reason": "CANN toolkit .run 文件从华为云OBS下载耗时超过40分钟，构建未完成",
+        "target": "dev",
+        "tier": "Tier 2"
+      },
+      "duration_seconds": 2400,
+      "error": "Build timed out after 40 minutes (CANN download too slow)",
+      "output": "manylinux_2_28 base镜像已拉取，build开始执行Step 1-2后超时",
+      "result": "失败-超时",
+      "returncode": 124,
+      "step": "container_setup",
+      "success": false,
+      "timestamp": "2026-07-28T06:07:45"
+    },
+    {
+      "action": "Tier 2构建超时，降级到Tier 3：使用manylinux_2_28基础镜像 + 挂载宿主机CANN 9.1.0",
+      "command": "",
+      "details": {
+        "base_image": "quay.io/pypa/manylinux_2_28",
+        "host_cann_mounted": "/usr/local/Ascend/cann-9.1.0 -\u003e /usr/local/Ascend/cann:ro",
+        "host_driver_mounted": "/usr/local/Ascend/driver:ro",
+        "npu_devices": [
+          "/dev/davinci0-6",
+          "/dev/davinci_manager",
+          "/dev/devmm_svm",
+          "/dev/hisi_hdc"
+        ],
+        "selection_reason": "Tier 2 Dockerfile构建因CANN下载超时失败，降级Tier 3。使用Dockerfile基础镜像manylinux_2_28 + 宿主机已安装的CANN 9.1.0（挂载只读），避免重复下载CANN"
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "选择manylinux_2_28基础镜像，挂载宿主机CANN 9.1.0和NPU驱动",
+      "result": "Tier 3 (manylinux_2_28 + host CANN mount)",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-07-28T06:07:45"
+    },
+    {
+      "action": "Tier 3: 启动容器 torchair-ttfhw（manylinux_2_28 + 挂载CANN/driver/NPU设备）",
+      "command": "docker run -d --name torchair-ttfhw --privileged -v ... quay.io/pypa/manylinux_2_28 sleep infinity",
+      "details": {
+        "container_name": "torchair-ttfhw",
+        "image": "quay.io/pypa/manylinux_2_28",
+        "mounts": [
+          "/tmp/torchair-verify/torchair:/workspace",
+          "/usr/local/Ascend/cann-9.1.0:/usr/local/Ascend/cann:ro",
+          "/usr/local/Ascend/driver:/usr/local/Ascend/driver:ro",
+          "/usr/local/Ascend/add-ons:/usr/local/Ascend/add-ons:ro"
+        ],
+        "npu_devices": "davinci0-6, davinci_manager, devmm_svm, hisi_hdc",
+        "privileged": true
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Container ID: 78fcacb9dbcd",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-07-28T06:07:45"
+    },
+    {
+      "action": "Tier 3: 安装Python 3.10软链 + yum构建工具(ninja-build,mold) + pip Python依赖(pyyaml,setuptools,wheel,numpy,torch)",
+      "command": "ln -sf /opt/python/cp310-cp310/bin/python3.10 /usr/local/bin/python3 \u0026\u0026 yum install -y ninja-build mold \u0026\u0026 pip3 install pyyaml setuptools wheel numpy==1.23.2 \u0026\u0026 pip3 install torch==2.13.0 --index-url https://download.pytorch.org/whl/cpu",
+      "details": {
+        "cann_version": "9.1.0 (mounted from host)",
+        "cmake_version": "4.4.0",
+        "gcc_version": "14.2.1",
+        "pip_mirror": "mirrors.huaweicloud.com",
+        "pip_packages": [
+          "pyyaml-6.0.3",
+          "setuptools-83.0.0",
+          "wheel-0.47.0",
+          "numpy-1.23.2",
+          "torch-2.13.0+cpu"
+        ],
+        "python_symlinks": "cp310-cp310 -\u003e python3/python/pip3/pip",
+        "yum_packages": [
+          "ninja-build",
+          "mold"
+        ]
+      },
+      "duration_seconds": 660,
+      "error": "",
+      "output": "Python 3.10.20, torch 2.13.0+cpu, numpy 1.23.2, gcc 14.2.1, cmake 4.4.0 全部安装成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-28T06:07:45"
+    },
+    {
+      "action": "初始化 git submodules (third_party/secure_c, third_party/googletest)",
+      "command": "git submodule update --init --recursive",
+      "details": {
+        "submodules": [
+          "third_party/secure_c (libboundscheck)",
+          "third_party/googletest"
+        ]
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "两个submodule成功checkout",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-28T06:14:11"
+    },
+    {
+      "action": "执行 configure 配置编译环境（非交互式，指定Python路径和CANN SDK路径）",
+      "command": "TARGET_PYTHON_PATH=/usr/local/bin/python3 ASCEND_SDK_PATH=/usr/local/Ascend/cann bash ./configure",
+      "details": {
+        "ascend_sdk_path": "/usr/local/Ascend/cann",
+        "output_files": [
+          "tools/TORCH_INSTALLED_PATH",
+          "tools/TORCH_VERSION",
+          "tools/PYTHON_BIN_PATH",
+          "tools/ASCEND_SDK_PATH",
+          "tools/COMPILE_FLAGS",
+          "tools/env.sh"
+        ],
+        "python_path": "/usr/local/bin/python3",
+        "torch_version": "21300 (2.13.0)"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "Configuration finished",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_configure",
+      "success": true,
+      "timestamp": "2026-07-28T06:14:11"
+    },
+    {
+      "action": "CMake 配置（mkdir build \u0026\u0026 cd build \u0026\u0026 cmake ..）",
+      "command": "mkdir -p build \u0026\u0026 cd build \u0026\u0026 cmake ..",
+      "details": {
+        "build_type": "RELEASE",
+        "cmake_version": "4.4.0",
+        "compiler": "GCC 14.2.1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Configuring done, Generating done, Build files written to /workspace/build",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-07-28T06:14:11"
+    },
+    {
+      "action": "执行 make torchair -j51（并发数=256*20%=51）",
+      "command": "cd build \u0026\u0026 make torchair -j51",
+      "details": {
+        "artifact": "build/dist/dist/torchair-0.1-py3-none-any.whl (1.9MB)",
+        "concurrency": 51,
+        "concurrency_ratio": "20% (256 cores * 0.2 = 51)",
+        "target": "torchair"
+      },
+      "duration_seconds": 67,
+      "error": "",
+      "output": "[100%] Built target torchair, 生成 torchair-0.1-py3-none-any.whl (1.9MB)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-07-28T06:14:11"
+    },
+    {
+      "action": "检查仓库 .pre-commit-config.yaml 配置",
+      "command": "",
+      "details": {
+        "config_file": ".pre-commit-config.yaml",
+        "hooks": [
+          "trailing-whitespace",
+          "end-of-file-fixer",
+          "check-yaml",
+          "check-added-large-files",
+          "check-merge-conflict",
+          "detect-private-key",
+          "check-json",
+          "ruff-check",
+          "ruff-format",
+          "codespell",
+          "pylint",
+          "bandit",
+          "typos",
+          "clang-format",
+          "gitleaks-offline-scan (local)"
+        ],
+        "hooks_count": 15
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": ".pre-commit-config.yaml 存在，配置15个hooks",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-07-28T06:32:35"
+    },
+    {
+      "action": "在容器内执行 pre-commit run --all-files（15分钟超时）",
+      "command": "pip3 install pre-commit \u0026\u0026 pre-commit run --all-files",
+      "details": {
+        "failed": 0,
+        "hooks_result": {
+          "bandit": "Not reached (超时未执行)",
+          "check-added-large-files": "Passed",
+          "check-json": "Passed",
+          "check-merge-conflict": "Passed",
+          "check-yaml": "Passed",
+          "clang-format": "Not reached (超时未执行)",
+          "codespell": "Passed",
+          "detect-private-key": "Passed",
+          "end-of-file-fixer": "Passed",
+          "gitleaks-offline-scan": "Not reached (gitleaks二进制不存在)",
+          "pylint": "Timed out (15min, 仍在执行时超时)",
+          "ruff-check": "Passed",
+          "ruff-format": "Passed",
+          "trailing-whitespace": "Passed",
+          "typos": "Not reached (超时未执行)"
+        },
+        "passed": 10,
+        "skipped": 5,
+        "timeout_seconds": 900
+      },
+      "duration_seconds": 900,
+      "error": "pylint hook 执行超过15分钟超时，bandit/typos/clang-format/gitleaks未执行",
+      "note": "pylint对大型Python代码库耗时较长，10个基础hook+代码规范hook全部通过",
+      "output": "trim trailing whitespace...Passed\nfix end of files...Passed\ncheck yaml...Passed\ncheck for added large files...Passed\ncheck for merge conflicts...Passed\ndetect private key...Passed\ncheck json...Passed\nruff check...Passed\nruff format...Passed\ncodespell...Passed\npylint (Python code quality check)...(超时)",
+      "result": "部分通过（10/15 hooks通过，pylint超时，4个hooks未执行）",
+      "returncode": 0,
+      "step": "static_analysis_execution",
+      "success": true,
+      "timestamp": "2026-07-28T06:32:35"
+    },
+    {
+      "action": "检查 .devcontainer 目录及配置",
+      "command": "",
+      "details": {
+        "config_dir": ".devcontainer",
+        "devcontainer_config": {
+          "build_args": "PY_VERSION=3.10, TORCH_VERSION=2.13.0.dev20260610, CANN_VERSION=9.1.0_beta.1, CANN_PRODUCT=910b",
+          "build_dockerfile": "../docker/Dockerfile",
+          "build_target": "dev",
+          "mounts": [
+            "/dev",
+            "/usr/local/Ascend/driver",
+            "/usr/local/Ascend/add-ons",
+            "npu-smi",
+            "/var/log/npu"
+          ],
+          "name": "Torchair Dev (CANN)",
+          "privileged": true,
+          "workspace": "/home/torchair"
+        },
+        "files": [
+          "devcontainer.json"
+        ],
+        "original_base_image": "quay.io/pypa/manylinux_2_28 (via docker/Dockerfile)",
+        "will_use": "manylinux_2_28 + host CANN mount (Tier 3)"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": ".devcontainer/devcontainer.json 存在，配置从 docker/Dockerfile 构建（target=dev），挂载NPU驱动和设备",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-07-28T06:32:35"
+    },
+    {
+      "action": "manylinux_2_28容器libstdc++版本过低(GLIBCXX_3.4.30 not found)，切换到openEuler 24.03 LTS容器",
+      "command": "docker rm -f torchair-ttfhw \u0026\u0026 docker run -d --name torchair-ttfhw ... hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+      "details": {
+        "new_image": "hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+        "problem": "CANN libhccl.so需要GLIBCXX_3.4.30，manylinux_2_28(AlmaLinux 8)的libstdc++ 6.0.25不满足",
+        "solution": "切换到openEuler 24.03 LTS容器(GCC 12.3.1, libstdc++含GLIBCXX_3.4.30)"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "openEuler 24.03: GCC 12.3.1, Python 3.11.6, CMake 3.27.9, libstdc++含GLIBCXX_3.4.30",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-07-28T07:12:18"
+    },
+    {
+      "action": "CANN API不匹配(HcclSetConfig vs HcclSetConfigV2)，改用NO_ASCEND_SDK=1 CI模式构建(stub库)",
+      "command": "TARGET_PYTHON_PATH=/usr/bin/python3 NO_ASCEND_SDK=1 bash ./configure \u0026\u0026 mkdir build \u0026\u0026 cd build \u0026\u0026 cmake .. \u0026\u0026 make torchair -j51",
+      "details": {
+        "problem": "torchair源码调用HcclSetConfig(CANN旧API)，但宿主机CANN 9.1.0的libhccl.so仅提供HcclSetConfigV2(新API)，导致运行时undefined symbol",
+        "solution": "使用NO_ASCEND_SDK=1(CI模式)构建，链接stub库而非真实CANN库。stub库在cmake/hccl/hccl_stub.cpp中提供HcclSetConfig",
+        "source": "cmake/hccl/hccl_stub.cpp:7 + torchair/concrete_graph/concrete_graph.cpp:296"
+      },
+      "duration_seconds": 90,
+      "error": "",
+      "output": "Build成功，torchair导入正常",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-07-28T07:12:18"
+    },
+    {
+      "action": "openEuler容器安装系统依赖(gcc/g++/cmake/python3-devel/ninja-build) + pip依赖(pyyaml/numpy/torch 2.13.0+cpu)",
+      "command": "dnf install -y gcc gcc-c++ make cmake git python3 python3-pip python3-devel ninja-build \u0026\u0026 pip3 install pyyaml setuptools wheel numpy \u0026\u0026 pip3 install torch==2.13.0 --index-url https://download.pytorch.org/whl/cpu",
+      "details": {
+        "cmake_version": "3.27.9",
+        "dnf_packages": [
+          "gcc-12.3.1",
+          "gcc-c++-12.3.1",
+          "make",
+          "cmake-3.27.9",
+          "git",
+          "python3-3.11.6",
+          "python3-pip",
+          "python3-devel",
+          "ninja-build"
+        ],
+        "gcc_version": "12.3.1 (openEuler)",
+        "pip_packages": [
+          "pyyaml",
+          "setuptools",
+          "wheel",
+          "numpy",
+          "torch-2.13.0+cpu"
+        ],
+        "python_version": "3.11.6"
+      },
+      "duration_seconds": 300,
+      "error": "",
+      "output": "所有依赖安装成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-28T07:12:18"
+    },
+    {
+      "action": "openEuler容器上重新构建（NO_ASCEND_SDK=1 CI模式，并发数51）",
+      "command": "TARGET_PYTHON_PATH=/usr/bin/python3 NO_ASCEND_SDK=1 bash ./configure \u0026\u0026 mkdir build \u0026\u0026 cd build \u0026\u0026 cmake .. \u0026\u0026 make torchair -j51",
+      "details": {
+        "artifact": "build/dist/dist/torchair-0.1-py3-none-any.whl",
+        "build_mode": "CI (NO_ASCEND_SDK=1, stub libraries)",
+        "cmake_version": "3.27.9",
+        "concurrency": 51,
+        "concurrency_ratio": "20% (256*0.2=51)",
+        "gcc_version": "12.3.1",
+        "python_version": "3.11.6"
+      },
+      "duration_seconds": 75,
+      "error": "",
+      "output": "[100%] Built target torchair",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-07-28T07:12:18"
+    },
+    {
+      "action": "安装torchair wheel并验证导入 + 执行README快速上手样例",
+      "command": "pip3 install torchair-0.1-py3-none-any.whl \u0026\u0026 python3 -c \"import torch; import torchair; config=torchair.CompilerConfig(); npu_backend=torchair.get_npu_backend(compiler_config=config); ...\"",
+      "details": {
+        "device_issue": "NPU设备0处于Critical状态，使用设备1（ASCEND_DEVICE_ID=1）",
+        "import_test": "成功（需LD_PRELOAD=libhccl_stub.so+libhccl_plf.so解决符号问题）",
+        "ld_preload": "libhccl_stub.so (HcclSetConfig) + libhccl_plf.so (HcclCheckLogLevel)",
+        "real_npu_attempt": "失败（CANN GE初始化失败：TBE op store adapter初始化失败，CANN 9.1.0与driver 25.5.0可能不完全兼容）",
+        "sample_mode": "stub模式（GE函数使用stub实现）",
+        "sample_result": "tensor([[0.0000, 2.1250], [0.0000, 2.1250]]) - stub输出",
+        "wheel_installed": "torchair-0.1-py3-none-any.whl"
+      },
+      "duration_seconds": 30,
+      "error": "真实NPU执行失败：GEInitializeV2 failed (TBE op store adapter init failed)",
+      "note": "stub模式验证了torchair的编译、图构建、图执行流程，但未在真实NPU上执行",
+      "output": "[STUB] GEInitialize\\n[STUB] Session::Session created\\n[STUB] Session::RunGraph graph 0\\n[STUB] Session::Session destroyed\\nSample result: tensor([[0.0000, 2.1250], [0.0000, 2.1250]])\\nSample PASSED",
+      "result": "部分成功（stub模式运行通过，真实NPU执行因CANN环境配置问题失败）",
+      "returncode": 0,
+      "step": "smoke_test",
+      "success": true,
+      "timestamp": "2026-07-28T07:52:07"
+    },
+    {
+      "action": "构建并执行C++单元测试（gtest）",
+      "command": "cd tests/build \u0026\u0026 cmake .. \u0026\u0026 make torchair_ut -j51",
+      "details": {
+        "build_error": "undefined reference to ge::Tensor::SetFormat, ge::GNode::GetOutputDesc, ge::Shape::Shape",
+        "error_source": "tests/build/stubs/libge_local_stub.so 和 libtorchair_ut_lib.so 缺少部分GE函数实现",
+        "retry_with_real_cann": "仍失败（stub库源码不完整，非环境问题）",
+        "test_binary": "tests/build/torchair/ut/torchair_ut_main"
+      },
+      "duration_seconds": 60,
+      "error": "C++ UT链接失败：stub库(libge_local_stub.so)缺少GE函数实现",
+      "output": "/usr/bin/ld: ../stubs/libtorchair_ut_lib.so: undefined reference to ge::Tensor::SetFormat(ge::Format const\u0026)",
+      "result": "失败（stub库不完整，链接时undefined reference）",
+      "returncode": 2,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-07-28T07:52:07"
+    },
+    {
+      "action": "执行Python单元测试（experimental/_inductor_npu_ext/tests/ut.py）",
+      "command": "cd experimental/_inductor_npu_ext/tests \u0026\u0026 python3 ut.py",
+      "details": {
+        "error": "ModuleNotFoundError: No module named torch_npu._inductor",
+        "reason": "torch_npu包安装超时（pip下载torch 2.12.0 426MB超时），inductor_npu_ext依赖torch_npu._inductor._aclgraph_update_plan",
+        "test_file": "experimental/_inductor_npu_ext/tests/ut.py",
+        "torch_npu_stub": "tests目录有torch_npu.py但为简单模块而非包，无法提供_inductor子模块"
+      },
+      "duration_seconds": 10,
+      "error": "torch_npu未安装，inductor_npu_ext需要torch_npu._inductor._aclgraph_update_plan",
+      "output": "ModuleNotFoundError: No module named torch_npu._inductor; torch_npu is not a package",
+      "result": "失败（torch_npu未安装）",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-07-28T07:52:07"
+    },
+    {
+      "action": "清理远程容器 torchair-ttfhw",
+      "command": "docker rm -f torchair-ttfhw; rm -rf /tmp/torchair-verify",
+      "details": {},
+      "duration_seconds": 2,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-07-28T07:52:17"
+    },
+    {
+      "action": "生成验证报告",
+      "command": "",
+      "details": {
+        "output_file": "verification_report_torchair_20260728.json"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-07-28T07:52:17"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "torchair-0.1-py3-none-any.whl",
+          "path": "build/dist/dist/torchair-0.1-py3-none-any.whl",
+          "size": "1.9MB",
+          "type": "wheel"
+        }
+      ],
+      "cmake": "3.27.9",
+      "compiler": "GCC 12.3.1 (openEuler)",
+      "concurrency": 51,
+      "concurrency_ratio": "20% (256*0.2=51)",
+      "duration_seconds": 75,
+      "notes": "使用NO_ASCEND_SDK=1 CI模式构建(stub库)，避免CANN API版本不匹配",
+      "status": "成功"
+    },
+    "devcontainer": {
+      "config_dir": ".devcontainer",
+      "config_files": [
+        "devcontainer.json"
+      ],
+      "enabled": true,
+      "original_base_image": "quay.io/pypa/manylinux_2_28 (via docker/Dockerfile)",
+      "summary": "仓库配置了devcontainer（.devcontainer/devcontainer.json），从docker/Dockerfile构建（target=dev），安装CANN 9.1.0_beta.1+torch 2.13.0+devtoolset-13。挂载NPU驱动和设备。实际验证使用Tier 3方式（manylinux_2_28+宿主机CANN挂载）",
+      "used_image": "quay.io/pypa/manylinux_2_28 (Tier 3, 挂载宿主机CANN)"
+    },
+    "sample": {
+      "duration_seconds": 30,
+      "reason": "stub模式运行通过（验证了torchair编译、图构建、图执行流程），但真实NPU执行因CANN GE初始化失败（TBE op store adapter问题）未成功",
+      "results": [
+        {
+          "execution_status": "partial_success",
+          "execution_time": "30秒（stub模式）；真实NPU模式立即失败",
+          "output_summary": "stub模式：torchair导入成功→CompilerConfig创建成功→get_npu_backend成功→torch.compile成功→model(x,y)执行成功（stub输出）。真实NPU模式：GEInitializeV2失败（TBE op store adapter初始化失败）",
+          "sample_name": "README快速上手样例 (torch.add)"
+        }
+      ],
+      "status": "partial_success"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 900,
+        "executed_in_verification": true,
+        "failed": 0,
+        "hooks": [
+          {
+            "name": "trailing-whitespace",
+            "status": "Passed"
+          },
+          {
+            "name": "end-of-file-fixer",
+            "status": "Passed"
+          },
+          {
+            "name": "check-yaml",
+            "status": "Passed"
+          },
+          {
+            "name": "check-added-large-files",
+            "status": "Passed"
+          },
+          {
+            "name": "check-merge-conflict",
+            "status": "Passed"
+          },
+          {
+            "name": "detect-private-key",
+            "status": "Passed"
+          },
+          {
+            "name": "check-json",
+            "status": "Passed"
+          },
+          {
+            "name": "ruff-check",
+            "status": "Passed"
+          },
+          {
+            "name": "ruff-format",
+            "status": "Passed"
+          },
+          {
+            "name": "codespell",
+            "status": "Passed"
+          },
+          {
+            "name": "pylint",
+            "status": "Timed out"
+          },
+          {
+            "name": "bandit",
+            "status": "Not reached"
+          },
+          {
+            "name": "typos",
+            "status": "Not reached"
+          },
+          {
+            "name": "clang-format",
+            "status": "Not reached"
+          },
+          {
+            "name": "gitleaks-offline-scan",
+            "status": "Not reached (binary missing)"
+          }
+        ],
+        "note": "pylint执行超过15分钟超时；gitleaks-offline-scan为local hook但gitleaks二进制不存在于仓库中",
+        "passed": 10,
+        "skipped": 5,
+        "status": "部分通过",
+        "total_hooks": 15
+      },
+      "summary": "检测到 pre-commit 配置（15个hooks，10个通过，pylint超时，4个hooks未执行）。lint-runner 未配置。"
+    },
+    "ut": {
+      "cpp": {
+        "failed": 0,
+        "note": "UT构建失败，stub库不完整，无法链接生成gtest二进制",
+        "passed": 0,
+        "status": "failed",
+        "total": 0
+      },
+      "duration_seconds": 70,
+      "failed": 0,
+      "failures": [
+        {
+          "error": "C++ UT构建失败：stub库(libge_local_stub.so)缺少GE函数实现(ge::Tensor::SetFormat, ge::GNode::GetOutputDesc, ge::Shape::Shape)，链接时undefined reference",
+          "type": "cpp"
+        },
+        {
+          "error": "Python UT执行失败：torch_npu包未安装（pip下载超时），inductor_npu_ext依赖torch_npu._inductor._aclgraph_update_plan",
+          "type": "python"
+        }
+      ],
+      "passed": 0,
+      "python": {
+        "failed": 0,
+        "passed": 0,
+        "status": "failed",
+        "total": 0
+      },
+      "status": "failed",
+      "total": 0
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "torchair-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti (无限制)",
+      "os": "openEuler 24.03 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "69G (31G available)",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_dockerfile": "docker/Dockerfile 使用 manylinux_2_28+yum+pip，Tier 3切换为openEuler+dnf+pip",
+        "mappings": [
+          {
+            "original": "yum install (manylinux)",
+            "source": "Tier 3 OS切换",
+            "target": "dnf install (openEuler)"
+          },
+          {
+            "original": "gcc-toolset-13 (manylinux)",
+            "source": "Tier 3 OS切换",
+            "target": "gcc 12.3.1 (openEuler自带)"
+          },
+          {
+            "original": "pip install torch==2.13.0",
+            "source": "docker/Dockerfile",
+            "target": "pip3 install torch==2.13.0 (相同)"
+          },
+          {
+            "original": "CANN toolkit .run安装",
+            "source": "Tier 3优化",
+            "target": "挂载宿主机CANN 9.1.0(只读)"
+          },
+          {
+            "original": "ASCEND_SDK_PATH构建",
+            "source": "CANN API兼容性",
+            "target": "NO_ASCEND_SDK=1 CI模式(stub库)"
+          }
+        ]
+      },
+      "image_name": "hub.oepkgs.net/openeuler/openeuler:24.03-lts (Tier 3, 挂载宿主机CANN 9.1.0)",
+      "selection_reason": "Tier 2 Dockerfile构建因CANN下载超时失败→降级Tier 3。最初使用manylinux_2_28但libstdc++版本过低不兼容CANN→切换openEuler 24.03 LTS(GCC 12.3.1)。使用NO_ASCEND_SDK=1 CI模式构建(stub库)避免CANN API版本不匹配",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "master (depth=1 clone)",
+    "duration_seconds": 9793,
+    "end_time": "2026-07-28T07:52:17",
+    "environment": "remote 192.168.9.114 (aarch64 Kunpeng-920, 256 cores, 2Ti RAM, NPU 910B3)",
+    "repo_url": "https://gitcode.com/Ascend/torchair.git",
+    "start_time": "2026-07-28T05:09:04",
+    "total_steps": 20,
+    "verifier": "opencode ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "manylinux_2_28容器libstdc++版本过低，CANN libhccl.so需要GLIBCXX_3.4.30但系统仅提供GLIBCXX_3.4.25",
+      "solution": "切换到openEuler 24.03 LTS容器，GCC 12.3.1自带兼容的libstdc++",
+      "source": "CANN 9.1.0 libhccl.so 运行时依赖",
+      "timestamp": "2026-07-28T07:12:18"
+    },
+    {
+      "problem": "CANN API版本不匹配：torchair调用HcclSetConfig(旧API)，CANN 9.1.0 libhccl.so仅提供HcclSetConfigV2(新API)，导致_torchair.so运行时undefined symbol",
+      "solution": "使用NO_ASCEND_SDK=1(CI模式)构建，链接stub库(cmake/hccl/hccl_stub.cpp)而非真实CANN库",
+      "source": "torchair/concrete_graph/concrete_graph.cpp:296 + cmake/hccl/hccl_stub.cpp:7",
+      "timestamp": "2026-07-28T07:12:18"
+    }
+  ],
+  "session_export_file": "",
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "bailian/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

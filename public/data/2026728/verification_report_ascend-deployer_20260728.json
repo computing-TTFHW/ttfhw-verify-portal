@@ -1,0 +1,561 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.rst 使用样例 + 宿主机",
+      "value": "aarch64 (README 示例为 x86_64，但工具为纯 Python，宿主机为 aarch64)"
+    },
+    "build_commands": {
+      "source": "README.rst + setup.py",
+      "value": "pip install . (构建并安装 Python 包)；或 python3 setup.py bdist_wheel 构建 wheel"
+    },
+    "dependencies": {
+      "source": "setup.py + test/requirements.txt + 源码 import 分析",
+      "value": [
+        "python3 \u003e= 3.6 (容器为 3.11.6)",
+        "pip (构建工具)",
+        "pytest (UT 框架, test/requirements.txt)",
+        "pytest-html (UT 报告, test/requirements.txt)",
+        "coverage (覆盖率, test/requirements.txt)",
+        "pyfakefs (UT mock 文件系统, test/requirements.txt)",
+        "pyyaml (UT 依赖, test/requirements.txt)",
+        "ansible-core (运行时依赖，源码 import ansible 模块，测试中 mock)",
+        "setuptools (setup.py 构建)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "ascend_deployer/tools/nexus/Dockerfile (Nexus 服务镜像，非主程序)",
+      "value": "该 Dockerfile 构建 Nexus Repository Manager，FROM openeuler-20.03-lts-sp3，安装 java-1.8.0-openjdk-headless；与 ascend-deployer 主程序构建无关，不作为依赖来源"
+    },
+    "recommended_image": {
+      "source": "ascend_deployer/tools/nexus/Dockerfile FROM + 宿主机 OS",
+      "value": "openEuler 24.03 LTS (Tier 3，nexus Dockerfile 使用 openEuler，宿主机为 openEuler aarch64)"
+    },
+    "sample_commands": {
+      "source": "setup.py entry_points + README.rst",
+      "value": "ascend-deployer --help (CLI 冒烟测试，验证包可正常导入与启动)"
+    },
+    "special_dependencies": {
+      "source": "test/requirements.txt",
+      "value": [
+        "pytest",
+        "pytest-html",
+        "coverage",
+        "pyfakefs",
+        "pyyaml",
+        "ansible-core"
+      ]
+    },
+    "ut_commands": {
+      "source": "test/run_dt_tests.sh",
+      "value": "cd /workspace \u0026\u0026 PYTHONPATH=/workspace python3 -m pytest test --junitxml=./final.xml"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "test/test_ascend_deployer.py 第2行 from ascend_deployer.ascend_deployer import CLI，但仓库中不存在 ascend_deployer/ascend_deployer.py。CLI 类实际定义在 ascend_deployer/start_deploy.py:76 和 ascend_deployer/ascend_download.py:27。该测试模块无法收集，导致整个测试套件收集中断。",
+      "source": "test/test_ascend_deployer.py:2 + ascend_deployer/start_deploy.py:76",
+      "time": "2026-07-28T06:43:30",
+      "title": "test_ascend_deployer.py 引用不存在的模块 ascend_deployer.ascend_deployer"
+    },
+    {
+      "body": "test/downloader/test_utils.py 第8行 from ascend_deployer.utils import CONFIG_INST，但 ascend_deployer/utils.py 中不存在 CONFIG_INST（grep 确认）。该测试模块无法收集。",
+      "source": "test/downloader/test_utils.py:8 + ascend_deployer/utils.py",
+      "time": "2026-07-28T06:43:30",
+      "title": "test/downloader/test_utils.py 引用不存在的符号 CONFIG_INST"
+    },
+    {
+      "body": "test/test_utils.py 中 6 个测试用例期望 get_validated_env 在环境变量未设置时 raise ValueError，但实际实现已改为返回 None（utils.py: if value is None: return None）。测试未随实现更新，导致 6 个用例失败。",
+      "source": "test/test_utils.py + ascend_deployer/utils.py get_validated_env",
+      "time": "2026-07-28T06:43:30",
+      "title": "get_validated_env 测试与实现不匹配"
+    },
+    {
+      "body": "test/module_utils_test/test_inventory_file.py 第2行 from ctypes import oledll，oledll 仅在 Windows 平台存在，Linux/aarch64 环境无法导入。仓库未对平台做条件跳过处理。",
+      "source": "test/module_utils_test/test_inventory_file.py:2",
+      "time": "2026-07-28T06:43:30",
+      "title": "test_inventory_file.py 使用 Windows 专有 ctypes.oledll"
+    },
+    {
+      "body": "官方测试脚本 run_dt_tests.sh 仅设置 PYTHONPATH=$PROJECT_DIR(仓库根)，未包含 test/ 目录。导致 test/library/test_scp.py 导入 library_test 失败。需补充 PYTHONPATH=$PROJECT_DIR:$PROJECT_DIR/test。",
+      "source": "test/run_dt_tests.sh",
+      "time": "2026-07-28T06:43:30",
+      "title": "run_dt_tests.sh 的 PYTHONPATH 缺少 test/ 目录"
+    },
+    {
+      "body": "setup.py 中 setuptools.setup() 未声明 install_requires，pip install . 不会自动安装运行时依赖(如 ansible-core、pyyaml)。运行时依赖仅在 test/requirements.txt 和 downloader/python_requirements/ 中分散维护。",
+      "source": "setup.py",
+      "time": "2026-07-28T06:43:30",
+      "title": "setup.py 未声明 install_requires 运行时依赖"
+    },
+    {
+      "body": "base_test.py 的 BaseTest.replace_ansible_module 使用 replace_module_tag 装饰器全局替换 sys.modules(仅执行一次)，而 BaseLibraryTest.tearDownClass 调用 patch.stopall() 全局停止所有 patch。跨测试类运行时先执行的类 tearDownClass 会破坏后续类依赖，导致未隔离运行时 59 个 errors。使用 pytest --forked 进程隔离后降至 8 个 errors。",
+      "source": "test/library_test/base_test.py",
+      "time": "2026-07-28T06:43:30",
+      "title": "测试框架存在跨测试类隔离问题"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "清理同名残留容器 ascend-deployer-ttfhw",
+      "command": "ssh root@192.168.9.114 \"docker rm -f ascend-deployer-ttfhw; rm -rf /tmp/ascend-deployer-verify\"",
+      "details": {
+        "container": "ascend-deployer-ttfhw"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "容器不存在或已删除",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_cleanup",
+      "success": true,
+      "timestamp": "2026-07-28T06:26:45"
+    },
+    {
+      "action": "在远程机器克隆 ascend-deployer 仓库 (master 分支, depth=1)",
+      "command": "ssh root@192.168.9.114 \"cd /tmp/ascend-deployer-verify \u0026\u0026 git clone --depth=1 -b master https://gitcode.com/Ascend/ascend-deployer.git\"",
+      "details": {
+        "branch": "master",
+        "commit": "ede7c9681523a0a9df6fbdc348c594c4b229444d",
+        "commit_date": "2025-07-12",
+        "path": "/tmp/ascend-deployer-verify/ascend-deployer",
+        "repo_url": "https://gitcode.com/Ascend/ascend-deployer.git"
+      },
+      "duration_seconds": 8,
+      "error": "",
+      "output": "Cloning into ascend-deployer... commit ede7c968",
+      "result": "成功",
+      "returncode": 0,
+      "step": "git_clone",
+      "success": true,
+      "timestamp": "2026-07-28T06:27:00"
+    },
+    {
+      "action": "阅读 README.rst/README.en.rst/setup.py/test 目录，提取构建/测试/样例信息；逐一查看 README 中的链接",
+      "command": "cat README.rst README.en.rst setup.py test/run_dt_tests.sh test/requirements.txt",
+      "details": {
+        "entry_points": [
+          "ascend-download",
+          "ascend-deployer",
+          "large-scale-deployer"
+        ],
+        "install_method": "pip3 install ascend-deployer==\u003cversion\u003e 或源码 pip install .",
+        "npu_note": "工具用途为安装 NPU 软件，但代码与单元测试使用 mock/pyfakefs，构建与 UT 不需要 NPU 硬件",
+        "npu_required": false,
+        "project_type": "Python pip 包 (离线安装工具，安装 Ascend 驱动/固件/CANN/MindCluster)",
+        "readme_links_checked": [
+          "https://gitee.com/ascend/ascend-deployer/releases (正式release版本，与验证无关)",
+          "https://www.hiascend.com/forum/thread-0241161684752207015-1-1.html (社区信息总览，与验证无关)",
+          "https://www.hiascend.com/document/detail/zh/mindx-dl/600/ascenddeployer/ascenddeployer/deployer_0001.html (用户指南外链，与编译/UT 无关)",
+          "https://www.hiascend.com/hardware/compatibility (兼容性查询，与验证无关)",
+          "https://pypi.org/project/ascend-deployer/#history (PyPI 发布历史，确认安装方式 pip3 install)"
+        ],
+        "test_runner": "test/run_dt_tests.sh (pytest + coverage)"
+      },
+      "duration_seconds": 20,
+      "error": "",
+      "output": "README 说明 pip3 install 安装；test/run_dt_tests.sh 用 pytest 执行测试；setup.py 无 install_requires；entry_points 提供 ascend-deployer/ascend-download CLI",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-07-28T06:28:00"
+    },
+    {
+      "action": "分析仓库内 Dockerfile，判断 Tier",
+      "command": "find . -name 'Dockerfile*' -not -path './.git/*'",
+      "details": {
+        "dockerfile_found": "ascend_deployer/tools/nexus/Dockerfile",
+        "dockerfile_purpose": "构建 Sonatype Nexus Repository Manager 镜像，非 ascend-deployer 主程序构建镜像",
+        "from_image": "openeuler-20.03-lts-sp3 (纯基础 OS 镜像)",
+        "tier1_signal": false,
+        "tier2_applicable": false,
+        "tier2_note": "该 Dockerfile 位于 tools/nexus/ 子目录(非 root/docker/.devcontainer)，且构建的是 Nexus 服务而非本仓库交付物，需要预下载 nexus tarball，不适合用于构建主程序",
+        "tier3_os": "openEuler 24.03 LTS"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "仅找到 ascend_deployer/tools/nexus/Dockerfile (FROM openeuler-20.03-lts-sp3)，非主程序构建镜像，判定 Tier 3",
+      "result": "Tier 3 (基础 OS 从零安装)",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-07-28T06:28:30"
+    },
+    {
+      "action": "检查仓库 pre-commit 与 lint-runner 配置",
+      "command": "find . -name '.pre-commit-config*' -o -name '*lint-runner*' -o -name '.lintrunner*'",
+      "details": {
+        "lint_runner_config": "未找到 lint-runner 配置",
+        "pre_commit_config": "不存在 .pre-commit-config.yaml"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "未找到 .pre-commit-config.yaml，未找到 lint-runner 配置",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-07-28T06:28:40"
+    },
+    {
+      "action": "检查 .devcontainer 目录",
+      "command": "find . -name '.devcontainer*' -not -path './.git/*'",
+      "details": {
+        "devcontainer_dir": "不存在 .devcontainer/"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "未找到 .devcontainer 目录",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-07-28T06:28:45"
+    },
+    {
+      "action": "根据探测结果选择镜像策略：Tier 3 + openEuler 24.03 LTS",
+      "command": "",
+      "details": {
+        "selection_reason": "无业务预构建镜像(Tier1 未命中)；nexus Dockerfile 非主程序构建(Tier2 不适用)；回退 Tier 3。仓库 Dockerfile 使用 openEuler，宿主机为 openEuler aarch64，选择 openEuler 24.03 LTS 从零安装",
+        "tier": 3
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "",
+      "result": "openEuler 24.03 LTS (Tier 3)",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-07-28T06:28:50"
+    },
+    {
+      "action": "拉取 openEuler 24.03 LTS 镜像并启动容器 ascend-deployer-ttfhw，挂载仓库到 /workspace",
+      "command": "docker run -d --name ascend-deployer-ttfhw -v /tmp/ascend-deployer-verify/ascend-deployer:/workspace -w /workspace hub.oepkgs.net/openeuler/openeuler:24.03-lts sleep infinity",
+      "details": {
+        "container_arch": "aarch64",
+        "container_cores": 256,
+        "container_name": "ascend-deployer-ttfhw",
+        "container_os": "openEuler 24.03 LTS",
+        "image": "hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+        "mount": "/tmp/ascend-deployer-verify/ascend-deployer:/workspace",
+        "python_version": "Python 3.11.6"
+      },
+      "duration_seconds": 12,
+      "error": "",
+      "output": "容器启动成功，OS=openEuler 24.03 LTS, arch=aarch64, cores=256, python=3.11.6",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-07-28T06:29:00"
+    },
+    {
+      "action": "安装系统工具链与测试依赖：dnf install python3-pip git gcc gcc-c++ make；pip install pytest pytest-html coverage pyfakefs pyyaml ansible-core",
+      "command": "dnf install -y python3-pip git gcc gcc-c++ make \u0026\u0026 pip install pytest pytest-html coverage pyfakefs pyyaml ansible-core",
+      "details": {
+        "pip_packages": [
+          "pytest==9.1.1",
+          "pytest-html==4.2.0",
+          "coverage==7.15.2",
+          "pyfakefs==6.2.0",
+          "PyYAML==6.0.3",
+          "ansible-core==2.19.11"
+        ],
+        "source": "openEuler dnf + PyPI",
+        "system_packages": [
+          "python3-pip",
+          "git",
+          "gcc",
+          "gcc-c++",
+          "make"
+        ]
+      },
+      "duration_seconds": 280,
+      "error": "",
+      "output": "pip 23.3.1 安装完成；pytest 9.1.1, pytest-html 4.2.0, coverage 7.15.2, pyfakefs 6.2.0, PyYAML 6.0.3, ansible-core 2.19.11 均已安装",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-28T06:37:12"
+    },
+    {
+      "action": "执行构建：pip install . (构建 wheel 并安装)",
+      "command": "cd /workspace \u0026\u0026 python3 -m pip install .",
+      "details": {
+        "build_command": "pip install .",
+        "concurrency": 51,
+        "concurrency_ratio": "20% (256 cores * 20% = 51, Python 包构建无并行编译)",
+        "version": "0.0.3",
+        "wheel": "ascend_deployer-0.0.3-py3-none-any.whl",
+        "wheel_size": "667698 bytes (~652 KB)"
+      },
+      "duration_seconds": 7,
+      "error": "",
+      "output": "Successfully built ascend-deployer; Created wheel ascend_deployer-0.0.3-py3-none-any.whl; Successfully installed ascend-deployer-0.0.3",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-07-28T06:37:49"
+    },
+    {
+      "action": "执行单元测试：pytest test/ (官方 run_dt_tests.sh 因 3 个测试模块损坏导致收集中断，改用 --continue-on-collection-errors + --forked 进程隔离)",
+      "command": "cd /workspace \u0026\u0026 PYTHONPATH=/workspace:/workspace/test python3 -m pytest test/ --continue-on-collection-errors --forked",
+      "details": {
+        "collection_errors": [
+          "test/test_ascend_deployer.py: import ascend_deployer.ascend_deployer (模块不存在，CLI 实际定义在 start_deploy.py)",
+          "test/downloader/test_utils.py: import CONFIG_INST from ascend_deployer.utils (符号不存在)",
+          "test/module_utils_test/test_inventory_file.py: from ctypes import oledll (Windows 专有，Linux 不可用)"
+        ],
+        "errors": 8,
+        "failed": 19,
+        "genuine_failures": "test_utils.py 6 个 (get_validated_env 实现已改为返回 None，测试仍期望 raise ValueError); test_common_utils/common_info/cann_checks/localhost_check/mcu/trans_excel 共 13 个断言失败",
+        "isolation_note": "官方脚本 PYTHONPATH 仅含 /workspace 导致 library_test 不可导入；mock 框架 BaseTest.replace_ansible_module 全局替换 sys.modules + tearDownClass patch.stopall 导致跨类隔离问题，未隔离时 59 errors，--forked 隔离后降至 8 errors",
+        "passed": 97,
+        "test_framework": "pytest 9.1.1 + pytest-forked 1.6.0",
+        "total": 124
+      },
+      "duration_seconds": 32,
+      "error": "partial_success: 19 failed (含 get_validated_env 测试与实现不匹配), 8 errors (setUpClass), 3 collection errors (损坏的测试模块)",
+      "output": "19 failed, 97 passed, 2 warnings, 8 errors in 31.65s",
+      "result": "partial_success (97 passed, 19 failed, 8 errors)",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-07-28T06:42:26"
+    },
+    {
+      "action": "执行 CLI 冒烟测试：ascend-deployer --help 与 ascend-download --help",
+      "command": "ascend-deployer --help; ascend-download --help",
+      "details": {
+        "entry_points_tested": [
+          "ascend-deployer",
+          "ascend-download"
+        ],
+        "examples_run": 2
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "ascend-deployer --help 输出完整选项列表(--install/--check/--clean/--install-scene 等); ascend-download --help 输出支持的 OS 列表; 两者均 exit 0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-07-28T06:43:30"
+    },
+    {
+      "action": "停止并删除容器 ascend-deployer-ttfhw，清理 /tmp/ascend-deployer-verify",
+      "command": "ssh root@192.168.9.114 \"docker rm -f ascend-deployer-ttfhw; rm -rf /tmp/ascend-deployer-verify\"",
+      "details": {
+        "container": "ascend-deployer-ttfhw"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-07-28T06:43:30"
+    },
+    {
+      "action": "生成验证报告",
+      "command": "",
+      "details": {
+        "output_file": "verification_report_ascend-deployer_20260728.json"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-07-28T06:43:30"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "ascend_deployer wheel",
+          "path": "ascend_deployer-0.0.3-py3-none-any.whl",
+          "size": "667698 bytes",
+          "type": "wheel"
+        }
+      ],
+      "compiler": "无 (Python 纯包，无 C 编译)",
+      "concurrency": 51,
+      "concurrency_ratio": "20% (256*0.2=51, Python 包构建无并行编译)",
+      "duration_seconds": 7,
+      "notes": "pip install . 构建并安装 wheel，setup.py 无 install_requires，运行时依赖已单独安装",
+      "status": "成功"
+    },
+    "devcontainer": {
+      "config_dir": null,
+      "config_files": [],
+      "enabled": false,
+      "original_base_image": "无 .devcontainer",
+      "summary": "仓库未配置 .devcontainer，使用 openEuler 24.03 LTS 基础镜像从零安装",
+      "used_image": "hub.oepkgs.net/openeuler/openeuler:24.03-lts (Tier 3)"
+    },
+    "sample": {
+      "duration_seconds": 5,
+      "results": [
+        {
+          "execution_status": "成功",
+          "execution_time": "3秒",
+          "output_summary": "CLI 正常启动，输出完整用法说明，含 --install/--check/--clean/--install-scene/--upgrade 等选项，exit 0",
+          "sample_name": "ascend-deployer --help"
+        },
+        {
+          "execution_status": "成功",
+          "execution_time": "2秒",
+          "output_summary": "CLI 正常启动，输出支持的 OS 列表(BCLinux/CentOS/EulerOS/openEuler/Ubuntu 等)，并完成下载配置完整性校验，exit 0",
+          "sample_name": "ascend-download --help"
+        }
+      ],
+      "status": "成功"
+    },
+    "static_analysis": {
+      "enabled": false,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": null,
+        "configured": false,
+        "duration_seconds": 0,
+        "status": "未配置"
+      },
+      "summary": "仓库未配置静态检查工具：根目录无 .pre-commit-config.yaml，未找到 lint-runner 配置"
+    },
+    "ut": {
+      "duration_seconds": 32,
+      "failed": 19,
+      "failures": [
+        {
+          "error": "get_validated_env 实现已改为 env 未设置时返回 None，但测试仍期望 raise ValueError(\"Environment variable ... is not set\")",
+          "test": "test/test_utils.py::TestGetValidatedEnv (6项)"
+        },
+        {
+          "error": "断言失败",
+          "test": "test/module_utils_test/test_common_utils.py (3项)"
+        },
+        {
+          "error": "断言失败",
+          "test": "test/module_utils_test/test_common_info.py::test_get_profile_model"
+        },
+        {
+          "error": "断言失败",
+          "test": "test/module_utils_test/test_cann_checks.py (2项)"
+        },
+        {
+          "error": "断言失败",
+          "test": "test/module_utils_test/test_localhost_check.py (2项)"
+        },
+        {
+          "error": "断言失败",
+          "test": "test/library_test/test_mcu/test_process_mcu.py (2项)"
+        },
+        {
+          "error": "断言失败",
+          "test": "test/library_test/test_trans_excel_to_inventory (4项)"
+        }
+      ],
+      "passed": 97,
+      "python": {
+        "failed": 19,
+        "passed": 97,
+        "status": "partial_success",
+        "total": 124
+      },
+      "skipped": 0,
+      "status": "partial_success",
+      "total": 124
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "ascend-deployer-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti (共享宿主机)",
+      "os": "openEuler 24.03 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "aarch64 (256 cores, openEuler 4.19.90)",
+      "disk": "31G available",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": false
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_dockerfile": "nexus Dockerfile 与主程序构建无关，依赖来自 test/requirements.txt 与源码 import 分析",
+        "mappings": [
+          {
+            "original": "pytest/pytest-html/coverage/pyfakefs/pyyaml",
+            "source": "test/requirements.txt",
+            "target": "pip install pytest pytest-html coverage pyfakefs pyyaml"
+          },
+          {
+            "original": "ansible-core",
+            "source": "源码 import ansible 模块",
+            "target": "pip install ansible-core"
+          }
+        ]
+      },
+      "image_name": "hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+      "selection_reason": "使用基础 OS 镜像 openEuler 24.03 LTS 从零安装（Tier 3）。原因：无业务预构建镜像(Tier1 未命中)；nexus Dockerfile 非主程序构建(Tier2 不适用)；仓库 nexus Dockerfile 与宿主机均使用 openEuler",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "ede7c9681523a0a9df6fbdc348c594c4b229444d",
+    "duration_seconds": 1005,
+    "end_time": "2026-07-28T06:43:30",
+    "environment": "远程机器 192.168.9.114 (aarch64, openEuler, 256 cores, 2Ti RAM) 容器 ascend-deployer-ttfhw",
+    "repo_url": "https://gitcode.com/Ascend/ascend-deployer.git",
+    "start_time": "2026-07-28T06:26:45",
+    "total_steps": 14,
+    "verifier": "ttfhw-verify-smart skill / opencode"
+  },
+  "problems_encountered": [
+    {
+      "problem": "官方测试脚本 run_dt_tests.sh 因 3 个测试模块损坏(test_ascend_deployer/test_utils CONFIG_INST/oledll)导致 pytest 收集中断，无法运行任何测试",
+      "solution": "改用 pytest --continue-on-collection-errors 跳过损坏模块继续收集运行可测用例",
+      "source": "test/run_dt_tests.sh + pytest 收集错误",
+      "timestamp": "2026-07-28T06:43:30"
+    },
+    {
+      "problem": "测试套件全量运行时出现 59 个 errors，经排查为 mock 框架(BaseTest.replace_ansible_module 全局 sys.modules 替换 + tearDownClass patch.stopall)导致跨测试类隔离问题",
+      "solution": "安装 pytest-forked，使用 pytest --forked 对每个测试进程隔离运行，errors 从 59 降至 8，得到真实结果 97 passed/19 failed",
+      "source": "test/library_test/base_test.py replace_module_tag + patch.stopall",
+      "timestamp": "2026-07-28T06:43:30"
+    },
+    {
+      "problem": "pip install ansible-core 通过 SSH 执行时 SSH 会话超时(\u003e300s)，但容器内安装实际已完成",
+      "solution": "通过 docker exec 执行 pip list 验证 ansible-core 2.19.11 等依赖均已安装成功，继续后续步骤",
+      "source": "SSH 会话超时 vs 容器内进程完成",
+      "timestamp": "2026-07-28T06:43:30"
+    }
+  ],
+  "session_export_file": "",
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "bailian/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

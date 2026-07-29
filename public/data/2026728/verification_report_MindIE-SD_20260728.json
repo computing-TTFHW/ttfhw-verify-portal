@@ -1,0 +1,737 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "宿主机 uname + npu-smi",
+      "value": "aarch64 (Kunpeng-920), 8x Ascend 910B3 NPU"
+    },
+    "build_commands": {
+      "source": "docs/zh/installation.md + setup.py + docker/README.md",
+      "value": "python setup.py build_py (构建 AscendC 算子 + PyTorch 插件) 或 python setup.py bdist_wheel"
+    },
+    "dependencies": {
+      "source": "requirements.txt + installation.md + Dockerfile",
+      "value": [
+        "Python \u003e=3.10 (镜像: 3.11.15)",
+        "torch==2.9.0 (从华为OBS安装)",
+        "torch_npu==2.9.0 (从华为OBS安装)",
+        "CANN 9.0.0+ (镜像预装 9.0.0)",
+        "triton\u003e=3.5.0, triton-ascend==3.2.1 (从 triton-ascend.osinfra.cn 安装)",
+        "einops, numpy\u003e=1.26.4, safetensors, strenum, zmq, decorator, scipy, attrs (pip)",
+        "gcc, cmake, make (镜像已含)",
+        "测试: coverage\u003e=7.6.10, pytest\u003e=8.3.2, timm\u003e=0.9.12, packaging"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "docker/Dockerfile_910b_aarch64.ubuntu RUN 指令",
+      "value": [
+        {
+          "original": "apt-get install gcc-9 g++-9 gcc-13 g++-13 make cmake",
+          "target_equivalent": "dnf install gcc gcc-c++ make cmake (openEuler 原生，镜像已含 gcc 12.3.1 cmake 3.27.9)"
+        },
+        {
+          "original": "wget Python-3.11.4.tar.xz \u0026\u0026 ./configure \u0026\u0026 make -j",
+          "target_equivalent": "镜像已预装 Python 3.11.15，无需编译"
+        },
+        {
+          "original": "wget CANN 9.0.0 .run \u0026\u0026 --install",
+          "target_equivalent": "镜像已预装 CANN 9.0.0，无需安装"
+        },
+        {
+          "original": "pip install torch-2.9.0-cp311 wheel + torch_npu",
+          "target_equivalent": "从华为OBS下载 torch-2.9.0-cp311 wheel 和 torch_npu-2.9.0.post1 wheel 安装"
+        },
+        {
+          "original": "pip install -r requirements.txt (pyinstaller, numpy, pandas, etc.)",
+          "target_equivalent": "pip install -r requirements.txt (从仓库安装)"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": ".devcontainer/cpu/devcontainer.json image 字段 + docker/Dockerfile_910b_aarch64.ubuntu FROM",
+      "value": "devcontainer.json 指定 swr.cn-north-4.myhuaweicloud.com/inference/ascend_mindie_ubuntu_x86:20260305_ubuntu24_3.0.0_cann8.5.1_torch2.9.0_py311 (x86)；docker/Dockerfile_910b_aarch64.ubuntu FROM ubuntu:24.04 (aarch64)；实际因 CANN/driver 兼容性使用 CANN 9.0.0 openEuler 镜像"
+    },
+    "sample_commands": {
+      "source": "examples/dummy_run/wan_infer.py + docs/zh/quick_start.md",
+      "value": "python examples/dummy_run/wan_infer.py --device_id 1 (使用 dummy 权重，无需下载模型)"
+    },
+    "special_dependencies": {
+      "source": "requirements.txt + installation.md",
+      "value": [
+        "triton-ascend==3.2.1 (仅从 https://triton-ascend.osinfra.cn/pypi/simple 提供)",
+        "CANN Toolkit 9.0.0+ + 910b ops 算子包",
+        "Ascend NPU driver (宿主机 25.5.0)"
+      ]
+    },
+    "ut_commands": {
+      "source": "docs/zh/developer_guide/test.md",
+      "value": "bash tests/run_UT_test.sh (CPU测试) 或 bash tests/run_test.sh --all (全量含NPU测试)"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "devcontainer.json 的 image 字段指向 CANN 8.5.1 镜像，但当前宿主机 driver 25.5.0 与 CANN 8.5.1 不兼容（NPU 初始化失败）。文档未说明最低 driver 版本要求或 CANN/driver 兼容性矩阵。",
+      "source": ".devcontainer/cpu/devcontainer.json + docs/zh/installation.md",
+      "time": "2026-07-28T04:30:00",
+      "title": "devcontainer.json 指定的镜像 CANN 版本与最新 driver 不兼容"
+    },
+    {
+      "body": "installation.md 要求 CANN 9.0.1，但 docker/Dockerfile_910b_aarch64.ubuntu 安装 CANN 9.0.0，devcontainer 镜像为 CANN 8.5.1。三处版本不一致，开发者可能困惑。",
+      "source": "docs/zh/installation.md + docker/Dockerfile_910b_aarch64.ubuntu + .devcontainer/cpu/devcontainer.json",
+      "time": "2026-07-28T04:30:00",
+      "title": "installation.md 中 CANN 版本要求与 Dockerfile 不一致"
+    },
+    {
+      "body": "单独下载的 torch wheel 与 torch_npu wheel 存在 ABI 不匹配。文档未说明 torch 和 torch_npu 必须来自同一构建包 (pytorch_v2.9.0-7.3.0_py311.tar.gz)，开发者可能分别下载导致 import 失败。",
+      "source": "docs/zh/installation.md + docker/Dockerfile_910b_aarch64.ubuntu",
+      "time": "2026-07-28T04:30:00",
+      "title": "torch 与 torch_npu 需来自同一 Daily 构建包"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "阅读 README.md，提取安装指南、构建命令、测试入口、样例信息",
+      "command": "",
+      "details": {
+        "file": "README.md",
+        "sections": [
+          "安装指南",
+          "快速入门",
+          "开发文档",
+          "生态支持"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "README 指向 docs/zh/installation.md (安装), docs/zh/quick_start.md (样例), docs/zh/developer_guide/test.md (测试)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-07-28T03:24:09"
+    },
+    {
+      "action": "逐一查看 README 链接: installation.md, architecture.md, quick_start.md, contribution_guide.md, test.md",
+      "command": "",
+      "details": {
+        "links_checked": 5,
+        "relevant": [
+          "installation.md(安装依赖)",
+          "quick_start.md(样例)",
+          "test.md(UT命令)"
+        ]
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "installation.md: pip install mindiesd 或源码 python setup.py bdist_wheel; test.md: run_UT_test.sh(CPU) / run_test.sh --all; quick_start.md: Wan2.1 推理样例(需下载模型权重)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-07-28T03:24:09"
+    },
+    {
+      "action": "读取 Dockerfile 和 devcontainer.json，判断镜像 Tier",
+      "command": "",
+      "details": {
+        "devcontainer_image": "swr.cn-north-4.myhuaweicloud.com/inference/ascend_mindie_ubuntu_x86:20260305_ubuntu24_3.0.0_cann8.5.1_torch2.9.0_py311",
+        "dockerfiles": [
+          "docker/Dockerfile_910b_aarch64.ubuntu (FROM ubuntu:24.04)",
+          "docker/omni/Dockerfile.a2.ubuntu (FROM quay.io/ascend/vllm-omni:v0.20.0)",
+          "docker/omni/Dockerfile.a3.ubuntu (FROM quay.io/ascend/vllm-omni:v0.20.0-a3)"
+        ],
+        "npu_keywords": [
+          "CANN",
+          "Ascend",
+          "torch_npu",
+          "910B",
+          "davinci"
+        ],
+        "npu_required": true,
+        "tier1_signals": [
+          "devcontainer.json image 字段",
+          "quay.io Dockerfile FROM"
+        ]
+      },
+      "duration_seconds": 8,
+      "error": "",
+      "output": "检测到 Tier 1 信号: devcontainer.json image 字段 + quay.io Dockerfile FROM。但 devcontainer 镜像为 x86 版本，aarch64 变体的 CANN 8.5.1 与宿主机 driver 25.5.0 不兼容。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-07-28T03:24:09"
+    },
+    {
+      "action": "Tier 1 尝试: 使用 devcontainer aarch64 变体镜像",
+      "command": "docker run ... ascend_mindie_ubuntu_aarch64:20260305...",
+      "details": {
+        "error_code": "507033",
+        "tier1_image": "swr.cn-north-4.myhuaweicloud.com/inference/ascend_mindie_ubuntu_aarch64:20260305_ubuntu24_3.0.0_cann8.5.1_torch2.9.0_py311"
+      },
+      "duration_seconds": 120,
+      "error": "CANN 8.5.1 与宿主机 driver 25.5.0 不兼容",
+      "output": "torch.npu.set_device(0) -\u003e RuntimeError: NPU function error: error code is 507033. rtGetDevMsg execution failed, context is null pointer.",
+      "result": "失败 - CANN 8.5.1 与 driver 25.5.0 不兼容",
+      "returncode": 1,
+      "step": "image_selection",
+      "success": false,
+      "timestamp": "2026-07-28T03:24:09"
+    },
+    {
+      "action": "降级到 Tier 3: 使用 CANN 9.0.0 openEuler 镜像 (宿主机已有)",
+      "command": "docker run -d --name MindIE-SD-ttfhw --privileged ... cann:9.0.0-910b-openeuler24.03-py3.11",
+      "details": {
+        "reason": "CANN 9.0.0 兼容 driver 25.5.0, Python 3.11.15 满足 \u003e=3.10 要求",
+        "tier3_image": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "容器启动成功, CANN 9.0.0, Python 3.11.15, gcc 12.3.1, cmake 3.27.9",
+      "result": "成功",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-07-28T03:24:09"
+    },
+    {
+      "action": "启动容器并验证 NPU 可用性",
+      "command": "docker exec MindIE-SD-ttfhw python3 -c \"import torch; import torch_npu; torch.npu.set_device(1); x=torch.randn(2,3).npu(); print(x+x)\"",
+      "details": {
+        "container_name": "MindIE-SD-ttfhw",
+        "npu_test": "torch.npu.set_device(1) + tensor compute OK"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "NPU_OK npu:1, Compute_OK",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-07-28T03:24:09"
+    },
+    {
+      "action": "从华为OBS安装 torch 2.9.0 + torch_npu 2.9.0.post1",
+      "command": "wget torch-2.9.0-cp311 wheel + pytorch_v2.9.0-7.3.0 tar.gz \u0026\u0026 pip install",
+      "details": {
+        "source": "华为OBS pytorch-package",
+        "torch_npu_version": "2.9.0.post1",
+        "torch_version": "2.9.0+cpu"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "torch-2.9.0+cpu, torch_npu-2.9.0.post1 安装成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-28T03:24:09"
+    },
+    {
+      "action": "检查 .pre-commit-config.yaml 配置",
+      "command": "cat .pre-commit-config.yaml",
+      "details": {
+        "config_file": ".pre-commit-config.yaml",
+        "hooks": [
+          "trailing-whitespace",
+          "end-of-file-fixer",
+          "check-yaml",
+          "check-added-large-files",
+          "check-merge-conflict",
+          "detect-private-key",
+          "check-json",
+          "ruff-check",
+          "ruff-format",
+          "codespell",
+          "pylint",
+          "bandit",
+          "typos",
+          "markdownlint(manual)",
+          "clang-format",
+          "gitleaks-offline-scan(local)"
+        ],
+        "hooks_count": 16
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "检测到 16 个 pre-commit hooks",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-07-28T04:30:00"
+    },
+    {
+      "action": "在远程容器内执行 pre-commit run --all-files",
+      "command": "pre-commit run --all-files",
+      "details": {
+        "failed": 4,
+        "failures": [
+          "ruff-check: F841 unused vars, E402 import order, F401 unused imports",
+          "pylint: R1723, R1730, C0412, W1203 etc.",
+          "typos: cacl-\u003ecalc, bood-\u003eboot, postion-\u003eposition",
+          "gitleaks: executable ./gitleaks not found"
+        ],
+        "passed": 11,
+        "skipped": 0,
+        "total_hooks": 15
+      },
+      "duration_seconds": 600,
+      "error": "4 hooks failed: ruff-check (unused variables/imports), pylint (code style), typos (3 spelling errors), gitleaks (binary not found)",
+      "output": "Passed: trailing-whitespace, end-of-file-fixer, check-yaml, check-added-large-files, check-merge-conflict, detect-private-key, check-json, ruff-format, codespell, bandit, clang-format. Failed: ruff-check, pylint, typos, gitleaks-offline-scan",
+      "result": "部分通过 (11 passed, 4 failed)",
+      "returncode": 1,
+      "step": "static_analysis_execution",
+      "success": false,
+      "timestamp": "2026-07-28T04:30:00"
+    },
+    {
+      "action": "检查 .devcontainer 目录及配置文件",
+      "command": "ls -la .devcontainer/ \u0026\u0026 cat .devcontainer/cpu/devcontainer.json",
+      "details": {
+        "build_job_num_env": "BUILD_JOB_NUM=2",
+        "config_dir": ".devcontainer",
+        "files": [
+          "README.md",
+          "cpu/devcontainer.json",
+          "npu/.gitkeeper"
+        ],
+        "image_field": "swr.cn-north-4.myhuaweicloud.com/inference/ascend_mindie_ubuntu_x86:20260305_ubuntu24_3.0.0_cann8.5.1_torch2.9.0_py311",
+        "original_base_image": "swr.cn-north-4.myhuaweicloud.com/inference/ascend_mindie_ubuntu_x86:20260305_ubuntu24_3.0.0_cann8.5.1_torch2.9.0_py311",
+        "tier1_signal": true
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": ".devcontainer/ 包含 cpu/devcontainer.json (指定预构建镜像) 和 npu/ (空目录)",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-07-28T04:30:00"
+    },
+    {
+      "action": "安装 MindIE-SD requirements.txt (triton-ascend, einops, numpy, safetensors 等)",
+      "command": "pip3 install scipy==1.13.1 \u0026\u0026 pip3 install triton-ascend==3.2.1 --no-deps \u0026\u0026 pip3 install einops strenum zmq pybind11 pytest pytest-xdist pyyaml coverage timm packaging pre-commit",
+      "details": {
+        "conflict": "triton-ascend==3.2.1 要求 scipy==1.13.1, 镜像预装 scipy 1.17.1",
+        "solution": "先降级 scipy 到 1.13.1, 再 --no-deps 安装 triton-ascend, 然后安装 pybind11 等缺失依赖"
+      },
+      "duration_seconds": 180,
+      "error": "",
+      "output": "所有依赖安装成功: triton 3.2.0 + ascend backend, scipy 1.13.1, numpy 2.2.6, einops 0.8.2, coverage 7.15.2, pytest 9.1.1, pre-commit installed",
+      "result": "成功 (解决依赖冲突)",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-28T04:30:00"
+    },
+    {
+      "action": "问题定位: torch_npu 导入失败 (undefined symbol _ZN5torch8autograd10deleteNodeEPNS0_4NodeE)",
+      "command": "pip3 install --force-reinstall --no-deps torch-2.9.0-cp311-cp311-manylinux_2_28_aarch64.whl",
+      "details": {
+        "problem": "torch (从OBS单独下载) 与 torch_npu (从tar.gz提取) ABI 不匹配",
+        "solution": "使用 tar.gz 中包含的 torch wheel 重新安装 (--force-reinstall)",
+        "source": "pytorch_v2.9.0-7.3.0_py311.tar.gz 中的 torch-2.9.0-cp311 wheel"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "torch_npu 导入成功, NPU 设备可用",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-07-28T04:30:00"
+    },
+    {
+      "action": "执行 python setup.py build_py (构建 AscendC 算子 + PyTorch 插件, 并发数 51)",
+      "command": "source set_env.sh \u0026\u0026 export ASCEND_HOME_PATH=$ASCEND_TOOLKIT_HOME \u0026\u0026 export CMAKE_BUILD_PARALLEL_LEVEL=51 \u0026\u0026 python3 setup.py build_py",
+      "details": {
+        "build_time": "1m49s",
+        "concurrency": 51,
+        "concurrency_ratio": "20% (256 cores)",
+        "ops_built": [
+          "laser_attention",
+          "la_preprocess",
+          "ada_block_sparse_attention",
+          "sparse_block_estimate",
+          "quant_flash_attn",
+          "quant_flash_attn_metadata",
+          "fused_infer_attention_score"
+        ],
+        "plugin_built": "libPTAExtensionOPS.so (3.0M)"
+      },
+      "duration_seconds": 109,
+      "error": "",
+      "output": "Build completed successfully! AscendC operators built for ascend910/910b/910_93/950. PyTorch plugin libPTAExtensionOPS.so (3.0M) built.",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-07-28T04:30:00"
+    },
+    {
+      "action": "执行 CPU 友好单元测试 (run_UT_test.sh)",
+      "command": "bash tests/run_UT_test.sh",
+      "details": {
+        "duration": "42.5s",
+        "failed": 0,
+        "passed": 34,
+        "skipped": 0,
+        "total": 34
+      },
+      "duration_seconds": 43,
+      "error": "",
+      "output": "Ran 34 tests in 9.901s — OK. Coverage: 19%. Tests: test_aclgraph_config(17), test_log(4), test_env(8), test_exception(5)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-07-28T05:29:30"
+    },
+    {
+      "action": "执行全量测试 (run_test.sh --all, 含 NPU 测试)",
+      "command": "bash tests/run_test.sh --all",
+      "details": {
+        "duration": "680.8s",
+        "failed": 0,
+        "passed": 559,
+        "skipped": 31,
+        "total": 590
+      },
+      "duration_seconds": 681,
+      "error": "",
+      "output": "Ran 590 tests in 680.805s — OK (skipped=31). 包含 CPU 兼容测试和 NPU 依赖测试，全部通过",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-07-28T05:29:30"
+    },
+    {
+      "action": "执行 dummy_run 样例 (Wan2.2 dummy weight verification)",
+      "command": "python3 examples/dummy_run/wan_infer.py --device_id 0 (ASCEND_RT_VISIBLE_DEVICES=1, HF_ENDPOINT=https://hf-mirror.com)",
+      "details": {
+        "build_time_ms": 2773.05,
+        "device": "NPU 1 (Ascend 910B3)",
+        "inference_time_ms": 6967.89,
+        "model": "Wan-AI/Wan2.2-T2V-A14B-Diffusers (dummy weights, 2 transformer layers)",
+        "peak_memory_gb": 12.14,
+        "result": "PASSED",
+        "sample_name": "wan_infer.py (dummy_run)",
+        "total_params_b": 4.48
+      },
+      "duration_seconds": 59,
+      "error": "",
+      "output": "Wan2.2 dummy weight verification PASSED. Build: 2773ms, Inference: 6968ms, Peak mem: 12.14GB. Transformer(0.94B params) + Text encoder(2.49B) + VAE(0.13B) = 4.48B total.",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-07-28T05:29:30"
+    },
+    {
+      "action": "安装样例依赖 (diffusers, transformers, torchvision 0.24.0, tensorboard)",
+      "command": "pip3 install diffusers==0.38.0 transformers==5.2.0 tensorboard \u0026\u0026 pip3 install torchvision==0.24.0 --no-deps",
+      "details": {
+        "note": "torchvision 0.28.0 (PyPI latest) 与华为OBS torch 不兼容, 降级到 0.24.0 (匹配 torch 2.9.0) 解决",
+        "packages": [
+          "diffusers==0.38.0",
+          "transformers==5.2.0",
+          "torchvision==0.24.0 (--no-deps)",
+          "tensorboard==2.21.0",
+          "huggingface_hub==1.25.1"
+        ]
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "所有样例依赖安装成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-28T05:29:30"
+    },
+    {
+      "action": "验证完成, 准备清理容器",
+      "command": "docker rm -f MindIE-SD-ttfhw; rm -rf /tmp/MindIE-SD-verify",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-07-28T05:29:30"
+    },
+    {
+      "action": "生成验证报告",
+      "command": "",
+      "details": {
+        "output_file": "verification_report_MindIE-SD_20260728.json"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-07-28T05:29:30"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "libPTAExtensionOPS.so",
+          "path": "mindiesd/plugin/libPTAExtensionOPS.so",
+          "size": "3.0M",
+          "type": "library"
+        },
+        {
+          "name": "AscendC ops vendors",
+          "path": "mindiesd/ops/vendors/",
+          "size": "multiple .so files",
+          "type": "operators"
+        },
+        {
+          "name": "libcust_opapi.so",
+          "path": "mindiesd/ops/vendors/aie_ascendc/op_api/lib/libcust_opapi.so",
+          "type": "library"
+        },
+        {
+          "name": "libcust_opsproto_rt2.0.so",
+          "path": "mindiesd/ops/vendors/aie_ascendc/op_proto/lib/linux/aarch64/libcust_opsproto_rt2.0.so",
+          "type": "library"
+        }
+      ],
+      "cmake": "3.27.9",
+      "compiler": "gcc 12.3.1 (openEuler)",
+      "concurrency": 51,
+      "concurrency_ratio": "20% (256 cores × 20% = 51)",
+      "duration_seconds": 109,
+      "notes": "构建包括 AscendC 算子 (7个: laser_attention, la_preprocess, ada_block_sparse_attention, sparse_block_estimate, quant_flash_attn, quant_flash_attn_metadata, fused_infer_attention_score) 和 PyTorch 插件 (libPTAExtensionOPS.so)。算子支持 ascend910/910b/910_93/950 后端。",
+      "status": "成功"
+    },
+    "devcontainer": {
+      "config_dir": ".devcontainer",
+      "config_files": [
+        "README.md",
+        "cpu/devcontainer.json",
+        "npu/.gitkeeper"
+      ],
+      "enabled": true,
+      "original_base_image": "swr.cn-north-4.myhuaweicloud.com/inference/ascend_mindie_ubuntu_x86:20260305_ubuntu24_3.0.0_cann8.5.1_torch2.9.0_py311",
+      "summary": "仓库配置了 devcontainer (cpu/devcontainer.json 指定预构建镜像 ascend_mindie_ubuntu_x86, Tier 1 信号)。实际使用 CANN 9.0.0 openEuler 镜像 (Tier 3) 因 CANN/driver 兼容性问题。devcontainer.json 中 BUILD_JOB_NUM=2, containerEnv 配置了 ccache、PYTHONUNBUFFERED 等。",
+      "used_image": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11 (Tier 3 回退, CANN 8.5.1 与 driver 25.5.0 不兼容)"
+    },
+    "sample": {
+      "duration_seconds": 59,
+      "results": [
+        {
+          "execution_status": "成功",
+          "execution_time": "59秒 (含配置下载11秒 + 构建3秒 + 推理14秒)",
+          "output_summary": "Wan2.2 dummy weight verification PASSED. 使用 dummy 权重 (meta device) 构建 2 层 transformer 的 Wan2.2 pipeline, 在 NPU 上完成 1 步推理。Build: 2773ms (Transformer 205ms + Transformer_2 166ms + VAE 62ms + TextEncoder 2326ms), Inference: 6968ms (transformer 6952ms + text_encoder 6ms), Peak memory: 12.14GB, Total params: 4.48B.",
+          "sample_name": "wan_infer.py (dummy_run)"
+        }
+      ],
+      "status": "成功"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 600,
+        "executed_in_verification": true,
+        "failed": 4,
+        "failures": [
+          {
+            "error": "F841 unused variables, E402 import not at top, F401 unused imports",
+            "file": "multiple files",
+            "hook_name": "ruff-check"
+          },
+          {
+            "error": "Code style issues: R1723, R1730, C0412, W1203, W1510",
+            "file": "multiple files",
+            "hook_name": "pylint"
+          },
+          {
+            "error": "cacl-\u003ecalc, bood-\u003eboot, postion-\u003eposition",
+            "file": "csrc/ops/laser_attention/op_kernel/VectorForward.h, tests/utils/utils/embedding.py",
+            "hook_name": "typos"
+          },
+          {
+            "error": "Executable ./gitleaks not found",
+            "file": "",
+            "hook_name": "gitleaks-offline-scan"
+          }
+        ],
+        "hooks": [
+          {
+            "name": "trailing-whitespace",
+            "status": "Passed"
+          },
+          {
+            "name": "end-of-file-fixer",
+            "status": "Passed"
+          },
+          {
+            "name": "check-yaml",
+            "status": "Passed"
+          },
+          {
+            "name": "check-added-large-files",
+            "status": "Passed"
+          },
+          {
+            "name": "check-merge-conflict",
+            "status": "Passed"
+          },
+          {
+            "name": "detect-private-key",
+            "status": "Passed"
+          },
+          {
+            "name": "check-json",
+            "status": "Passed"
+          },
+          {
+            "errors": "F841 unused vars, E402 import order, F401 unused imports",
+            "name": "ruff-check",
+            "status": "Failed"
+          },
+          {
+            "name": "ruff-format",
+            "status": "Passed"
+          },
+          {
+            "name": "codespell",
+            "status": "Passed"
+          },
+          {
+            "errors": "R1723, R1730, C0412, W1203, W1510 etc.",
+            "name": "pylint",
+            "status": "Failed"
+          },
+          {
+            "name": "bandit",
+            "status": "Passed"
+          },
+          {
+            "errors": "cacl-\u003ecalc, bood-\u003eboot, postion-\u003eposition",
+            "name": "typos",
+            "status": "Failed"
+          },
+          {
+            "name": "clang-format",
+            "status": "Passed"
+          },
+          {
+            "errors": "Executable ./gitleaks not found",
+            "name": "gitleaks-offline-scan",
+            "status": "Failed"
+          }
+        ],
+        "passed": 11,
+        "skipped": 0,
+        "status": "部分通过",
+        "total_hooks": 15
+      },
+      "summary": "检测到 pre-commit 配置（16个hooks，11通过4失败）。lint-runner 未配置。失败项: ruff-check(未使用变量/导入), pylint(代码风格), typos(3处拼写错误), gitleaks(二进制未找到)"
+    },
+    "ut": {
+      "duration_seconds": 681,
+      "failed": 0,
+      "failures": [],
+      "passed": 559,
+      "skipped": 31,
+      "status": "成功",
+      "total": 590
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "MindIE-SD-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "openEuler 24.03 LTS-SP2"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "31G available (69G total)",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 1
+      }
+    },
+    "image_source": {
+      "image_name": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11",
+      "selection_reason": "Tier 1 预构建镜像（devcontainer.json image 字段指向 swr.cn-north-4.myhuaweicloud.com/inference/ascend_mindie_ubuntu_aarch64:20260305_ubuntu24_3.0.0_cann8.5.1_torch2.9.0_py311）的 CANN 8.5.1 与宿主机 driver 25.5.0 不兼容（NPU 设备初始化失败，error 507033），降级到 Tier 3。选用宿主机已有的 CANN 9.0.0 openEuler 镜像（兼容 driver 25.5.0），从零安装 torch 2.9.0、torch_npu 2.9.0 及 MindIE-SD 依赖。",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "044461f",
+    "duration_seconds": 8353,
+    "end_time": "2026-07-28T05:29:30",
+    "environment": "remote: root@192.168.9.114 (aarch64 Kunpeng-920, 256 cores, 2TB RAM, 8x Ascend 910B3 NPU)",
+    "repo_url": "https://gitcode.com/Ascend/MindIE-SD.git",
+    "start_time": "2026-07-28T03:10:17",
+    "total_steps": 19,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "Tier 1 预构建镜像 CANN 8.5.1 与宿主机 driver 25.5.0 不兼容，NPU 设备初始化失败 (error 507033)",
+      "solution": "降级到 Tier 3，使用宿主机已有的 CANN 9.0.0 openEuler 镜像，从零安装 torch 和 torch_npu",
+      "source": "devcontainer.json image 字段 + 宿主机 driver version.info",
+      "timestamp": "2026-07-28T04:30:00"
+    },
+    {
+      "problem": "torch (从OBS单独下载的wheel) 与 torch_npu (从tar.gz提取的wheel) ABI 不匹配，import torch_npu 报 undefined symbol",
+      "solution": "使用 tar.gz 中包含的 torch wheel 重新 --force-reinstall 安装，确保 torch 与 torch_npu 来自同一 Daily 构建",
+      "source": "pytorch_v2.9.0-7.3.0_py311.tar.gz",
+      "timestamp": "2026-07-28T04:30:00"
+    },
+    {
+      "problem": "triton-ascend==3.2.1 要求 scipy==1.13.1，但 CANN 镜像预装 scipy 1.17.1，pip 依赖解析冲突",
+      "solution": "先降级 scipy 到 1.13.1，再 --no-deps 安装 triton-ascend，然后手动安装缺失的 pybind11 等依赖",
+      "source": "requirements.txt + triton-ascend 包依赖",
+      "timestamp": "2026-07-28T04:30:00"
+    },
+    {
+      "problem": "torchvision 0.28.0 (PyPI) 与华为OBS torch 2.9.0 不兼容, import torchvision 报 \"operator torchvision::nms does not exist\"",
+      "solution": "降级到 torchvision 0.24.0 (匹配 torch 2.9.0), 使用 --no-deps 安装避免覆盖 torch",
+      "source": "requirements-test.txt (timm\u003e=0.9.12 依赖 torchvision) + examples/dummy_run/requirements.txt",
+      "timestamp": "2026-07-28T05:29:30"
+    },
+    {
+      "problem": "dummy_run 样例需要从 HuggingFace 下载模型配置, 但容器内无法直接访问 huggingface.co (连接被重置)",
+      "solution": "设置 HF_ENDPOINT=https://hf-mirror.com 使用 HuggingFace 镜像, 成功下载 13 个配置文件",
+      "source": "examples/dummy_run/model/__init__.py resolve_config_path()",
+      "timestamp": "2026-07-28T05:29:30"
+    }
+  ],
+  "session_export_file": "",
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

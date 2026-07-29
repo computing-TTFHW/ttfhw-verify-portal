@@ -1,0 +1,613 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "hcom.spec ExclusiveArch + 宿主机架构",
+      "value": "aarch64"
+    },
+    "build_commands": {
+      "source": "README.md 第4节 + build.sh",
+      "value": "./build.sh  (默认 release，CMake 构建，并发数 nproc)"
+    },
+    "dependencies": {
+      "source": "hcom.spec BuildRequires + CMakeLists.txt + build.sh",
+      "value": [
+        "make (dnf: make)",
+        "gcc/g++ (dnf: gcc gcc-c++)",
+        "cmake \u003e= 3.14.1 (dnf: cmake)",
+        "libboundscheck (dnf: libboundscheck)",
+        "rdma-core-devel (dnf: rdma-core-devel)",
+        "umdk-urma-devel (dnf: umdk-urma-devel, Huawei 专用包)",
+        "openssl + openssl-devel (dnf: openssl openssl-devel)",
+        "git (用于 clone 测试工具)",
+        "googletest 1.12.1 (源码编译，由 build/install_test_tools.sh 安装)",
+        "mockcpp v2.7 (源码编译，由 build/install_test_tools.sh 安装)",
+        "clang-format (pre-commit hook 依赖)",
+        "clang-tidy (pre-commit hook 依赖)",
+        "python3 + pre-commit (pre-commit 工具)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库无 Dockerfile",
+      "value": "无 Dockerfile，依赖来源为 hcom.spec BuildRequires + build.sh + CMakeLists.txt"
+    },
+    "recommended_image": {
+      "source": "仓库无 Dockerfile，项目为 openEuler 社区项目，hcom.spec 使用 dnf 包（libboundscheck, rdma-core-devel 等），ExclusiveArch: aarch64",
+      "value": "openEuler 24.03 LTS（Tier 3，无 Dockerfile/预构建镜像/devcontainer 信号）"
+    },
+    "sample_commands": {
+      "source": "README.md 第5节 + test/hcom/tools/perf_test/README.md",
+      "value": "export HCOM_BUILD_TOOLS_PERF=on \u0026\u0026 bash build.sh  (构建 hcom_perf 工具); 运行: ./hcom_perf --case transport_send_lat --role server --protocol rdma -i \u003cIP\u003e -n 1000 --all (需双节点+RDMA)"
+    },
+    "special_dependencies": {
+      "source": "build/install_test_tools.sh",
+      "value": [
+        "googletest 从 Huawei 内部 git (codehub.devcloud.cn-north-4.huaweicloud.com) clone，可能不可访问，需用公开源替代",
+        "mockcpp 从 Huawei 内部 git clone，可能不可访问，需用公开源替代",
+        "umdk-urma-devel 为 Huawei 专用包，可能需要特殊仓库"
+      ]
+    },
+    "ut_commands": {
+      "source": "README.md 第6节 + build/generate_gtest_report.sh",
+      "value": "export HCOM_BUILD_TYPE=debug \u0026\u0026 export HCOM_BUILD_TESTS=on \u0026\u0026 ./build.sh \u0026\u0026 ./build/generate_gtest_report.sh  (运行 hcom_ut 和 hcom_test)"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "README 第6节说明执行 UT 需要 HCOM_BUILD_TESTS=on，但未说明 build/install_test_tools.sh 会从 Huawei 内部 git 仓库 (codehub.devcloud.cn-north-4.huaweicloud.com) 克隆 googletest 和 mockcpp。外部开发者无法访问此内部仓库，导致 UT 无法构建。",
+      "source": "README.md 第6节 + build/install_test_tools.sh",
+      "time": "2026-07-28T08:16:54",
+      "title": "README 中 UT 构建命令缺少测试工具来源说明"
+    },
+    {
+      "body": "UT 构建在 debug/release 两种模式下均失败：1) net_sock_async_endpoint.h 使用 NetDriverSockWithOOB 成员但未包含其完整定义头文件；2) hcom_obj_statistics.h 缺少 #include \u003ccstdint\u003e；3) 测试 CMakeLists.txt 无条件编译 sock 测试文件，未根据 BUILD_WITH_SOCK 选项条件编译。",
+      "source": "src/hcom/transport/sock/net_sock_async_endpoint.h, src/hcom/hcom_obj_statistics.h, test/hcom/unit_test/CMakeLists.txt",
+      "time": "2026-07-28T08:16:54",
+      "title": "UT 构建存在代码质量问题导致编译失败"
+    },
+    {
+      "body": "test/hcom/tools/perf_test/test_case/service_v2/service_read_lat_test.h 使用 LOG_ERROR 和 LOG_DEBUG 宏，但这些宏在 perf_test_logger.h 中定义，而该头文件在宏使用之后才被包含，导致编译失败。",
+      "source": "test/hcom/tools/perf_test/test_case/service_v2/service_read_lat_test.h:50,59",
+      "time": "2026-07-28T08:16:54",
+      "title": "perf_test 工具构建失败：头文件包含顺序问题"
+    },
+    {
+      "body": ".pre-commit-config.yaml 中的 clang-format hook 使用 -i 参数直接修改源文件（reorder includes），改变了头文件包含顺序，导致后续构建失败。run-build hook 在 clang-format 之前执行所以构建成功，但之后任何构建都会失败，需要 git checkout 恢复。",
+      "source": ".pre-commit-config.yaml — clang-format hook args: [-style=file, -i]",
+      "time": "2026-07-28T08:16:54",
+      "title": "pre-commit clang-format hook 会修改源文件并破坏构建"
+    },
+    {
+      "body": "README 第5节中引用的路径 \"lingqu\\test\\tools\\perf_test\\README.md\" 使用 Windows 风格反斜杠，实际仓库中路径为 test/hcom/tools/perf_test/README.md（且多了一层 hcom 目录），可能导致开发者无法找到文档。",
+      "source": "README.md 第5节",
+      "time": "2026-07-28T08:16:54",
+      "title": "README 性能测试工具路径使用 Windows 风格反斜杠"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "克隆仓库并阅读 README.md、README.en.md、CMakeLists.txt、build.sh、hcom.spec、.pre-commit-config.yaml、CONTRIBUTING.md、perf_test/README.md 等文档",
+      "command": "git clone --branch br_BeiMing.26.0.RC1 https://gitcode.com/openeuler/ubs-comm.git",
+      "details": {
+        "commit": "f0df29c2864e59331c7b4c9a4621f091d8513704",
+        "devcontainer_found": false,
+        "dockerfile_found": false,
+        "files_read": [
+          "README.md",
+          "README.en.md",
+          "CMakeLists.txt",
+          "build.sh",
+          "hcom.spec",
+          ".pre-commit-config.yaml",
+          "CONTRIBUTING.md",
+          "test/hcom/tools/perf_test/README.md",
+          "build/install_test_tools.sh",
+          "build/generate_gtest_report.sh",
+          "doc/hcom/HCOM-Tutorial-Demo.md"
+        ],
+        "image_tier": "Tier 3 (无 Dockerfile/预构建镜像/devcontainer)",
+        "links_checked": [
+          "CONTRIBUTING.md (仓库内链接，已读)",
+          "gitee.com/openeuler/community (外链，与构建验证无关)"
+        ],
+        "npu_required": false,
+        "os_choice": "openEuler (项目为 openEuler 社区项目，spec 使用 dnf 包)",
+        "pre_commit_config_found": true
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "仓库克隆成功，commit f0df29c，架构 aarch64，CMake 项目",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-07-28T07:56:23"
+    },
+    {
+      "action": "根据文档阅读结果选择镜像：无 Dockerfile/预构建镜像/devcontainer 信号 → Tier 3 基础 OS",
+      "command": "",
+      "details": {
+        "os_choice": "openEuler 24.03 LTS（与 hcom.spec 使用的 dnf 包生态一致）",
+        "reason": "仓库无 Dockerfile、无预构建镜像信号、无 devcontainer，项目为 openEuler 社区项目",
+        "tier": "Tier 3"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "",
+      "result": "openEuler 24.03 LTS",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-07-28T08:01:24"
+    },
+    {
+      "action": "清理旧容器并启动 openEuler 24.03 LTS 容器，挂载仓库到 /workspace",
+      "command": "docker rm -f ubs-comm-ttfhw; docker run -d --name ubs-comm-ttfhw -v /tmp/ubs-comm-verify/ubs-comm:/workspace -w /workspace openeuler/openeuler:24.03-lts sleep infinity",
+      "details": {
+        "container_name": "ubs-comm-ttfhw",
+        "image": "openeuler/openeuler:24.03-lts",
+        "mount": "/tmp/ubs-comm-verify/ubs-comm:/workspace"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Container started, openEuler 24.03 LTS, aarch64, 256 cores",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-07-28T08:01:24"
+    },
+    {
+      "action": "第一层：安装系统工具链 + 构建依赖（gcc g++ make cmake git python3 python3-pip openssl openssl-devel rdma-core-devel libboundscheck umdk-urma-devel clang-tools-extra）",
+      "command": "dnf install -y gcc gcc-c++ make cmake git python3 python3-pip openssl openssl-devel rdma-core-devel libboundscheck umdk-urma-devel clang-tools-extra \u0026\u0026 pip3 install pre-commit",
+      "details": {
+        "packages": [
+          "gcc-12.3.1",
+          "gcc-c++-12.3.1",
+          "make",
+          "cmake-3.27.9",
+          "git",
+          "python3",
+          "python3-pip",
+          "openssl",
+          "openssl-devel",
+          "rdma-core-devel-50.0",
+          "libboundscheck",
+          "umdk-urma-devel-1.3.0",
+          "clang-tools-extra-17.0.6"
+        ],
+        "pre_commit": "pip3 install pre-commit (4.6.1)",
+        "source": "openEuler 官方仓库 (dnf)"
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "所有依赖安装成功，gcc 12.3.1, cmake 3.27.9, clang-format 17.0.6, clang-tidy 17.0.6, pre-commit 4.6.1",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-28T08:01:24"
+    },
+    {
+      "action": "检查仓库 pre-commit 和 lint-runner 配置",
+      "command": "",
+      "details": {
+        "hooks": [
+          "run-build (bash build.sh)",
+          "run-build-test (bash build.sh test --skip-run-tests)",
+          "clang-format",
+          "clang-tidy",
+          "clang-tidy-test"
+        ],
+        "lint_runner": "未找到 lint-runner 配置文件",
+        "pre_commit_config": ".pre-commit-config.yaml 存在"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "",
+      "result": "pre-commit 已配置，lint-runner 未配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-07-28T08:03:14"
+    },
+    {
+      "action": "在远程容器内执行 pre-commit run --all-files（含 5 个 hooks）",
+      "command": "pre-commit run --all-files",
+      "details": {
+        "clang-format": "Failed — 文件被修改（格式不符合规范）",
+        "clang-tidy": "Failed — 缺少 cmake-build-release 编译数据库目录",
+        "clang-tidy-test": "Failed — 缺少 cmake-build-debug 编译数据库目录",
+        "run-build": "Passed — bash build.sh 构建成功",
+        "run-build-test": "Failed — build.sh 不接受 test 参数，报 Unknown parameter"
+      },
+      "duration_seconds": 300,
+      "error": "run-build-test hook 配置错误（build.sh 不支持 test 参数）；clang-tidy hooks 缺少编译数据库（需先生成 cmake-build-release/cmake-build-debug 目录）",
+      "note": "run-build hook 通过说明构建本身是成功的；其他 hooks 失败属于 pre-commit 配置问题",
+      "output": "Run Release Build...Passed\nRun Tests Build...Failed (exit code 1: Unknown parameter passed: test)\nRun clang-format check...Failed (files were modified)\nRun clang-tidy check...Failed (exit code 1: No compilation database)\nRun clang-tidy check for test files...Failed (exit code 1: No compilation database)",
+      "result": "1 通过，4 失败",
+      "returncode": 1,
+      "step": "static_analysis_execution",
+      "success": false,
+      "timestamp": "2026-07-28T08:03:14"
+    },
+    {
+      "action": "检查 .devcontainer 目录",
+      "command": "ls -la .devcontainer/",
+      "details": {
+        "config_dir": null,
+        "reason": "仓库无 .devcontainer 目录"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "No such file or directory",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-07-28T08:03:14"
+    },
+    {
+      "action": "执行 ./build.sh 构建（release 模式，由 pre-commit run-build hook 触发）",
+      "command": "./build.sh",
+      "details": {
+        "build_type": "release",
+        "cmake": "3.27.9",
+        "compiler": "gcc 12.3.1",
+        "concurrency": 256,
+        "concurrency_ratio": "nproc (build.sh 默认使用 nproc)"
+      },
+      "duration_seconds": 300,
+      "error": "",
+      "output": "构建成功，产物: dist/BoostKit-hcom_1.0.0_aarch64.tar.gz (43.7MB), dist/hcom/lib/libhcom.so.0.0.1 (50.9MB), dist/hcom/lib/libhcom_static.a (130.9MB), dist/hcom/include/hcom/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-07-28T08:03:14"
+    },
+    {
+      "action": "UT 构建（debug 模式）：HCOM_BUILD_TYPE=debug HCOM_BUILD_TESTS=on bash build.sh",
+      "command": "export HCOM_BUILD_TYPE=debug HCOM_BUILD_TESTS=on \u0026\u0026 bash build.sh",
+      "details": {
+        "build_type": "debug",
+        "error_file": "src/hcom/transport/sock/net_sock_async_endpoint.h:143",
+        "error_msg": "invalid use of incomplete type class NetDriverSockWithOOB",
+        "error_type": "编译错误",
+        "test_tools_installed": true
+      },
+      "duration_seconds": 120,
+      "error": "NetDriverSockWithOOB 在 net_sock_common.h 中仅前向声明，net_sock_async_endpoint.h 使用其成员但未 include net_sock_driver_oob.h 获取完整定义",
+      "output": "net_sock_async_endpoint.h:143: error: invalid use of incomplete type NetDriverSockWithOOB. hcom.cpp 编译失败。测试工具 googletest/mockcpp 安装成功。",
+      "result": "构建失败",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-07-28T08:16:54"
+    },
+    {
+      "action": "UT 构建（release 模式）：HCOM_BUILD_TYPE=release HCOM_BUILD_TESTS=on bash build.sh",
+      "command": "export HCOM_BUILD_TYPE=release HCOM_BUILD_TESTS=on \u0026\u0026 bash build.sh",
+      "details": {
+        "build_type": "release",
+        "error_file": "src/hcom/hcom_obj_statistics.h:18",
+        "error_msg": "int32_t does not name a type",
+        "error_type": "编译错误"
+      },
+      "duration_seconds": 60,
+      "error": "hcom_obj_statistics.h 缺少 #include \u003ccstdint\u003e，在测试构建的编译环境下暴露",
+      "output": "hcom_obj_statistics.h:18: error: int32_t does not name a type. 测试构建使用 CXX_STANDARD 11 且添加 -DMOCK_VERBS -DTEST_LLT 宏，改变了头文件包含顺序。",
+      "result": "构建失败",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-07-28T08:16:54"
+    },
+    {
+      "action": "UT 构建（debug, SOCK=off）：尝试禁用 SOCK 模块避免编译错误",
+      "command": "export HCOM_BUILD_TYPE=debug HCOM_BUILD_TESTS=on HCOM_BUILD_SOCK=off \u0026\u0026 bash build.sh",
+      "details": {
+        "build_type": "debug",
+        "error_msg": "StateValidation/TwoSideSglValidation/OneSideValidation not declared + NetDriverSockWithOOB incomplete type",
+        "error_type": "编译错误",
+        "sock_disabled": true
+      },
+      "duration_seconds": 90,
+      "error": "测试 CMakeLists.txt 未根据 BUILD_WITH_SOCK 条件编译 sock 测试",
+      "output": "测试 CMakeLists.txt 无条件编译 sock 测试文件（aux_source_directory(transport/sock)），禁用 SOCK 模块后 sock 测试文件仍编译但缺少 SOCK_BUILD_ENABLED 宏下的函数定义",
+      "result": "构建失败",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-07-28T08:16:54"
+    },
+    {
+      "action": "安装构建产物并执行冒烟测试（smoke test）验证 HCOM 库 API 可用性",
+      "command": "gcc -o /tmp/smoke_test /tmp/smoke_test.c -I/usr/include -lhcom -L/usr/lib64 \u0026\u0026 LD_LIBRARY_PATH=/usr/lib64 /tmp/smoke_test",
+      "details": {
+        "build_commit": "f0df29c2864e59331c7b4c9a4621f091d8513704",
+        "headers_installed": "/usr/include/hcom/",
+        "library_installed": "libhcom.so.0.0.1 -\u003e /usr/lib64/",
+        "library_version": "1.0.0",
+        "tests": [
+          "ubs_hcom_driver_create(TCP) -\u003e ret=0, driver 创建成功",
+          "ubs_hcom_driver_set_ipport -\u003e OK",
+          "ubs_hcom_check_local_support(TCP) -\u003e ret=1 (TCP 支持)",
+          "ubs_hcom_set_log_handler -\u003e OK"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Smoke Test PASSED: driver 创建成功(ret=0)，IP/port 设置成功，TCP 本地支持检查通过(ret=1)，日志处理器设置成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-07-28T08:16:54"
+    },
+    {
+      "action": "构建 hcom_perf 性能测试工具（HCOM_BUILD_TOOLS_PERF=on）",
+      "command": "export HCOM_BUILD_TOOLS_PERF=on \u0026\u0026 bash build.sh",
+      "details": {
+        "error_file": "test/hcom/tools/perf_test/test_case/service_v2/service_read_lat_test.h:50,59",
+        "error_msg": "LOG_ERROR/LOG_DEBUG not declared in this scope (宏定义在 perf_test_logger.h 中，但头文件包含顺序导致宏未定义)",
+        "error_type": "编译错误"
+      },
+      "duration_seconds": 30,
+      "error": "perf_test 代码中 service_read_lat_test.h 使用 LOG_ERROR/LOG_DEBUG 宏，但 perf_test_logger.h（定义这些宏）在之后才被包含",
+      "output": "service_read_lat_test.h:50: error: LOG_ERROR not declared; :59: error: LOG_DEBUG not declared. perf_test_logger.h 在宏使用之后才被包含。",
+      "result": "构建失败",
+      "returncode": 1,
+      "step": "sample_execution",
+      "success": false,
+      "timestamp": "2026-07-28T08:16:54"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "BoostKit-hcom_1.0.0_aarch64.tar.gz",
+          "path": "dist/BoostKit-hcom_1.0.0_aarch64.tar.gz",
+          "size": "43.7 MB",
+          "type": "package"
+        },
+        {
+          "name": "libhcom.so.0.0.1",
+          "path": "dist/hcom/lib/libhcom.so.0.0.1",
+          "size": "50.9 MB",
+          "type": "library"
+        },
+        {
+          "name": "libhcom_static.a",
+          "path": "dist/hcom/lib/libhcom_static.a",
+          "size": "130.9 MB",
+          "type": "library"
+        },
+        {
+          "name": "hcom headers",
+          "path": "dist/hcom/include/hcom/",
+          "size": "N/A",
+          "type": "header"
+        }
+      ],
+      "cmake": "3.27.9",
+      "compiler": "gcc 12.3.1 (openEuler)",
+      "concurrency": 256,
+      "concurrency_ratio": "nproc (build.sh 默认)",
+      "duration_seconds": 300,
+      "notes": "构建由 pre-commit run-build hook 触发，release 模式，CMake 构建系统",
+      "status": "成功"
+    },
+    "devcontainer": {
+      "config_dir": null,
+      "config_files": [],
+      "enabled": false,
+      "original_base_image": "none",
+      "summary": "仓库未配置 .devcontainer 目录，使用 openEuler 24.03 LTS 基础镜像从零安装依赖",
+      "used_image": "openEuler 24.03 LTS"
+    },
+    "sample": {
+      "duration_seconds": 35,
+      "reason": "hcom_perf 工具构建失败（代码中宏定义包含顺序问题），但库冒烟测试成功",
+      "results": [
+        {
+          "execution_status": "成功",
+          "execution_time": "5秒",
+          "output_summary": "安装 libhcom.so 到系统路径，编译并运行 C 冒烟测试程序。ubs_hcom_driver_create(TCP) 返回 0，驱动创建成功；ubs_hcom_check_local_support(TCP) 返回 1。库版本 1.0.0，commit f0df29c。",
+          "sample_name": "hcom_library_smoke_test"
+        },
+        {
+          "execution_status": "失败",
+          "execution_time": "30秒（构建尝试）",
+          "output_summary": "hcom_perf 性能测试工具构建失败：service_read_lat_test.h 中 LOG_ERROR/LOG_DEBUG 宏在使用前未定义（perf_test_logger.h 包含顺序问题）",
+          "sample_name": "hcom_perf_tool"
+        }
+      ],
+      "status": "partial_success"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 300,
+        "executed_in_verification": true,
+        "failed": 4,
+        "failures": [
+          {
+            "error": "build.sh 不支持 test 参数，entry 配置为 bash build.sh test --skip-run-tests",
+            "file": ".pre-commit-config.yaml",
+            "hook_name": "run-build-test"
+          },
+          {
+            "error": "文件格式不符合 .clang-format 规范",
+            "file": "multiple",
+            "hook_name": "clang-format"
+          },
+          {
+            "error": "缺少 cmake-build-release 编译数据库目录",
+            "file": "multiple",
+            "hook_name": "clang-tidy"
+          },
+          {
+            "error": "缺少 cmake-build-debug 编译数据库目录",
+            "file": "multiple",
+            "hook_name": "clang-tidy-test"
+          }
+        ],
+        "hooks": [
+          {
+            "name": "run-build",
+            "status": "Passed"
+          },
+          {
+            "error": "build.sh 不接受 test 参数",
+            "name": "run-build-test",
+            "status": "Failed"
+          },
+          {
+            "error": "文件被修改（格式不符合规范）",
+            "name": "clang-format",
+            "status": "Failed"
+          },
+          {
+            "error": "缺少 cmake-build-release 编译数据库",
+            "name": "clang-tidy",
+            "status": "Failed"
+          },
+          {
+            "error": "缺少 cmake-build-debug 编译数据库",
+            "name": "clang-tidy-test",
+            "status": "Failed"
+          }
+        ],
+        "passed": 1,
+        "skipped": 0,
+        "status": "部分通过",
+        "total_hooks": 5
+      },
+      "summary": "检测到 pre-commit 配置（5个hooks，1通过4失败），未检测到 lint-runner 配置。run-build hook 通过（构建成功），run-build-test 失败（build.sh 不支持 test 参数），clang-format 失败（格式问题），clang-tidy/clang-tidy-test 失败（缺少编译数据库）"
+    },
+    "ut": {
+      "duration_seconds": 270,
+      "failed": 0,
+      "failures": [
+        {
+          "error": "UT 构建失败，三种模式均无法编译：1) debug 模式 — NetDriverSockWithOOB incomplete type; 2) release 模式 — int32_t not defined (missing cstdint); 3) debug+SOCK=off — 测试 CMakeLists.txt 无条件编译 sock 测试文件",
+          "note": "UT 构建失败属于代码质量问题（缺少 include、测试 CMakeLists.txt 未条件编译），非环境问题。测试工具 googletest/mockcpp 安装成功。",
+          "type": "build_error"
+        }
+      ],
+      "passed": 0,
+      "status": "failed",
+      "total": 0
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "ubs-comm-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti (无限制)",
+      "os": "openEuler 24.03 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920 (HiSilicon, 4 sockets x 64 cores)",
+      "disk": "69G (30G available)",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": false
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "CMakeLists.txt 要求 cmake \u003e= 3.14.1",
+        "from_dockerfile": "仓库无 Dockerfile，依赖来源为 hcom.spec BuildRequires",
+        "from_readme": "README.md + build.sh 描述构建流程",
+        "mappings": [
+          {
+            "original": "make gcc cmake (hcom.spec BuildRequires)",
+            "source": "hcom.spec",
+            "target": "dnf install -y make gcc gcc-c++ cmake"
+          },
+          {
+            "original": "libboundscheck (hcom.spec BuildRequires)",
+            "source": "hcom.spec",
+            "target": "dnf install -y libboundscheck"
+          },
+          {
+            "original": "rdma-core-devel (hcom.spec BuildRequires)",
+            "source": "hcom.spec",
+            "target": "dnf install -y rdma-core-devel"
+          },
+          {
+            "original": "umdk-urma-devel (hcom.spec BuildRequires)",
+            "source": "hcom.spec",
+            "target": "dnf install -y umdk-urma-devel"
+          },
+          {
+            "original": "openssl openssl-devel (hcom.spec BuildRequires)",
+            "source": "hcom.spec",
+            "target": "dnf install -y openssl openssl-devel"
+          },
+          {
+            "original": "clang-format/clang-tidy (pre-commit hooks)",
+            "source": ".pre-commit-config.yaml",
+            "target": "dnf install -y clang-tools-extra"
+          }
+        ]
+      },
+      "image_name": "openeuler/openeuler:24.03-lts",
+      "selection_reason": "Tier 3: 仓库无 Dockerfile/预构建镜像/devcontainer 信号，项目为 openEuler 社区项目（hcom.spec 使用 dnf 包，ExclusiveArch: aarch64），选择 openEuler 24.03 LTS 基础镜像从零安装依赖",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "br_BeiMing.26.0.RC1",
+    "commit": "f0df29c2864e59331c7b4c9a4621f091d8513704",
+    "duration_seconds": 1418,
+    "end_time": "2026-07-28T08:17:07",
+    "environment": "remote container on 192.168.9.114",
+    "repo_url": "https://gitcode.com/openeuler/ubs-comm.git",
+    "start_time": "2026-07-28T07:53:29",
+    "total_steps": 13,
+    "verifier": "ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "pre-commit clang-format hook 修改了源文件（reorder includes），导致后续构建失败",
+      "solution": "执行 git checkout . 恢复源文件到原始状态后重新构建成功",
+      "source": ".pre-commit-config.yaml clang-format hook (args: -style=file -i)",
+      "timestamp": "2026-07-28T08:16:54"
+    },
+    {
+      "problem": "UT 构建失败：net_sock_async_endpoint.h 中 NetDriverSockWithOOB 不完整类型",
+      "solution": "代码问题无法在不修改源码的情况下解决，记录为 UT 构建失败",
+      "source": "src/hcom/transport/sock/net_sock_async_endpoint.h:143 — 缺少 #include net_sock_driver_oob.h",
+      "timestamp": "2026-07-28T08:16:54"
+    },
+    {
+      "problem": "hcom_perf 工具构建失败：LOG_ERROR/LOG_DEBUG 宏未定义",
+      "solution": "代码问题无法在不修改源码的情况下解决，使用库冒烟测试作为替代验证",
+      "source": "test/hcom/tools/perf_test/test_case/service_v2/service_read_lat_test.h — 头文件包含顺序问题",
+      "timestamp": "2026-07-28T08:16:54"
+    }
+  ],
+  "session_export_file": "",
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "bailian/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}
