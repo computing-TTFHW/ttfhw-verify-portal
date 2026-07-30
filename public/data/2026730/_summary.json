@@ -2824,18 +2824,17 @@
     "displayName": "pytorch",
     "result": "partial_success",
     "buildStatus": "success",
-    "utStatus": "failed",
-    "sampleStatus": "failed",
-    "totalDuration": 5317,
-    "environmentDuration": 4762,
-    "buildDuration": 535,
-    "utDuration": 5,
-    "sampleDuration": 15,
-    "testPassed": 0,
-    "testFailed": 0,
-    "testTotal": 0,
-    "testSkipped": 0,
-    "generatedAt": "2026-07-30T11:51:19",
+    "utStatus": "partial_success",
+    "sampleStatus": "partial_success",
+    "totalDuration": 6921,
+    "environmentDuration": 6436,
+    "buildDuration": 420,
+    "utDuration": 35,
+    "sampleDuration": 30,
+    "testPassed": 7,
+    "testFailed": 1,
+    "testTotal": 8,
+    "generatedAt": "2026-07-30T14:34:03",
     "environment": "unknown",
     "url": "https://gitcode.com/Ascend/pytorch.git",
     "category": "PyTorch",
@@ -2844,48 +2843,54 @@
     "file": "verification_report_pytorch_20260730.json",
     "issues": [
       {
-        "problem": "清华源 PyPI 镜像返回 403 Forbidden 错误，无法通过 pip 安装 cmake 和 torch",
-        "solution": "cmake 等纯 Python 包改用阿里云镜像安装；torch 改用 wget 直接从 download.pytorch.org 下载 wheel 文件后通过 pip 本地安装",
-        "source": "pip install -i https://pypi.tuna.tsinghua.edu.cn/simple",
-        "timestamp": "2026-07-30T12:53:34"
+        "problem": "pip 清华源对 cmake-4.0.3 aarch64 wheel 返回 403 Forbidden",
+        "solution": "按 skill 规则依次尝试备用源，切换到阿里云源(mirrors.aliyun.com/pypi/simple)安装成功",
+        "source": "pip install cmake==4.0.3",
+        "timestamp": "2026-07-30T14:50:00"
       },
       {
-        "problem": "CANN 9.1.0 的 libhccl_v2.so 存在未定义符号 _Z17HcclCheckLogLevelii（HcclCheckLogLevel(int, int)），导致 torch_npu._C 模块加载失败",
-        "solution": "通过 LD_PRELOAD=/usr/local/Ascend/cann-9.1.0/lib64/libhccl_plf.so 预加载定义该符号的库，成功加载 torch_npu._C 模块",
-        "source": "CANN 9.1.0 libhccl_v2.so 依赖问题",
-        "timestamp": "2026-07-30T13:19:10"
+        "problem": "import torch_npu 失败：CANN 9.1.0 的 libhccl.so 存在未解析符号 _Z17HcclCheckLogLevelii(HcclCheckLogLevel(int,int))。该符号定义于 cann-9.1.0/aarch64-linux/lib64/libhccl_plf.so 与 libhcom_executor.so，但 set_env.sh 仅将 cann-9.1.0/lib64 加入 LD_LIBRARY_PATH，未包含 aarch64-linux/lib64，且 libhccl.so 未将 libhccl_plf.so 列为 NEEDED 依赖，导致符号运行时无法解析。系宿主机 CANN 9.1.0 安装布局非标准(lib64 与 aarch64-linux/lib64 并存且内容不一致)所致。",
+        "solution": "通过 LD_PRELOAD 预加载 /usr/local/Ascend/cann-9.1.0/aarch64-linux/lib64/libhccl_plf.so，使 HcclCheckLogLevel 符号在 libhccl.so 加载前可用，import torch_npu 成功。同时将 aarch64-linux/lib64 加入 LD_LIBRARY_PATH。",
+        "source": "/usr/local/Ascend/cann-9.1.0/lib64/libhccl.so + set_env.sh LD_LIBRARY_PATH 配置",
+        "timestamp": "2026-07-30T15:55:00"
       },
       {
-        "problem": "NPU 设备不可用：宿主机上 16+ 个 Docker 容器共享同一组 NPU 设备（davinci0-7），导致 DCMI 初始化失败（ret=-8020）和 rtGetDeviceCount 失败（retCode=0x7020010）。npu-smi 也报警告：driver package may not be completely installed",
-        "solution": "无法在当前环境中解决——NPU 驱动竞争是环境限制，需要停止占用 NPU 的其他容器或使用独占的 NPU 设备。构建和导入验证已完成，NPU 运行时测试无法执行",
-        "source": "宿主机 NPU 驱动竞争 + 驱动安装可能不完整",
-        "timestamp": "2026-07-30T13:19:10"
-      },
-      {
-        "problem": "清华源 PyPI 镜像（pypi.tuna.tsinghua.edu.cn）返回 403 Forbidden，无法下载 pip 包",
-        "solution": "纯 Python 包改用阿里云镜像（mirrors.aliyun.com/pypi/simple），torch wheel 使用 wget 直接从 download.pytorch.org 下载后本地安装",
-        "source": "pip install -i https://pypi.tuna.tsinghua.edu.cn/simple",
-        "timestamp": "2026-07-30T13:19:10"
+        "problem": "NPU 计算操作(x+y)失败：CANN 9.1.0 的 TBE 算子编译器(基于 Python 的 AOE/CannKB)无法在 Ubuntu 22.04 容器的 python3.10 环境下初始化。宿主机 CANN 9.1.0 针对 openEuler python3.7 安装，其 TBE 编译器使用 multiprocessing forkserver 子进程，而 python3.10 的 forkserver 信号处理更严格(signal.signal 拒绝非 callable 处理器)，触发 TypeError: signal handler must be signal.SIG_IGN/SIG_DFL/callable，导致 TBE 编译器初始化失败 → GEInitializeV2 失败 → ops kernel info store 初始化失败 → ACL 算子编译选项设置失败(error 500001) → NPU 计算不可用。",
+        "solution": "已尝试的缓解：安装 TBE Python 依赖(decorator/scipy)、补充 vendor es 库路径(libes_math/libes_nn)、libhccl_plf 预加载、强制 fork 启动方法——均无法绕过 python3.10 forkserver 兼容性问题。根本解决需在容器内安装与 CANN 配套的 python3.7，或在容器内重新安装匹配 python3.10 的 CANN 工具链(参考 docker/devel/Dockerfile dev 阶段)。本次验证环境仅挂载宿主机只读 CANN，无法重装。此为环境限制，非 torch_npu 代码缺陷。",
+        "source": "CANN 9.1.0 TBE 编译器 (cann-9.1.0/python/site-packages/tbe) + python3.10 multiprocessing/forkserver.py:303",
+        "timestamp": "2026-07-30T16:10:00"
       }
     ],
     "documentationGaps": [
       {
-        "body": "README 和源码安装指南均未提及 CANN 9.1.0 的 libhccl_v2.so 存在未定义符号 HcclCheckLogLevel(int, int) 的问题。该符号定义在 libhccl_plf.so 中，但 libhccl_v2.so 未链接此库。用户安装 CANN 后直接导入 torch_npu 会遇到 ImportError，需要手动设置 LD_PRELOAD 才能解决。建议在安装指南中补充说明。",
-        "source": "README.md 安装章节 + docs/zh/installation_guide/compilation_installation_using_source_code.md",
-        "time": "2026-07-30T13:19:10",
-        "title": "README 未说明 CANN libhccl_v2.so 的符号依赖问题"
+        "body": "README.md Installation 章节示例使用 torch==2.10.0，但 master 分支 requirements.txt 与 devcontainer.json 均要求 torch==2.13.0。新手按 README 安装 torch 2.10.0 后构建 master 分支会出现版本不匹配，ci/build.sh 的 check_torch_installed 会因大版本不一致而报错退出。",
+        "source": "README.md Installation 章节 (line 78) vs requirements.txt (torch==2.13.0) vs .devcontainer/devcontainer.json (TORCH_VERSION=2.13.0)",
+        "time": "2026-07-30T14:35:00",
+        "title": "README 安装章节 PyTorch 版本与 master 分支 requirements.txt 不一致"
       },
       {
-        "body": "源码安装指南提到需要安装 CANN，但未明确说明 CANN 版本与 NPU 驱动版本的兼容性矩阵。当前环境中驱动版本 25.5.0 与 CANN 9.1.0 存在兼容性问题（npu-smi 报警告 driver package may not be completely installed），导致 NPU 运行时功能不可用。建议补充驱动与 CANN 版本配套说明。",
-        "source": "docs/zh/installation_guide/compilation_installation_using_source_code.md",
-        "time": "2026-07-30T13:19:10",
-        "title": "源码安装指南未说明 CANN 与驱动版本的兼容性要求"
+        "body": "源码编译指南(docs/zh/installation_guide/compilation_installation_using_source_code.md)要求 source CANN set_env.sh 但未说明 CANN 工具链的 TBE 算子编译器(AOE/CannKB)是基于 Python 的，且需与安装 CANN 时使用的 Python 版本一致。若在非 CANN 原生 Python 环境(如 Ubuntu 22.04 的 python3.10 vs openEuler 的 python3.7)运行，TBE 编译器初始化会因 multiprocessing forkserver 信号处理兼容性问题失败，导致 NPU 计算不可用。指南应明确指出 CANN 必须与运行环境 Python 配套安装。",
+        "source": "docs/zh/installation_guide/compilation_installation_using_source_code.md 安装TorchNPU插件章节",
+        "time": "2026-07-30T14:40:00",
+        "title": "源码编译指南未说明 CANN TBE 编译器对 Python 版本的强依赖"
       },
       {
-        "body": "源码安装指南的 gcc/cmake 版本要求表格仅列到 PyTorch 2.10.0（AArch64 要求 gcc 13.3.0、cmake 4.0.3），当前 master 分支版本为 2.13.0，表格未更新。实际构建使用 gcc 13.4.0 和 cmake 4.4.0 成功，但文档缺乏对 2.11.0-2.14.0 版本的要求说明。",
-        "source": "docs/zh/installation_guide/compilation_installation_using_source_code.md - gcc/cmake 版本要求表格",
-        "time": "2026-07-30T13:19:10",
-        "title": "README 源码安装指南中 gcc/cmake 版本要求表格未覆盖 PyTorch 2.13.0"
+        "body": "编译指南的表1(gcc/cmake 版本要求)仅列出到 PyTorch 2.10.0 的要求(aarch64 需 gcc 13.3.0 / cmake 4.0.3)，未覆盖 master 分支对应的 2.13.0。开发者需自行从 docker/devel/Dockerfile(DEVTOOLSET_VERSION=13)推断 gcc 版本，cmake 4.0.3 则需从 devel Dockerfile(仅 amd64 显式安装 cmake)反向推断。建议补充 2.13.0 行。",
+        "source": "docs/zh/installation_guide/compilation_installation_using_source_code.md 表1 gcc_cmake + docker/devel/Dockerfile",
+        "time": "2026-07-30T14:50:00",
+        "title": "gcc/cmake 版本要求表未覆盖 master 分支(PyTorch 2.13.0)的 aarch64 要求"
+      },
+      {
+        "body": "在标准 CANN set_env.sh 环境下 import torch_npu 时，libhccl.so 存在未解析符号 _Z17HcclCheckLogLevelii(定义于 aarch64-linux/lib64/libhccl_plf.so)，set_env.sh 既未将 aarch64-linux/lib64 加入 LD_LIBRARY_PATH，libhccl.so 也未将 libhccl_plf.so 列为 NEEDED 依赖，导致运行时符号解析失败。文档未提及此运行时配置要求，新手难以定位。",
+        "source": "CANN 9.1.0 set_env.sh + libhccl.so 依赖关系 (验证中实测发现)",
+        "time": "2026-07-30T15:55:00",
+        "title": "未说明 libhccl.so 运行时符号解析需 libhccl_plf.so 预加载或路径配置"
+      },
+      {
+        "body": "源码编译指南的 git clone 命令使用 --depth 1 但未加 --recurse-submodules，而 torch_npu 构建依赖 third_party/op-plugin(算子插件)、torchair、googletest 等子模块。新手按指南克隆后子模块为空，ci/build.sh 在 Fetching ACL headers 阶段或 setup.py 构建阶段会失败。指南应明确提示需执行 git submodule update --init --recursive。",
+        "source": "docs/zh/installation_guide/compilation_installation_using_source_code.md 方式一/方式二 git clone 步骤 + .gitmodules",
+        "time": "2026-07-30T14:30:00",
+        "title": "源码编译指南未提示需初始化 git 子模块"
       }
     ]
   },
