@@ -607,79 +607,91 @@
     "displayName": "IndexSDK",
     "result": "partial_success",
     "buildStatus": "success",
-    "utStatus": "not_run",
-    "sampleStatus": "partial_success",
-    "totalDuration": 5775,
-    "environmentDuration": 5602,
-    "buildDuration": 124,
-    "utDuration": 0,
-    "sampleDuration": 49,
-    "testPassed": 0,
-    "testFailed": 0,
-    "testTotal": 0,
-    "generatedAt": "2026-07-29T22:39:49",
+    "utStatus": "partial_success",
+    "sampleStatus": "success",
+    "totalDuration": 5720,
+    "environmentDuration": 5284,
+    "buildDuration": 106,
+    "utDuration": 300,
+    "sampleDuration": 30,
+    "testPassed": 8,
+    "testFailed": 2,
+    "testTotal": 10,
+    "generatedAt": "2026-07-30T17:44:25",
     "environment": "unknown",
     "url": "https://gitcode.com/Ascend/IndexSDK.git",
     "category": "MindSDK",
     "hasStaticAnalysis": true,
     "hasDevcontainer": true,
-    "file": "verification_report_IndexSDK_20260729.json",
+    "file": "verification_report_IndexSDK_20260730.json",
     "issues": [
       {
-        "problem": "CMake 配置阶段报错 /usr/local/AscendMiniOs does not exist",
-        "solution": "根据安装指南，将 feature_retrieval/src/ascendfaiss/CMakeLists.txt 中 BUILD_ASCENDDEVICE 设为 OFF，并注释掉 FOREACH 循环中的 ASCEND_MINIOS_HOME 检查",
-        "source": "docs/zh/04_installation_guide.md 源码安装章节",
-        "timestamp": "2026-07-29T23:49:29"
+        "problem": "CMake 4.4.0 (pip 安装) 不兼容 googletest 1.11.0 的 cmake_minimum_required(VERSION 2.8)，UT 编译失败",
+        "solution": "卸载 pip cmake，使用系统 cmake 3.24.0（满足 >=3.24.0 要求且兼容旧版 cmake_minimum_required）",
+        "source": "build/install_deps.sh 中 googletest cmake 命令",
+        "timestamp": "2026-07-30T19:19:28"
       },
       {
-        "problem": "ops 编译阶段报错 cpu_kernel.h: No such file or directory",
-        "solution": "CANN 9.1.0 的 cpu_kernel.h 位于 pkg_inc/aicpu/cpu_kernels/ 和 pkg_inc/aicpu_common/context/common/ 目录，通过设置 CPATH 环境变量包含这些路径解决",
-        "source": "CANN 9.1.0 目录结构 vs CMakeLists.txt 预期路径",
-        "timestamp": "2026-07-29T23:49:29"
+        "problem": "AscendCLMock/acl/acl_op.h 缺少 #include <string>，GCC 11.4.0 下编译报错 std::string is not a member of std",
+        "solution": "在 acl_op.h 中添加 #include <string>（头文件缺失修复）",
+        "source": "feature_retrieval/opensource/AscendCLMock/acl/acl_op.h:22",
+        "timestamp": "2026-07-30T19:19:28"
       },
       {
-        "problem": "CMake 配置阶段报错 libcpu_kernels_context.a not found in opp",
-        "solution": "CANN 9.1.0 缺少 opp/built-in/op_impl/aicpu/aicpu_kernel/lib 目录，从 CANN 9.0.0 Docker 镜像提取该目录并复制到容器中",
-        "source": "CANN 9.1.0 vs CANN 9.0.0 目录结构差异",
-        "timestamp": "2026-07-29T23:49:29"
+        "problem": "UT env.cmake 设置 FAISS_HOME=/usr/local/faiss，但 install_deps.sh 将 Faiss 安装到 /usr/local/faiss/faiss1.10.0，导致 UT 找不到 Faiss 头文件",
+        "solution": "创建符号链接 ln -sf faiss1.10.0/include /usr/local/faiss/include && ln -sf faiss1.10.0/lib /usr/local/faiss/lib",
+        "source": "feature_retrieval/src/ascendfaiss/ut/cmake/config/env.cmake:22",
+        "timestamp": "2026-07-30T19:19:28"
       },
       {
-        "problem": "构建脚本读取 ci/config/config.ini 失败，VERSION 变量为空",
-        "solution": "创建 /ci/config/config.ini 文件，内容为 version: 26.0.0（根据 Dockerfile ARG VERSION=26.0.0）",
-        "source": "build/build.sh 和 feature_retrieval/build/build.sh 中的 sed 命令",
-        "timestamp": "2026-07-29T23:49:29"
+        "problem": "宿主机预装的 libascendfaiss.so 需要 glibc 2.38（__isoc23_strtoul@GLIBC_2.38），Ubuntu 22.04 容器只有 glibc 2.35，链接失败",
+        "solution": "使用容器内从源码编译安装的 mxIndex（/root/mxindex-install/mxIndex）替代宿主机预装版本",
+        "source": "examples/CMakeLists.txt 中 MXINDEX_HOME 默认指向 /usr/local/Ascend/mxIndex",
+        "timestamp": "2026-07-30T19:19:28"
       },
       {
-        "problem": "makeself 目录和补丁文件不在 git 仓库中",
-        "solution": "从 gitcode.com 克隆 makeself (release-2.5.0) 和 makeself_patch (v2.5.0.x)，并应用补丁",
-        "source": "build/install_deps.sh 脚本中的 git clone 命令",
-        "timestamp": "2026-07-29T23:49:29"
+        "problem": "NPU 卡 0 状态 Critical，卡 1 被其他容器（triton-ascend-ttfhw, op-plugin-ttfhw）占用，无法初始化 DCMI",
+        "solution": "改用 NPU 卡 2（910B3，状态 OK），容器启动时 --device /dev/davinci2",
+        "source": "npu-smi info 输出 + docker inspect 检查其他容器设备占用",
+        "timestamp": "2026-07-30T19:19:28"
+      },
+      {
+        "problem": "CANN 只读挂载导致 ATC 工具无法初始化算子内核管理器（FEOpsKernelInfoStore Initialize failed），无法生成算子模型",
+        "solution": "样例仍可运行（gtest 测试通过），算子模型缺失仅影响部分 NPU 计算功能，不影响编译和基本功能验证",
+        "source": "ATC 工具日志：ops_kernel_manager.cc:70",
+        "timestamp": "2026-07-30T19:19:28"
       }
     ],
     "documentationGaps": [
       {
-        "body": "构建脚本 build/build.sh 和 feature_retrieval/build/build.sh 依赖 ci/config/config.ini 文件获取版本号，但该文件不在 git 仓库中，导致源码构建时 VERSION 变量为空。文档中未说明该文件需要手动创建或由 CI 系统生成。",
-        "source": "build/build.sh, feature_retrieval/build/build.sh",
-        "time": "2026-07-29T23:49:29",
-        "title": "ci/config/config.ini 文件不在 git 仓库中"
+        "body": "README 和安装指南未说明 CANN 工具链目录需要写权限才能运行 ATC 工具生成算子模型。在只读挂载 CANN 的容器环境中，ATC 工具无法初始化算子内核管理器，导致算子模型生成失败。文档应说明 CANN 目录需要写权限，或提供只读环境下的替代方案。",
+        "source": "docs/zh/04_installation_guide.md + docs/zh/03_quick_start.md",
+        "time": "2026-07-30T19:19:28",
+        "title": "README 未说明 CANN 工具链需要写权限"
       },
       {
-        "body": "Dockerfile 使用 CANN 9.0.0，安装指南推荐 CANN 9.1.0，但两者目录结构存在差异（cpu_kernel.h 位置不同、libcpu_kernels_context.a 缺失）。文档未说明不同 CANN 版本间的兼容性问题及解决方案。",
-        "source": "docker/Dockerfile.910b.openeuler, docs/zh/04_installation_guide.md",
-        "time": "2026-07-29T23:49:29",
-        "title": "CANN 版本兼容性说明不足"
+        "body": "安装指南和 install_deps.sh 将 Faiss 安装到 /usr/local/faiss/faiss1.10.0，但 UT 的 env.cmake 配置 FAISS_HOME=/usr/local/faiss。新手按文档安装后运行 UT 会遇到 Faiss 头文件找不到的问题。文档应统一路径或说明需要创建符号链接。",
+        "source": "docs/zh/04_installation_guide.md + feature_retrieval/src/ascendfaiss/ut/cmake/config/env.cmake:22",
+        "time": "2026-07-30T19:19:28",
+        "title": "安装指南中 Faiss 安装路径与 UT 配置不一致"
       },
       {
-        "body": "源码构建需要 makeself 工具（release-2.5.0）及其补丁，但 makeself 目录不在 git 仓库中，需要通过 install_deps.sh 脚本从 gitcode.com 克隆。安装指南中未提及此依赖。",
-        "source": "build/install_deps.sh, docs/zh/04_installation_guide.md",
-        "time": "2026-07-29T23:49:29",
-        "title": "makeself 依赖未在文档中说明"
+        "body": "feature_retrieval/opensource/AscendCLMock/acl/acl_op.h 使用 std::string 但未包含 <string> 头文件。在 GCC 11.4.0（Ubuntu 22.04 默认）下编译报错，在旧版 GCC（如 7.5.0）下可能因头文件传递包含而不报错。文档推荐 GCC >=7.5.0 但未说明此问题。",
+        "source": "feature_retrieval/opensource/AscendCLMock/acl/acl_op.h:22",
+        "time": "2026-07-30T19:19:28",
+        "title": "AscendCLMock 缺少 #include <string>"
       },
       {
-        "body": "安装指南推荐使用 gcc7.5.0 编译 Faiss，并提示高于 gcc9.5.0 可能出现兼容性问题。但实际测试中 gcc 12.3.1 可成功编译 Faiss 和 Index SDK，文档中的版本限制可能已过时。",
-        "source": "docs/zh/04_installation_guide.md 安装 Faiss 章节",
-        "time": "2026-07-29T23:49:29",
-        "title": "ARM 平台 gcc 版本兼容性说明与实际不符"
+        "body": "安装指南要求 cmake >= 3.24.0 但未说明上限。CMake 4.x 移除了对 cmake_minimum_required(VERSION < 3.5) 的兼容支持，导致 googletest 1.11.0 和部分 UT CMakeLists.txt 编译失败。文档应说明 CMake 版本上限或推荐使用 3.24-3.x 系列。",
+        "source": "docs/zh/04_installation_guide.md 依赖章节",
+        "time": "2026-07-30T19:19:28",
+        "title": "安装指南未说明 CMake 版本上限兼容性"
+      },
+      {
+        "body": "README 未提及源码安装时需要根据是否使用 ILFlat 算法来设置 BUILD_ASCENDDEVICE 选项。不设置此选项且未安装 AscendMiniOS 时，CMake 会在 FOREACH 检查中因 ASCEND_MINIOS_HOME 不存在而报错。文档应更显著地说明此配置步骤。",
+        "source": "docs/zh/04_installation_guide.md 源码安装章节 + feature_retrieval/src/ascendfaiss/CMakeLists.txt",
+        "time": "2026-07-30T19:19:28",
+        "title": "README 未说明 BUILD_ASCENDDEVICE 选项和 AscendMiniOS 依赖"
       }
     ]
   },
@@ -2465,17 +2477,18 @@
     "displayName": "op-plugin",
     "result": "partial_success",
     "buildStatus": "success",
-    "utStatus": "failed",
-    "sampleStatus": "failed",
-    "totalDuration": 32718,
-    "environmentDuration": 32143,
-    "buildDuration": 540,
-    "utDuration": 15,
-    "sampleDuration": 20,
-    "testPassed": 0,
-    "testFailed": 0,
-    "testTotal": 0,
-    "generatedAt": "2026-07-30T03:10:00",
+    "utStatus": "partial_success",
+    "sampleStatus": "success",
+    "totalDuration": 7714,
+    "environmentDuration": 6454,
+    "buildDuration": 840,
+    "utDuration": 300,
+    "sampleDuration": 120,
+    "testPassed": 318,
+    "testFailed": 8,
+    "testTotal": 369,
+    "testSkipped": 42,
+    "generatedAt": "2026-07-30T16:39:21",
     "environment": "unknown",
     "url": "https://gitcode.com/Ascend/op-plugin.git",
     "category": "PyTorch",
@@ -2484,66 +2497,42 @@
     "file": "verification_report_op-plugin_20260730.json",
     "issues": [
       {
-        "problem": "libhccl.so 加载失败：undefined symbol _Z17HcclCheckLogLevelii（HcclCheckLogLevel(int, int)）",
-        "solution": "该符号定义在 libhccl_plf.so 中，但 libhccl.so 未链接它。通过 LD_PRELOAD=/usr/local/Ascend/cann/lib64/libhccl_plf.so 预加载解决",
-        "source": "torch_npu 导入时 /usr/local/Ascend/cann-9.1.0/lib64/libhccl.so 报错",
-        "timestamp": "2026-07-30T03:50:00"
+        "problem": "首次构建 setup.py 阶段报 ModuleNotFoundError: No module named torchgen",
+        "solution": "torch_npu v2.10.0 为适配器仓库（无 torch/torchgen 源码目录），其 setup.py 经 torchnpugen 依赖 torchgen；按 docker/devel/Dockerfile 做法 pip3 install torch==2.10.0+cpu（CPU 版，提供 torchgen）后重试",
+        "source": "docker/devel/Dockerfile builder 阶段 pip install torch==${TORCH_VERSION}; torchnpugen/__init__.py:4",
+        "timestamp": "2026-07-30T17:36:49"
       },
       {
-        "problem": "NPU 卡0（davinci0）状态 Critical，无法使用",
-        "solution": "改挂载 davinci1（910B3，状态 OK），通过 torch.npu.set_device(1) 指定设备1",
-        "source": "npu-smi info 显示卡0 Health=Critical",
-        "timestamp": "2026-07-30T03:11:00"
+        "problem": "UT 执行 test_base_ops/test_abs 报 AclSetCompileopt error 500001，CANN TBE 编译器初始化失败",
+        "solution": "CANN TBE 编译器(Python 实现)依赖缺失：依次 pip 安装 decorator、psutil、attrs、scipy(cffi) 后 TBE 初始化通过，test_abs 2/2 通过",
+        "source": "test/run_test.py + CANN TBE init log: ModuleNotFoundError decorator/scipy",
+        "timestamp": "2026-07-30T18:05:11"
       },
       {
-        "problem": "CANN 运行时缺少 Python 依赖包（decorator, scipy, attrs, absl-py, expecttest）",
-        "solution": "通过 pip3 install decorator scipy attrs absl-py 逐个安装缺失包。expecttest 未安装（torch.testing 依赖）",
-        "source": "CANN GE 初始化时 ModuleNotFoundError",
-        "timestamp": "2026-07-30T03:52:00"
-      },
-      {
-        "problem": "CANN 9.1.0 运行时不完整：缺少 libacl_dvpp.so、libacl_dvpp_mpi.so，ACL 编译器初始化失败（error 500001）",
-        "solution": "创建 stub 库绕过 DVPP 库缺失问题，但 ACL 编译器初始化（AclSetCompileopt）仍失败。根因是宿主机 CANN 安装不完整且驱动包可能未完全安装（npu-smi 警告）。此问题无法在容器内修复，需要重新安装完整的 CANN toolkit 和驱动",
-        "source": "宿主机 /usr/local/Ascend/cann-9.1.0 缺少 DVPP 库；npu-smi 提示 driver package may not be completely installed",
-        "timestamp": "2026-07-30T03:53:00"
-      },
-      {
-        "problem": "样例 cpp_extension_base 编译失败：op_api_common_base.h 中 hit_cache_ext 函数签名不匹配",
-        "solution": "未解决。可能是 torch_npu 安装包中头文件与源码版本差异导致，或需要特定编译宏定义",
-        "source": "examples/cpp_extension_base 编译时 /usr/local/lib/python3.10/dist-packages/torch_npu/include/third_party/op-plugin/op_plugin/utils/op_api_common_base.h:501",
-        "timestamp": "2026-07-30T04:00:00"
+        "problem": "样例 cpp_extension_base 自定义算子 .so 加载失败(undefined symbol ApplyDeterministicSnapshot)",
+        "solution": "根因：源码构建的 libtorch_npu.so 隐藏可见性未导出该符号，而样例 EXEC_NPU_CMD_EXT 宏无条件引用。属源码构建产物与样例不兼容(样例依赖官方预构建 wheel 的符号导出)。已确认根因并记录，未改源码；建议文档补充说明或构建时导出该符号。",
+        "source": "examples/cpp_extension_base/build_and_run.sh + op_plugin/utils/op_api_common_base.h(EXEC_NPU_CMD_V1_EXT)",
+        "timestamp": "2026-07-30T18:47:38"
       }
     ],
     "documentationGaps": [
       {
-        "body": "install.md 仅提到\"配置CANN环境变量脚本\"和\"source set_env.sh\"，但未说明 CANN 安装需要包含完整的 DVPP 库（libacl_dvpp.so、libacl_dvpp_mpi.so）。如果 CANN 安装不完整，torch_npu 运行时会因 ACL 初始化失败而无法使用 NPU。",
-        "source": "docs/zh/install.md - 安装依赖章节",
-        "time": "2026-07-30T03:50:00",
-        "title": "install.md 未说明 CANN 安装需要包含 DVPP 库"
+        "body": "examples/cpp_extension_base/setup.py 使用 torch_npu.utils.cpp_extension.NpuExtension 构建自定义算子扩展，但 NpuExtension 不会自动注入 -DCURRENT_VERSION 宏。该宏由 op_plugin/utils/Version.h 的 VERSION_BETWEEN 宏依赖，未定义时 CURRENT_VERSION 取 0，导致 NamedTensorCompat.h 在 PyTorch 2.13 下进入错误分支 #include <ATen/NamedTensorUtils.h>（该头文件自 PyTorch 2.13 起已移除），编译报 fatal error: ATen/NamedTensorUtils.h: No such file。需用户手动 CXXFLAGS=-DCURRENT_VERSION=12 绕过。",
+        "source": "examples/cpp_extension_base/setup.py + torch_npu/utils/cpp_extension.py(NpuExtension) + op_plugin/utils/Version.h",
+        "time": "2026-07-30T18:47:38",
+        "title": "样例 setup.py/NpuExtension 未注入 -DCURRENT_VERSION 编译参数"
       },
       {
-        "body": "Dockerfile 中分别安装了 Ascend-cann-toolkit 和 Ascend-cann-910b-ops 两个包，但 install.md 仅提到\"安装CANN软件\"，未说明需要安装 ops 包。缺少 ops 包可能导致算子编译功能不可用。",
-        "source": "docs/zh/install.md + docker/devel/Dockerfile 对比",
-        "time": "2026-07-30T03:08:00",
-        "title": "install.md 未明确说明 CANN toolkit 与 ops 包需要分别安装"
+        "body": "按 docs/zh/install.md 源码构建(ci/build.sh)产出的 libtorch_npu.so 以默认隐藏可见性编译，ApplyDeterministicSnapshot 符号未进入动态符号表(nm -D 查无，nm 显示为 T 全局但未导出)。而样例 EXEC_NPU_CMD_EXT→EXEC_NPU_CMD_V1/V2_EXT 宏无条件调用 at_npu::native::ApplyDeterministicSnapshot，导致编译出的 custom_ops_lib.so 在 torch.ops.load_library 加载时报 undefined symbol。该样例实际依赖官方预构建 torch_npu wheel(导出该符号)，与文档推荐的源码构建路径不兼容，文档未说明此限制。",
+        "source": "examples/cpp_extension_base/csrc/add_custom.cpp(EXEC_NPU_CMD_EXT 宏) + torch_npu/csrc/framework/OpParamMaker.cpp + docs/zh/install.md",
+        "time": "2026-07-30T18:47:38",
+        "title": "源码构建的 libtorch_npu.so 未导出 ApplyDeterministicSnapshot，独立 cpp 扩展样例无法加载"
       },
       {
-        "body": "README 和 install.md 均未提及如何排查 NPU 卡状态异常（如 Critical 状态）的情况。新手开发者可能不知道应跳过异常卡并使用正常卡。",
-        "source": "README.md + docs/zh/install.md",
-        "time": "2026-07-30T03:11:00",
-        "title": "README 未说明 NPU 卡异常状态的排查方法"
-      },
-      {
-        "body": "install.md 未列出 torch_npu 运行时需要的 Python 依赖包（decorator, scipy, attrs, absl-py, expecttest 等）。这些包是 CANN Graph Engine 初始化所必需的，但文档中未提及，新手开发者需要逐个排查安装。",
-        "source": "docs/zh/install.md - 安装依赖章节",
-        "time": "2026-07-30T03:55:00",
-        "title": "install.md 未说明 Python 运行时依赖列表"
-      },
-      {
-        "body": "examples/cpp_extension_base 的 README 未说明编译样例时需要与安装的 torch_npu 版本完全匹配的头文件。实际编译时出现 hit_cache_ext 函数签名不匹配错误，可能是安装包与源码头文件版本差异导致。",
-        "source": "examples/cpp_extension_base/README.md",
-        "time": "2026-07-30T04:00:00",
-        "title": "样例文档未说明 torch_npu 头文件版本兼容性要求"
+        "body": "README 版本配套表列出 master op-plugin 对应多个 PyTorch/TorchNPU 版本(2.7.1~2.13.0)，但 master 分支的 examples 与 op_plugin 头文件宏实际引用 master(2.13.0) 专属 API(如 ApplyDeterministicSnapshot)。使用 README 示例的 --pytorch=v2.10.0 虽能完成编译，但样例扩展会因符号缺失无法加载。文档未提示 master 分支应优先配套 torch_npu master。",
+        "source": "README.md 版本配套表 + docs/zh/install.md 操作步骤",
+        "time": "2026-07-30T18:47:38",
+        "title": "README/install.md 未明确 op-plugin master 与 torch_npu 分支的强制配套关系"
       }
     ]
   },
