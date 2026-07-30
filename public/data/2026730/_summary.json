@@ -2592,18 +2592,18 @@
     "name": "Plugin",
     "displayName": "Plugin",
     "result": "partial_success",
-    "buildStatus": "partial_success",
-    "utStatus": "not_run",
-    "sampleStatus": "success",
-    "totalDuration": 3849,
-    "environmentDuration": 3219,
-    "buildDuration": 600,
-    "utDuration": 0,
-    "sampleDuration": 30,
-    "testPassed": 0,
-    "testFailed": 0,
-    "testTotal": 0,
-    "generatedAt": "2026-07-30T12:16:32",
+    "buildStatus": "success",
+    "utStatus": "partial_success",
+    "sampleStatus": "unknown",
+    "totalDuration": 8759,
+    "environmentDuration": 7812,
+    "buildDuration": 522,
+    "utDuration": 425,
+    "sampleDuration": 0,
+    "testPassed": 153,
+    "testFailed": 366,
+    "testTotal": 519,
+    "generatedAt": "2026-07-30T16:06:51",
     "environment": "unknown",
     "url": "https://gitcode.com/openGauss/Plugin.git",
     "category": "openGauss",
@@ -2612,66 +2612,60 @@
     "file": "verification_report_Plugin_20260730.json",
     "issues": [
       {
-        "problem": "初始按 contrib/age/Dockerfile FROM postgres:11 选择 Ubuntu 22.04 基础镜像，但阅读 openGauss-server README 发现其官方仅支持 openEuler/CentOS 操作系统，binarylibs 第三方预编译库也仅提供 openEuler/CentOS 版本，Ubuntu 上无法编译",
-        "solution": "切换为 openEuler 24.03 LTS 基础镜像（hub.oepkgs.net/openeuler/openeuler:24.03-lts），重新创建容器并挂载仓库目录",
-        "source": "openGauss-server README.md - 操作系统和软件依赖要求章节",
-        "timestamp": "2026-07-30T12:35:15"
+        "problem": "make install 阶段 cmake 因 libstdc++ 版本冲突无法运行：GCC 10.3 binarylibs 的 libstdc++.so.6 仅提供 GLIBCXX_3.4.28，而系统 cmake 3.27.9 需要 GLIBCXX_3.4.30",
+        "solution": "将 /usr/lib64 放在 LD_LIBRARY_PATH 首位，使 cmake 使用系统 GCC 12.3.1 提供的 libstdc++（包含 GLIBCXX_3.4.30），同时保留 GCC 10.3 路径供编译产物使用",
+        "source": "openGauss-server dest/lib/libstdc++.so.6 与 binarylibs/buildtools/gcc10.3/gcc/lib64/libstdc++.so.6",
+        "timestamp": "2026-07-30T17:29:07"
       },
       {
-        "problem": "编译缺少 java-1.8.0-openjdk-devel 依赖",
-        "solution": "通过 dnf 安装 java-1.8.0-openjdk-devel",
-        "source": "build.sh 依赖检查",
-        "timestamp": "2026-07-30T13:18:15"
+        "problem": "timescaledb 插件编译失败：缺少 gssapi/gssapi.h 头文件（krb5-devel 未安装）",
+        "solution": "不影响 dolphin 插件测试，跳过 timescaledb 安装。手动执行 make -C src/bin/psql install 和 make -C src/bin/initdb install 安装所需组件",
+        "source": "contrib/timescaledb 编译日志：fatal error: gssapi/gssapi.h: No such file or directory",
+        "timestamp": "2026-07-30T17:29:07"
       },
       {
-        "problem": "binarylibs -3rd 参数路径错误：build.sh 帮助说明为父目录，但 build_opengauss.sh 实际需要 binarylibs 目录本身",
-        "solution": "使用 -3rd /ttfhw/binarylibs 指向 binarylibs 目录本身",
-        "source": "build.sh -3rd 参数 vs build_opengauss.sh binarylib_dir 使用方式",
-        "timestamp": "2026-07-30T13:18:15"
+        "problem": "dolphin check 用例需以非 root 用户运行：pg_regress 不允许 root 用户执行",
+        "solution": "创建 omm 用户（uid=1000），将 openGauss-server 源码目录属主改为 omm，使用 docker exec --user omm 运行测试",
+        "source": "pg_regress: cannot be run as root",
+        "timestamp": "2026-07-30T18:14:08"
       },
       {
-        "problem": "dolphin 目录通过软链接挂载到 openGauss-server/contrib/dolphin，导致 cmake 的 CMAKE_SOURCE_DIR 和相对路径 ../.. 解析到 Plugin 仓库路径，找不到 openGauss-server 的 cmake 模块和源文件",
-        "solution": "删除软链接，改用 cp -r 复制 dolphin 目录到 openGauss-server/contrib/dolphin",
-        "source": "cmake_compile.sh + dolphin CMakeLists.txt 路径解析",
-        "timestamp": "2026-07-30T13:18:15"
+        "problem": "pg_regress 临时安装阶段 make install 失败：omm 用户无法读取 binarylibs 中的 libstdc++.so.6（权限不足）",
+        "solution": "执行 chmod -R a+rx /workspace/build/binarylibs 修复权限；删除 timescaledb 目录避免 gssapi/gssapi.h 编译错误",
+        "source": "cp: cannot stat libstdc++.so.6: Permission denied; timescaledb: gssapi/gssapi.h: No such file or directory",
+        "timestamp": "2026-07-30T18:14:08"
       }
     ],
     "documentationGaps": [
       {
-        "body": "Plugin 仓库 README 指明需要拉取 openGauss-server 并在其根目录执行 make 编译，但未说明 openGauss-server 仅支持 openEuler/CentOS 操作系统。新手开发者可能在 Ubuntu 等不支持的系统上尝试编译而失败。此外，contrib/age/Dockerfile 使用 FROM postgres:11（Debian 系列），可能误导开发者认为项目支持 Debian/Ubuntu。",
-        "source": "README.md + openGauss-server/README.md - 操作系统和软件依赖要求章节",
-        "time": "2026-07-30T12:42:26",
-        "title": "Plugin 仓库 README 未说明 openGauss-server 的操作系统要求"
-      },
-      {
-        "body": "Plugin 仓库 README 指明在 openGauss-server 根目录执行 make 编译，但未提及 openGauss 编译需要 binarylibs 第三方预编译库。新手需要阅读 openGauss-server 的 README 才能了解此依赖，增加了上手难度。",
-        "source": "README.md + openGauss-server/README.md - 编译章节",
-        "time": "2026-07-30T12:42:26",
-        "title": "Plugin 仓库 README 未说明 binarylibs 依赖"
-      },
-      {
-        "body": "README 中只提到在 openGauss-server 仓根目录下执行 make 编译项目代码，但未列出编译所需的系统依赖（如 libaio-devel, bison, flex, ncurses-devel 等），需要查看 openGauss-server 的 build.sh 或 README 才能获取完整依赖列表。",
+        "body": "README 中构建说明仅提到在 openGauss-server 仓根目录下执行 make 编译项目代码，但未提及 openGauss 编译依赖预构建的 binarylibs 三方库（约 837MB），新手无法仅凭 README 完成构建。",
         "source": "README.md - dolphin 插件 check 用例执行章节",
-        "time": "2026-07-30T12:42:26",
-        "title": "Plugin 仓库 README 未说明编译依赖列表"
+        "time": "2026-07-30T18:32:20",
+        "title": "README 未说明需要单独下载 openGauss binarylibs 三方库"
       },
       {
-        "body": "dolphin 插件的 pgstatfuncs.cpp 引用了 PgStatProgressInfo 类型和 PgBackendStatus.pg_stat_progress_info 成员，但这些在 openGauss-server master 分支中不存在。说明 dolphin 插件可能与特定版本的 openGauss-server 配合使用，但 README 未说明版本对应关系，导致使用 master 分支编译时失败。",
-        "source": "README.md + contrib/dolphin/plugin_utils/adt/pgstatfuncs.cpp:4618",
-        "time": "2026-07-30T13:18:15",
-        "title": "Plugin 仓库 README 未说明 dolphin 插件与 openGauss-server 的版本兼容性"
+        "body": "README 构建说明过于简化，未提及需要设置 CODE_BASE、BINARYLIBS、GAUSSHOME、GCC_PATH 等环境变量，也未说明需要使用 binarylibs 中的 GCC 10.3 而非系统 GCC。实际构建需要执行 configure 步骤并指定 --gcc-version=10.3.1 等参数。",
+        "source": "README.md - 编译章节 + openGauss-server README 编译说明",
+        "time": "2026-07-30T18:32:20",
+        "title": "README 未说明需要设置环境变量和使用 GCC 10.3"
       },
       {
-        "body": "build.sh 帮助信息说 -3rd 是 \"the parent directory of binarylibs\"，但 build_opengauss.sh 和 cmake_compile.sh 实际使用 binarylib_dir 作为 binarylibs 目录本身（如 ${binarylib_dir}/buildtools/）。这种不一致可能导致用户传递错误的路径。",
-        "source": "openGauss-server/build.sh:60 + build_opengauss.sh:25",
-        "time": "2026-07-30T13:18:15",
-        "title": "build.sh 的 -3rd 参数说明与实际使用不一致"
-      },
-      {
-        "body": "README 说\"将 Plugin 仓中 contrib/dolphin 目录复制或软链接到 openGauss-server 仓的 contrib 目录下\"，但使用软链接时，cmake 的路径解析会导致构建失败（CMAKE_SOURCE_DIR 解析到 Plugin 仓库路径）。应明确说明必须使用复制方式。",
+        "body": "README 中 check 用例执行说明未提及 pg_regress 不允许以 root 用户运行，新手在 root 环境下执行 make check 会遇到 pg_regress: cannot be run as root 错误。",
         "source": "README.md - dolphin 插件 check 用例执行章节",
-        "time": "2026-07-30T13:18:15",
-        "title": "README 未说明 dolphin 目录应使用复制而非软链接"
+        "time": "2026-07-30T18:32:20",
+        "title": "README 未说明测试需要非 root 用户执行"
+      },
+      {
+        "body": "README 未指定 Plugin 仓与 openGauss-server 的版本对应关系。使用 openGauss-server master 分支编译后运行 check 用例，约 70% 的用例因输出格式差异（额外 WARNING 消息、格式变化）而失败，表明 Plugin 仓的预期测试结果与特定版本的 openGauss-server 绑定。",
+        "source": "README.md + 测试结果分析",
+        "time": "2026-07-30T18:32:20",
+        "title": "README 未说明 openGauss-server 版本兼容性要求"
+      },
+      {
+        "body": "openGauss-server 的 make install 会编译 contrib 下的所有插件，包括 timescaledb。timescaledb 需要 gssapi/gssapi.h（krb5-devel），README 未提及此依赖，导致 make install 在 timescaledb 处失败。",
+        "source": "openGauss-server GNUmakefile install target + contrib/timescaledb 编译日志",
+        "time": "2026-07-30T18:32:20",
+        "title": "README 未说明 make install 阶段可能遇到的 timescaledb 编译问题"
       }
     ]
   },
