@@ -1,0 +1,667 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md - 平台要求章节 + CMakeLists.txt",
+      "value": "aarch64 (ARMv8-A + LSE 原子指令集), CMakeLists.txt 默认 -march=armv8-a+lse"
+    },
+    "build_commands": {
+      "source": "README.md - 快速开始章节",
+      "value": "dos2unix build.sh \u0026\u0026 sh build.sh"
+    },
+    "dependencies": {
+      "source": "README.md 环境与依赖 + CMakeLists.txt + test/CMakeLists.txt",
+      "value": [
+        "cmake \u003e= 3.22 (dnf: cmake 3.27.9)",
+        "gcc/g++ 支持 C11/C++17 (dnf: gcc 12.3.1)",
+        "pthread (系统自带)",
+        "librt (系统自带)",
+        "libboundscheck.so at /usr/lib64/ (dnf: libboundscheck)",
+        "dos2unix (dnf: dos2unix)",
+        "ninja-build (可选, build.sh 优先使用 ninja)",
+        "googletest (test/3rdparty, 从 GitHub 克隆)",
+        "mockcpp (test/3rdparty, 从 GitHub 克隆, 需要 arm64 补丁)",
+        "lcov/genhtml (可选, 用于覆盖率报告)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库文件扫描",
+      "value": "仓库无 Dockerfile，依赖信息来源于 README.md 和 CMakeLists.txt"
+    },
+    "recommended_image": {
+      "source": "README.md + 仓库文件扫描",
+      "value": "仓库无 Dockerfile、无 devcontainer、无预构建镜像。README 仅要求 Linux 环境，项目来自 openEuler 组织，选择 openEuler 24.03 LTS 基础镜像"
+    },
+    "sample_commands": {
+      "source": "README.md - 使用示例章节 + 样例说明章节",
+      "value": "README 使用示例1(分布式事务资源)为自包含C++代码, 使用 ub_dist_tx_res.h, 可直接编译运行。sample_code/ 下样例(ub_lock, ub_comm_queue, share_mem)均依赖 ubsmem SDK, 无法在无 SDK 环境运行。README 样例说明提及 sample_code/ub_dist_tx_res/ 但该目录实际不存在"
+    },
+    "special_dependencies": {
+      "source": "README.md + test/3rdparty",
+      "value": [
+        "googletest: test/3rdparty/googletest (需手动克隆, 仓库无 .gitmodules)",
+        "mockcpp: test/3rdparty/mockcpp (需手动克隆, 仓库无 .gitmodules, 需要 arm64 补丁)",
+        "libboundscheck.so: /usr/lib64/libboundscheck.so (openEuler libboundscheck 包)",
+        "ubsmem SDK: 样例代码依赖, 核心库不依赖 (样例验证时缺失)"
+      ]
+    },
+    "ut_commands": {
+      "source": "README.md - 测试说明章节",
+      "value": "sh test/run_ut.sh"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "README.md 样例说明章节列出 `sample_code/ub_dist_tx_res/`：单节点、多线程、主从模式下的原子资源示例。但实际 sample_code/ 目录下只有 share_mem、ub_comm_queue、ub_lock 三个子目录，ub_dist_tx_res 目录不存在。这会误导开发者寻找不存在的示例代码。",
+      "source": "README.md 样例说明章节 + sample_code/ 目录",
+      "time": "2026-07-29T09:36:40",
+      "title": "README 样例说明提及 sample_code/ub_dist_tx_res/ 目录但实际不存在"
+    },
+    {
+      "body": "README 快速开始和测试说明章节均要求执行 `git submodule update --init --recursive`，但仓库中不存在 .gitmodules 文件。test/3rdparty/ 目录下的 googletest 和 mockcpp 需要手动从 GitHub 克隆，README 未明确说明这一替代方案。",
+      "source": "README.md 快速开始章节 + 测试说明章节",
+      "time": "2026-07-29T09:36:40",
+      "title": "README 提及 git submodule update 但仓库无 .gitmodules"
+    },
+    {
+      "body": "sample_code/ 下的 ub_lock、ub_comm_queue、share_mem 示例均依赖 ubsmem SDK（ubs_mem.h、-lubsm_sdk），但 README 未说明如何获取和安装 ubsmem SDK。开发者无法在没有该 SDK 的环境中运行这些样例。",
+      "source": "README.md 样例说明章节 + sample_code/*/README.md",
+      "time": "2026-07-29T09:36:40",
+      "title": "样例代码依赖 ubsmem SDK 但未说明获取方式"
+    },
+    {
+      "body": "4个测试用例(MessageManageTest.NotifyWaitersTest, MessageManageTest.NotifyUnlockTest, UbDistributeLockApiTest.LockApisReturnErrorOnNullArgs, UbDistributeLockApiTest.UnlockApisReturnErrorOnNullArgs)传入 nullptr 作为 policy 参数期望返回 UB_LOCK_SUCCESS(0), 但API实际返回错误码3。测试期望与实现行为不一致, 可能是API变更后测试未同步更新, 或测试用例本身有误。",
+      "source": "test/testcase/ub_lock/message_manage_test.cpp:88,238 + test/testcase/ub_lock/ub_distribute_lock_api_test.cpp:99-139",
+      "time": "2026-07-29T09:56:38",
+      "title": "4个单元测试与API实际行为不一致"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "清理同名残留容器并在远程机器克隆仓库",
+      "command": "ssh root@192.168.9.114 \"docker rm -f ubs-atomic-ttfhw; rm -rf /tmp/ubs-atomic-verify; git clone --depth 1 -b master https://gitcode.com/openeuler/ubs-atomic.git\"",
+      "details": {
+        "clone_cmd": "git clone --depth 1 -b master",
+        "remote_ip": "192.168.9.114",
+        "repo_path": "/tmp/ubs-atomic-verify"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "仓库克隆成功，包含 CMakeLists.txt, README.md, build.sh, src/, test/, sample_code/, .pre-commit-config.yaml",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-07-29T09:36:40"
+    },
+    {
+      "action": "扫描仓库确定基础镜像：无 Dockerfile、无 devcontainer、无预构建镜像 → 选择 openEuler 24.03 LTS",
+      "command": "find /tmp/ubs-atomic-verify -name Dockerfile* -o -name devcontainer.json; grep -rilE \"CANN|Ascend|torch_npu|davinci|910|310|昇腾|npu\" ...",
+      "details": {
+        "npu_keywords_scanned": "CANN, Ascend, torch_npu, npu, davinci, 910, 310, 昇腾 — 仅 sample_code/ub_comm_queue/README.md 中 \"1310\" 误匹配 \"310\"，实际为 RTT 数值，非 NPU 依赖",
+        "npu_required": false
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "无 Dockerfile, 无 .devcontainer 目录, NPU 不需要",
+      "result": "openEuler 24.03 LTS",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-07-29T09:36:40"
+    },
+    {
+      "action": "拉取 openEuler 24.03 LTS 镜像并启动容器 ubs-atomic-ttfhw",
+      "command": "docker run -d --name ubs-atomic-ttfhw -v /tmp/ubs-atomic-verify:/workspace -w /workspace hub.oepkgs.net/openeuler/openeuler:24.03-lts sleep infinity",
+      "details": {
+        "container_name": "ubs-atomic-ttfhw",
+        "image": "hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+        "mount": "/tmp/ubs-atomic-verify:/workspace"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "Container ID: 647955da5d26",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-07-29T09:36:40"
+    },
+    {
+      "action": "在容器内阅读 README.md, 提取构建/测试/样例命令和依赖信息",
+      "command": "cat /workspace/README.md",
+      "details": {
+        "build_command": "dos2unix build.sh \u0026\u0026 sh build.sh",
+        "file": "README.md",
+        "links_checked": "README 内链接为目录锚点和 sample_code 子目录, 无外部编译/测试相关链接需跟进",
+        "platform": "aarch64 ARMv8-A+LSE",
+        "sample_info": "sample_code/ 包含 ub_lock, ub_comm_queue, share_mem 示例; README 使用示例1为自包含 tx_res 代码",
+        "sections_read": [
+          "项目简介",
+          "环境与依赖",
+          "快速开始",
+          "使用示例",
+          "样例说明",
+          "测试说明",
+          "注意事项",
+          "常见问题"
+        ],
+        "ut_command": "sh test/run_ut.sh"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "README 详尽描述了项目功能(分布式锁/队列/事务资源)、构建方式(build.sh)、测试方式(test/run_ut.sh)、API说明、使用示例",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-07-29T09:36:40"
+    },
+    {
+      "action": "阅读 CMakeLists.txt 和 src/CMakeLists.txt 确认构建系统和依赖",
+      "command": "cat /workspace/CMakeLists.txt /workspace/test/CMakeLists.txt",
+      "details": {
+        "build_system": "CMake + Ninja/Make",
+        "c_standard": "C11",
+        "cmake_min_version": "3.22",
+        "cxx_standard": "C++17",
+        "file": "CMakeLists.txt + test/CMakeLists.txt",
+        "key_deps": [
+          "libboundscheck.so (/usr/lib64/)",
+          "pthread",
+          "rt"
+        ],
+        "targets": [
+          "ubs_atomic (shared lib libubs-atomic.so)",
+          "ubs_atomic_ut (test executable, BUILD_TESTS=ON)"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "CMake 项目, 构建产物为 libubs-atomic.so, 测试目标 ubs_atomic_ut, 测试依赖 googletest + mockcpp",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-07-29T09:36:40"
+    },
+    {
+      "action": "扫描仓库确认无 Dockerfile, 确定 OS 选择为 openEuler 24.03 LTS",
+      "command": "find /workspace -name Dockerfile*",
+      "details": {
+        "dockerfile": "无",
+        "reason": "项目来自 openEuler 组织, 宿主机为 openEuler aarch64, README 仅要求 Linux 环境",
+        "selected_os": "openEuler 24.03 LTS"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "无 Dockerfile 文件",
+      "result": "无 Dockerfile",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-07-29T09:36:40"
+    },
+    {
+      "action": "检查仓库 pre-commit 配置和 lint-runner 配置",
+      "command": "cat /workspace/.pre-commit-config.yaml; find /workspace -name \".lint-runner*\" -o -name \"lint-runner.config.*\"",
+      "details": {
+        "hooks": [
+          "run-build",
+          "run-build-test",
+          "clang-format",
+          "clang-tidy",
+          "clang-tidy-test"
+        ],
+        "lint_runner": "未找到 lint-runner 相关配置文件",
+        "pre_commit_config": ".pre-commit-config.yaml 存在, 5个 local hooks"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": ".pre-commit-config.yaml 存在，包含5个 local hooks (run-build, run-build-test, clang-format, clang-tidy, clang-tidy-test)",
+      "result": "pre-commit 已配置, lint-runner 未配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-07-29T09:36:40"
+    },
+    {
+      "action": "检查 .devcontainer 目录",
+      "command": "ls -la /workspace/.devcontainer/",
+      "details": {
+        "config_dir": null,
+        "files": []
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "无 .devcontainer 目录",
+      "result": "未配置 devcontainer",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-07-29T09:36:40"
+    },
+    {
+      "action": "第一层：安装系统工具链 (gcc gcc-c++ make cmake git python3 python3-pip dos2unix ninja-build)",
+      "command": "dnf install -y gcc gcc-c++ make cmake git python3 python3-pip dos2unix ninja-build",
+      "details": {
+        "packages": [
+          "gcc 12.3.1",
+          "gcc-c++ 12.3.1",
+          "cmake 3.27.9",
+          "git 2.43.0",
+          "python3 3.11.6",
+          "dos2unix 7.5.2",
+          "ninja-build 1.11.1"
+        ],
+        "source": "openEuler 官方仓库 (dnf)",
+        "total_packages": 156
+      },
+      "duration_seconds": 180,
+      "error": "",
+      "output": "安装完成：gcc-12.3.1, g++-12.3.1, cmake-3.27.9, ninja-1.11.1, python3-3.11.6, dos2unix-7.5.2, git-2.43.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-29T09:51:35"
+    },
+    {
+      "action": "第二层：安装构建依赖 libboundscheck (CMakeLists.txt 和 test/CMakeLists.txt 均依赖 /usr/lib64/libboundscheck.so)",
+      "command": "dnf install -y libboundscheck",
+      "details": {
+        "packages": [
+          "libboundscheck-1.1.11-6.oe2403.aarch64"
+        ],
+        "source": "openEuler 官方仓库 (dnf)"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "libboundscheck-v1.1.11-6.oe2403.aarch64 已安装, /usr/lib64/libboundscheck.so 存在 (67552 bytes)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-29T09:51:35"
+    },
+    {
+      "action": "验证所有依赖安装",
+      "command": "gcc --version; cmake --version; ninja --version; ls /usr/lib64/libboundscheck.so",
+      "details": {
+        "cmake": "3.27.9",
+        "dos2unix": "7.5.2",
+        "g++": "12.3.1",
+        "gcc": "12.3.1",
+        "git": "2.43.0",
+        "libboundscheck.so": "/usr/lib64/libboundscheck.so (67552 bytes)",
+        "ninja": "1.11.1",
+        "python3": "3.11.6"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "所有依赖包已确认安装且版本满足要求 (cmake \u003e= 3.22 ✓, gcc C11/C++17 ✓)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-07-29T09:51:35"
+    },
+    {
+      "action": "执行构建: dos2unix build.sh \u0026\u0026 sh build.sh -j 51 (并发数=256×20%=51)",
+      "command": "dos2unix build.sh \u0026\u0026 sh build.sh -j 51",
+      "details": {
+        "build_dir": "dist/release",
+        "build_type": "Release",
+        "compile_units": "26/26",
+        "compiler": "GNU 12.3.1",
+        "concurrency": 51,
+        "concurrency_ratio": "20% (256 cores × 20% = 51)",
+        "cxx_standard": "C++17",
+        "generator": "Ninja",
+        "platform": "Linux aarch64"
+      },
+      "duration_seconds": 4.677,
+      "error": "",
+      "output": "Ninja 26/26 编译完成, Linking CXX shared library lib/libubs-atomic.so, Build complated in 4.677s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-07-29T09:51:35"
+    },
+    {
+      "action": "第三层：克隆 googletest 源码到 test/3rdparty/ (仓库无 .gitmodules, 需手动获取; GitHub 不可达, 切换 Gitee 镜像)",
+      "command": "cd /workspace/test/3rdparty \u0026\u0026 git clone --depth 1 https://gitee.com/mirrors/googletest.git googletest",
+      "details": {
+        "note": "原始 GitHub 地址 https://github.com/google/googletest.git 连接超时(port 443 after 130s), 切换 Gitee 镜像成功",
+        "source": "Gitee 镜像 (https://gitee.com/mirrors/googletest.git)",
+        "target_dir": "test/3rdparty/googletest"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "googletest 克隆成功 (从 Gitee 镜像)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-29T09:54:16"
+    },
+    {
+      "action": "第三层：克隆 mockcpp 源码到 test/3rdparty/ (仓库无 .gitmodules, 需手动获取; GitHub 不可达, 切换 Gitee 镜像)",
+      "command": "cd /workspace/test/3rdparty \u0026\u0026 git clone --depth 1 https://gitee.com/sinojelly/mockcpp.git mockcpp",
+      "details": {
+        "note": "原始 GitHub 地址 https://github.com/sinojelly/mockcpp.git 连接超时, 切换 Gitee 镜像成功; mockcpp 需要 arm64 补丁, test/3rdparty/patch_mockcpp.sh 会在构建时自动应用",
+        "source": "Gitee 镜像 (https://gitee.com/sinojelly/mockcpp.git)",
+        "target_dir": "test/3rdparty/mockcpp"
+      },
+      "duration_seconds": 20,
+      "error": "",
+      "output": "mockcpp 克隆成功 (从 Gitee 镜像)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-29T09:54:16"
+    },
+    {
+      "action": "执行单元测试: sh test/run_ut.sh (构建 ubs_atomic_ut 并运行)",
+      "command": "sh test/run_ut.sh",
+      "details": {
+        "duration_ms": 22442,
+        "failed": 4,
+        "failed_tests": [
+          "MessageManageTest.NotifyWaitersTest - 期望 res=UB_LOCK_SUCCESS(0), 实际 res=3",
+          "MessageManageTest.NotifyUnlockTest - 期望 res=UB_LOCK_SUCCESS(0), 实际 res=3",
+          "UbDistributeLockApiTest.LockApisReturnErrorOnNullArgs - 传入 nullptr policy 期望成功但返回错误码3",
+          "UbDistributeLockApiTest.UnlockApisReturnErrorOnNullArgs - 传入 nullptr policy 期望成功但返回错误码3"
+        ],
+        "note": "4个失败均为测试期望与API实际行为不一致: 测试传入 nullptr 作为 policy 参数期望返回成功(0), 但API返回错误码3。属于代码/测试逻辑差异, 非环境问题",
+        "passed": 191,
+        "test_suites": 14,
+        "total": 195
+      },
+      "duration_seconds": 22.442,
+      "error": "4 FAILED TESTS - 测试期望传入 nullptr policy 时 API 返回成功, 但实际返回错误码3",
+      "output": "[==========] 195 tests from 14 test suites ran. (22442 ms total)\n[  PASSED  ] 191 tests.\n[  FAILED  ] 4 tests: MessageManageTest.NotifyWaitersTest, MessageManageTest.NotifyUnlockTest, UbDistributeLockApiTest.LockApisReturnErrorOnNullArgs, UbDistributeLockApiTest.UnlockApisReturnErrorOnNullArgs",
+      "result": "部分失败 (191/195 通过, 4个失败)",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-07-29T09:55:57"
+    },
+    {
+      "action": "编译并运行 README 使用示例1(分布式事务资源) — 自包含C++代码, 使用 ub_dist_tx_res.h",
+      "command": "g++ -std=c++17 -O2 -o /tmp/tx_res_sample /tmp/tx_res_sample.cpp -I./include -L./dist/release/lib -lubs-atomic -lpthread -lrt -march=armv8-a+lse \u0026\u0026 LD_LIBRARY_PATH=./dist/release/lib /tmp/tx_res_sample",
+      "details": {
+        "actual_output": "old=100 current=101",
+        "compile_command": "g++ -std=c++17 -O2 -o tx_res_sample tx_res_sample.cpp -I./include -L./dist/release/lib -lubs-atomic -lpthread -lrt -march=armv8-a+lse",
+        "expected_output": "old=100 current=101",
+        "note": "sample_code/ 下样例(ub_lock, ub_comm_queue, share_mem)均依赖 ubsmem SDK, 无法在无 SDK 环境运行。README 使用示例1为自包含代码, 可直接编译验证",
+        "sample_name": "分布式事务资源示例 (tx_res)",
+        "source": "README.md 使用示例章节"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "old=100 current=101",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-07-29T09:56:38"
+    },
+    {
+      "action": "停止并删除容器 ubs-atomic-ttfhw",
+      "command": "docker rm -f ubs-atomic-ttfhw",
+      "details": {
+        "container_name": "ubs-atomic-ttfhw"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "ubs-atomic-ttfhw",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-07-29T09:57:05"
+    },
+    {
+      "action": "生成验证报告",
+      "command": "",
+      "details": {
+        "output_file": "verification_report_ubs-atomic_20260729.json"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-07-29T09:57:05"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "libubs-atomic.so",
+          "path": "dist/release/lib/libubs-atomic.so",
+          "size": "320K (264552 bytes)",
+          "type": "shared library"
+        }
+      ],
+      "cmake": "3.27.9 (Ninja generator)",
+      "compiler": "GNU 12.3.1 (gcc/g++ 12.3.1, openEuler 12.3.1-38.oe2403)",
+      "concurrency": 51,
+      "concurrency_ratio": "20% (256 cores × 20% = 51)",
+      "duration_seconds": 4.677,
+      "notes": "构建使用 Ninja 生成器, Release 模式, C++17 标准, -march=armv8-a+lse。26个编译单元全部成功, 无警告无错误。",
+      "status": "成功"
+    },
+    "devcontainer": {
+      "config_dir": null,
+      "config_files": [],
+      "enabled": false,
+      "original_base_image": "无（仓库无 .devcontainer 目录）",
+      "summary": "仓库未配置 devcontainer，无 .devcontainer 目录。根据项目来源(openEuler组织)和宿主机环境(aarch64 openEuler)选择 openEuler 24.03 LTS 基础镜像",
+      "used_image": "hub.oepkgs.net/openeuler/openeuler:24.03-lts"
+    },
+    "sample": {
+      "duration_seconds": 3,
+      "reason": "sample_code/ 目录下的样例(ub_lock, ub_comm_queue, share_mem)均依赖 ubsmem SDK, 无法在无 SDK 环境运行。README 使用示例1(分布式事务资源)为自包含C++代码, 仅依赖 ub_dist_tx_res.h 和 libubs-atomic.so, 成功编译运行",
+      "results": [
+        {
+          "execution_status": "成功",
+          "execution_time": "0.1秒",
+          "output_summary": "输出 old=100 current=101, 与 README 预期一致。验证了 ub_dist_tx_res_init/set/fetch_add/get 四个API的功能正确性",
+          "sample_name": "分布式事务资源示例 (README 使用示例1)"
+        }
+      ],
+      "status": "成功"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 1,
+        "hooks": [
+          {
+            "entry": "bash build.sh",
+            "id": "run-build",
+            "language": "system",
+            "name": "Run Release Build"
+          },
+          {
+            "entry": "bash build.sh test --skip-run-tests",
+            "id": "run-build-test",
+            "language": "system",
+            "name": "Run Tests Build"
+          },
+          {
+            "args": [
+              "-style=file",
+              "-i"
+            ],
+            "entry": "clang-format",
+            "id": "clang-format",
+            "language": "system",
+            "name": "Run clang-format check"
+          },
+          {
+            "args": [
+              "-p=cmake-build-release",
+              "-header-filter=.*",
+              "--fix"
+            ],
+            "entry": "clang-tidy",
+            "id": "clang-tidy",
+            "language": "system",
+            "name": "Run clang-tidy check"
+          },
+          {
+            "args": [
+              "-p=cmake-build-debug",
+              "--fix"
+            ],
+            "entry": "clang-tidy",
+            "id": "clang-tidy-test",
+            "language": "system",
+            "name": "Run clang-tidy check for test files"
+          }
+        ],
+        "status": "已配置（仅检查配置，未执行）",
+        "total_hooks": 5
+      },
+      "summary": "检测到 .pre-commit-config.yaml 配置（5个 local hooks: run-build, run-build-test, clang-format, clang-tidy, clang-tidy-test），未检测到 lint-runner 配置"
+    },
+    "ut": {
+      "duration_seconds": 22.442,
+      "failed": 4,
+      "failures": [
+        {
+          "error": "期望 res=UB_LOCK_SUCCESS(0), 实际 res=3。测试模拟通知等待者场景, API返回错误码3而非成功",
+          "file": "test/testcase/ub_lock/message_manage_test.cpp:88",
+          "test_name": "MessageManageTest.NotifyWaitersTest"
+        },
+        {
+          "error": "期望 res=UB_LOCK_SUCCESS(0), 实际 res=3。测试模拟通知解锁场景, API返回错误码3而非成功",
+          "file": "test/testcase/ub_lock/message_manage_test.cpp:238",
+          "test_name": "MessageManageTest.NotifyUnlockTest"
+        },
+        {
+          "error": "传入 nullptr 作为 policy 参数调用 ub_rw_lock_s_lock/sx_lock/x_lock, 期望返回 UB_LOCK_SUCCESS(0) 但实际返回3",
+          "file": "test/testcase/ub_lock/ub_distribute_lock_api_test.cpp:99-109",
+          "test_name": "UbDistributeLockApiTest.LockApisReturnErrorOnNullArgs"
+        },
+        {
+          "error": "传入 nullptr 作为 policy 参数调用 ub_rw_lock_s_unlock/sx_unlock/x_unlock, 期望返回 UB_LOCK_SUCCESS(0) 但实际返回3",
+          "file": "test/testcase/ub_lock/ub_distribute_lock_api_test.cpp:129-139",
+          "test_name": "UbDistributeLockApiTest.UnlockApisReturnErrorOnNullArgs"
+        }
+      ],
+      "passed": 191,
+      "status": "部分成功",
+      "total": 195
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "ubs-atomic-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2044GB (无限制)",
+      "os": "openEuler 24.03 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "15GB available",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2044GB",
+      "npu": {
+        "available": true,
+        "card_count": 16,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "CMakeLists.txt 要求 cmake\u003e=3.22, C11/C++17, pthread, librt, libboundscheck.so",
+        "from_dockerfile": "仓库无 Dockerfile，依赖来源为 README.md 环境与依赖章节 + CMakeLists.txt",
+        "from_readme": "README 列出依赖: pthread, librt, libboundscheck.so, googletest, mockcpp, lcov, genhtml, dos2unix",
+        "mappings": [
+          {
+            "original": "gcc/g++",
+            "source": "README 环境与依赖章节",
+            "target": "gcc gcc-c++ (dnf)"
+          },
+          {
+            "original": "cmake \u003e= 3.22",
+            "source": "README 环境与依赖章节",
+            "target": "cmake (dnf, 3.27.9)"
+          },
+          {
+            "original": "libboundscheck.so",
+            "source": "README 依赖库章节 + CMakeLists.txt",
+            "target": "libboundscheck (dnf)"
+          },
+          {
+            "original": "googletest",
+            "source": "README 测试说明 + test/3rdparty/CMakeLists.txt",
+            "target": "git clone from GitHub"
+          },
+          {
+            "original": "mockcpp",
+            "source": "README 测试说明 + test/3rdparty/CMakeLists.txt",
+            "target": "git clone from GitHub"
+          },
+          {
+            "original": "dos2unix",
+            "source": "README 快速开始章节",
+            "target": "dos2unix (dnf)"
+          },
+          {
+            "original": "ninja (可选)",
+            "source": "build.sh 脚本检测",
+            "target": "ninja-build (dnf)"
+          }
+        ]
+      },
+      "image_name": "hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+      "selection_reason": "仓库无 Dockerfile、无 devcontainer、无预构建镜像。项目来自 openEuler 组织，README 仅要求 Linux 环境，选择 openEuler 24.03 LTS 基础镜像从零安装依赖",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "e12b5467840ba3e96ac34edd32807023ec9f8144",
+    "duration_seconds": 1916,
+    "end_time": "2026-07-29T09:57:05",
+    "repo_url": "https://gitcode.com/openeuler/ubs-atomic.git",
+    "start_time": "2026-07-29T09:25:09",
+    "total_steps": 18
+  },
+  "problems_encountered": [
+    {
+      "problem": "从 GitHub 克隆 googletest 和 mockcpp 源码失败: github.com 端口 443 连接超时 (130秒后超时), 远程机器无法访问 GitHub",
+      "solution": "切换到 Gitee 镜像源: googletest 使用 https://gitee.com/mirrors/googletest.git, mockcpp 使用 https://gitee.com/sinojelly/mockcpp.git, 均克隆成功",
+      "source": "test/3rdparty/CMakeLists.txt (ExternalProject_Add gtest/mockcpp)",
+      "timestamp": "2026-07-29T09:54:16"
+    }
+  ],
+  "session_export_file": "",
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

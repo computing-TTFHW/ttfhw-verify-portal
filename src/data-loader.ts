@@ -34,6 +34,18 @@ const REPO_COMMUNITY_MAP: Record<string, string> = {
   'ge': 'CANN', 'metadef': 'CANN', 'graph-autofusion': 'CANN', 'asc-devkit': 'CANN',
   'asc-tools': 'CANN', 'pto-isa': 'CANN', 'pyasc': 'CANN', 'pypto': 'CANN', 'atvoss': 'CANN',
   'runtime': 'CANN', 'driver': 'CANN', 'oam-tools': 'CANN', 'amct': 'CANN',
+  'agentsdk': 'Ascend', 'ascend-deployer': 'Ascend', 'ascenddeployer': 'Ascend', 'indexsdk': 'Ascend',
+  'ragsdk': 'Ascend', 'recsdk': 'Ascend',
+  'mind-cluster': 'MindCluster', 'mindcluster': 'MindCluster',
+  'mskl': 'MindSDK', 'mskpp': 'MindSDK', 'msmonitor': 'MindSDK', 'mspti': 'MindSDK',
+  'mstx': 'MindSDK', 'multimodalsdk': 'MindSDK',
+  'kae': 'BoostKit', 'kpglibc': 'BoostKit', 'ultrascan': 'BoostKit',
+  'ograc': 'openGauss', 'opengauss-connector-jdbc': 'openGauss', 'plugin': 'openGauss',
+  'ubs-atomic': 'UBSCore',
+  'kunpeng-extension-for-pytorch': 'HPCKit',
+  'vllm-ascend': 'MindIE', 'pymotor': 'MindIE',
+  'triton-ascend': 'triton',
+  'polymind': 'openEuler', 'witty-service': 'openEuler',
 }
 
 const REPO_NAME_NORMALIZE: Record<string, string> = {
@@ -42,6 +54,10 @@ const REPO_NAME_NORMALIZE: Record<string, string> = {
   'mindie-pymotor': 'MindIE-PyMotor', 'mindie-llm': 'MindIE-LLM', 'omnistatestore': 'OmniStateStore',
   'component-drivers': 'component_drivers', 'memfabric-hybrid': 'memfabric_hybrid',
   'openeuler-kernel': 'kernel', 'isula': 'iSulad',
+  'agentsdk': 'AgentSDK', 'ascenddeployer': 'AscendDeployer', 'indexsdk': 'IndexSDK',
+  'kae': 'KAE', 'mindcluster': 'MindCluster', 'multimodalsdk': 'MultimodalSDK',
+  'ograc': 'oGRAC', 'plugin': 'Plugin', 'pymotor': 'PyMotor', 'ragsdk': 'RAGSDK',
+  'recsdk': 'RecSDK', 'ultrascan': 'Ultrascan',
 }
 
 const REPO_URL_MAP: Record<string, string> = {

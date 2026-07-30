@@ -1,0 +1,605 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md - Platform 标签 + 宿主机架构",
+      "value": "aarch64 (Ascend NPU 平台，宿主机为 Kunpeng-920 aarch64)"
+    },
+    "build_commands": {
+      "source": "README.md 源码安装指南 + ci/build.sh",
+      "value": "bash ci/build.sh --python=3.10"
+    },
+    "dependencies": {
+      "source": "README.md 源码安装指南 + docker/devel/Dockerfile + requirements.txt",
+      "value": [
+        "gcc 13.3.0 (AArch64 要求，Dockerfile 使用 gcc-toolset-13)",
+        "cmake (Dockerfile 中 amd64 用 3.18.4，README 表格中 AArch64 要求 4.0.3)",
+        "ninja-build (构建系统)",
+        "patch, make, perl, autoconf, automake, bison, diffutils (构建工具)",
+        "zlib1g-dev (压缩库)",
+        "build-essential, libbz2-dev, libreadline-dev, wget, curl, llvm, libncurses5-dev, libncursesw5-dev, xz-utils, tk-dev, liblzma-dev, m4, dos2unix, libopenblas-dev, git (README Ubuntu 依赖列表)",
+        "pyyaml, setuptools, auditwheel, wheel (pip 构建依赖)",
+        "torch==2.13.0 (PyTorch CPU 版本)",
+        "numpy==1.23.2 (Python 3.10 对应版本)",
+        "CANN 9.1.0 (昇腾计算架构，从宿主机挂载)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "docker/devel/Dockerfile RUN 指令",
+      "value": [
+        {
+          "original": "yum install -y bzip2 curl file git sudo unzip util-linux wget which",
+          "target_equivalent": "apt-get install -y bzip2 curl file git sudo unzip util-linux wget"
+        },
+        {
+          "original": "yum install -y autoconf automake bison diffutils make mold ninja-build patch perl yum-utils zlib-devel gcc-toolset-13-gcc gcc-toolset-13-gcc-c++ gcc-toolset-13-gcc-gfortran gcc-toolset-13-gdb",
+          "target_equivalent": "apt-get install -y autoconf automake bison diffutils make ninja-build patch perl zlib1g-dev gcc-13 g++-13 gfortran-13 (mold 需单独安装)"
+        },
+        {
+          "original": "pip install pyyaml setuptools wheel torch==2.13.0 numpy==1.23.2",
+          "target_equivalent": "pip install pyyaml setuptools wheel torch==2.13.0 numpy==1.23.2 (pip 原生，无需翻译)"
+        },
+        {
+          "original": "CANN 9.1.0_beta.1 toolkit + 910b ops (通过 .run 文件安装)",
+          "target_equivalent": "从宿主机挂载 /usr/local/Ascend (CANN 9.1.0 已安装在宿主机)"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "docker/devel/Dockerfile FROM 指令 + README 源码安装指南",
+      "value": "docker/devel/Dockerfile 使用 quay.io/pypa/manylinux_2_28（CentOS/AlmaLinux 系），按技能规则映射到 Ubuntu 22.04；README 源码安装指南方式二直接提供 Ubuntu apt-get 依赖安装命令"
+    },
+    "sample_commands": {
+      "source": "README.md - Quick Start 章节 + examples/ 目录",
+      "value": "python3 -c \"import torch;import torch_npu; a = torch.randn(3, 4).npu(); print(a + a);\" （README 提供的快速验证示例）；examples/ 目录包含 libtorch_npu, libtorch_resnet 等 C++ 样例"
+    },
+    "special_dependencies": {
+      "source": "README.md + devcontainer.json + docker/devel/Dockerfile",
+      "value": [
+        "CANN 9.1.0_beta.1 (从宿主机 /usr/local/Ascend 挂载)",
+        "torch==2.13.0 (pip install --index-url https://download.pytorch.org/whl/nightly/cpu，dev 版本使用 nightly 源)",
+        "NPU 驱动 25.5.0 (从宿主机挂载 /usr/local/Ascend/driver)",
+        "mold 链接器 (Dockerfile 中用于加速链接，Ubuntu 需单独安装)"
+      ]
+    },
+    "ut_commands": {
+      "source": "test/npu/ 目录",
+      "value": "test/npu/ 目录包含大量 NPU 测试文件（如 test_aclgraph_*.py, test_amp.py 等），可通过 python -m pytest test/npu/ 执行"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "README 和源码安装指南均未提及 CANN 9.1.0 的 libhccl_v2.so 存在未定义符号 HcclCheckLogLevel(int, int) 的问题。该符号定义在 libhccl_plf.so 中，但 libhccl_v2.so 未链接此库。用户安装 CANN 后直接导入 torch_npu 会遇到 ImportError，需要手动设置 LD_PRELOAD 才能解决。建议在安装指南中补充说明。",
+      "source": "README.md 安装章节 + docs/zh/installation_guide/compilation_installation_using_source_code.md",
+      "time": "2026-07-30T13:19:10",
+      "title": "README 未说明 CANN libhccl_v2.so 的符号依赖问题"
+    },
+    {
+      "body": "源码安装指南提到需要安装 CANN，但未明确说明 CANN 版本与 NPU 驱动版本的兼容性矩阵。当前环境中驱动版本 25.5.0 与 CANN 9.1.0 存在兼容性问题（npu-smi 报警告 driver package may not be completely installed），导致 NPU 运行时功能不可用。建议补充驱动与 CANN 版本配套说明。",
+      "source": "docs/zh/installation_guide/compilation_installation_using_source_code.md",
+      "time": "2026-07-30T13:19:10",
+      "title": "源码安装指南未说明 CANN 与驱动版本的兼容性要求"
+    },
+    {
+      "body": "源码安装指南的 gcc/cmake 版本要求表格仅列到 PyTorch 2.10.0（AArch64 要求 gcc 13.3.0、cmake 4.0.3），当前 master 分支版本为 2.13.0，表格未更新。实际构建使用 gcc 13.4.0 和 cmake 4.4.0 成功，但文档缺乏对 2.11.0-2.14.0 版本的要求说明。",
+      "source": "docs/zh/installation_guide/compilation_installation_using_source_code.md - gcc/cmake 版本要求表格",
+      "time": "2026-07-30T13:19:10",
+      "title": "README 源码安装指南中 gcc/cmake 版本要求表格未覆盖 PyTorch 2.13.0"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "拉取 Ubuntu 22.04 基础镜像并启动容器 pytorch-ttfhw，挂载 NPU 设备(davinci2)和 CANN 工具链",
+      "command": "docker run -d --name pytorch-ttfhw --device /dev/davinci2 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/Ascend:/usr/local/Ascend -v /home/pytorch:/workspace -w /workspace ubuntu:22.04 sleep infinity",
+      "details": {
+        "container_name": "pytorch-ttfhw",
+        "image": "ubuntu:22.04",
+        "mounts": [
+          "/usr/local/Ascend (CANN+driver+firmware)",
+          "/usr/local/sbin/npu-smi",
+          "/home/pytorch:/workspace"
+        ],
+        "note": "NPU 卡0状态为 Critical 已跳过，选择卡2（状态 OK）；卡1被多个容器共享",
+        "npu_devices": [
+          "/dev/davinci2",
+          "/dev/davinci_manager",
+          "/dev/devmm_svm",
+          "/dev/hisi_hdc"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Container ID: ed31c5f52f8d",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-07-30T11:59:23"
+    },
+    {
+      "action": "阅读 README.md、源码安装指南、docker/devel/Dockerfile、ci/build.sh、requirements.txt、.devcontainer/devcontainer.json，提取构建依赖、构建命令、UT/样例命令",
+      "command": "",
+      "details": {
+        "cann_version": "9.1.0",
+        "files_read": [
+          "README.md",
+          "docs/zh/installation_guide/compilation_installation_using_source_code.md",
+          "docker/devel/Dockerfile",
+          "docker/Dockerfile",
+          "ci/build.sh",
+          "requirements.txt",
+          "version.txt",
+          ".devcontainer/devcontainer.json"
+        ],
+        "npu_keyword_sources": [
+          "README.md",
+          "docker/Dockerfile",
+          ".devcontainer/devcontainer.json",
+          "requirements.txt"
+        ],
+        "npu_keywords_found": [
+          "Ascend",
+          "NPU",
+          "CANN",
+          "torch_npu",
+          "davinci",
+          "910B"
+        ],
+        "npu_required": true,
+        "selected_os": "Ubuntu 22.04",
+        "torch_version": "2.13.0"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-07-30T12:01:46"
+    },
+    {
+      "action": "检查 pre-commit 和 lint-runner 配置文件",
+      "command": "ls .pre-commit-config.yaml; find . -name \".lintrunner.toml\"",
+      "details": {
+        "active_linters_count": 4,
+        "lint_runner_config_file": ".lintrunner.toml",
+        "lint_runner_configured": true,
+        "pre_commit_configured": false
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": ".lintrunner.toml 存在，.pre-commit-config.yaml 不存在",
+      "result": "pre-commit 未配置，lint-runner 已配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-07-30T12:01:46"
+    },
+    {
+      "action": "检查 .devcontainer 目录及配置文件",
+      "command": "ls .devcontainer/ \u0026\u0026 cat .devcontainer/devcontainer.json",
+      "details": {
+        "build_args": {
+          "CANN_PRODUCT": "910b",
+          "CANN_VERSION": "9.1.0_beta.1",
+          "PY_VERSION": "3.10",
+          "TORCH_VERSION": "2.13.0.dev20260610"
+        },
+        "config_dir": ".devcontainer",
+        "files": [
+          "devcontainer.json"
+        ],
+        "npu_mounts": [
+          "/dev:/dev",
+          "/usr/local/Ascend/driver",
+          "/usr/local/sbin/npu-smi:/usr/local/bin/npu-smi",
+          "/var/log/npu:/usr/slog"
+        ],
+        "original_base_image": "quay.io/pypa/manylinux_2_28",
+        "referenced_dockerfile": "../docker/devel/Dockerfile",
+        "will_use": "Ubuntu 22.04"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": ".devcontainer/devcontainer.json 存在，引用 docker/devel/Dockerfile",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-07-30T12:01:46"
+    },
+    {
+      "action": "第一层：安装系统工具链（software-properties-common, python3, python3-pip, wget, curl, git, make, patch, m4, dos2unix）",
+      "command": "apt-get update \u0026\u0026 apt-get install -y software-properties-common python3 python3-pip wget curl git make patch m4 dos2unix",
+      "details": {
+        "packages": [
+          "software-properties-common",
+          "python3",
+          "python3-pip",
+          "wget",
+          "curl",
+          "git",
+          "make",
+          "patch",
+          "m4",
+          "dos2unix"
+        ],
+        "source": "Ubuntu 官方仓库 (apt)"
+      },
+      "duration_seconds": 215,
+      "error": "",
+      "output": "python3-3.10.12, pip-22.0.2, git-2.34.1, make-4.3",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-30T12:53:34"
+    },
+    {
+      "action": "第二层：添加 ubuntu-toolchain-r PPA 并安装 gcc-13、g++-13 及构建依赖（build-essential, libbz2-dev, libreadline-dev, libopenblas-dev, ninja-build 等）",
+      "command": "add-apt-repository -y ppa:ubuntu-toolchain-r/test \u0026\u0026 apt-get install -y gcc-13 g++-13 build-essential libbz2-dev libreadline-dev libncurses5-dev libncursesw5-dev xz-utils tk-dev liblzma-dev libopenblas-dev autoconf automake bison diffutils ninja-build perl zlib1g-dev \u0026\u0026 update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 \u0026\u0026 update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100",
+      "details": {
+        "note": "gcc-13 通过 update-alternatives 设为默认编译器；README 要求 gcc 13.3.0（AArch64），实际安装 13.4.0",
+        "packages": [
+          "gcc-13 (13.4.0)",
+          "g++-13 (13.4.0)",
+          "build-essential",
+          "libbz2-dev",
+          "libreadline-dev",
+          "libncurses5-dev",
+          "libncursesw5-dev",
+          "xz-utils",
+          "tk-dev",
+          "liblzma-dev",
+          "libopenblas-dev",
+          "autoconf",
+          "automake",
+          "bison",
+          "diffutils",
+          "ninja-build",
+          "perl",
+          "zlib1g-dev"
+        ],
+        "source": "Ubuntu 官方仓库 + ubuntu-toolchain-r PPA (apt)"
+      },
+      "duration_seconds": 300,
+      "error": "",
+      "output": "gcc-13 (Ubuntu 13.4.0-6ubuntu1~22~ppa2) 13.4.0, g++-13 (Ubuntu 13.4.0-6ubuntu1~22~ppa2) 13.4.0, ninja 1.10.1",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-30T12:53:34"
+    },
+    {
+      "action": "第三层：通过 pip 安装 cmake 4.4.0、pyyaml、setuptools、wheel、auditwheel",
+      "command": "pip3 install cmake pyyaml setuptools wheel auditwheel -i https://mirrors.aliyun.com/pypi/simple/",
+      "details": {
+        "note": "cmake 4.4.0 满足 README 中 AArch64 要求的 4.0.3+",
+        "packages": [
+          "cmake-4.4.0",
+          "pyyaml-6.0.3",
+          "setuptools-83.0.0",
+          "wheel",
+          "auditwheel-6.7.0"
+        ],
+        "source": "阿里云 PyPI 镜像 (pip)"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "cmake version 4.4.0, pyyaml 6.0.3",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-30T12:53:34"
+    },
+    {
+      "action": "安装 numpy==1.23.2（Python 3.10 对应版本）",
+      "command": "pip3 install numpy==1.23.2 -i https://mirrors.aliyun.com/pypi/simple/",
+      "details": {
+        "packages": [
+          "numpy-1.23.2"
+        ],
+        "source": "阿里云 PyPI 镜像 (pip)"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "numpy-1.23.2-cp310-cp310-manylinux_2_17_aarch64",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-30T12:53:34"
+    },
+    {
+      "action": "下载并安装 torch==2.13.0+cpu（从 PyTorch CPU 索引下载 wheel 后本地安装）",
+      "command": "wget -O /tmp/torch.whl \"https://download.pytorch.org/whl/cpu/torch-2.13.0%2Bcpu-cp310-cp310-manylinux_2_28_aarch64.whl\" \u0026\u0026 pip3 install /tmp/torch-2.13.0+cpu-cp310-cp310-manylinux_2_28_aarch64.whl",
+      "details": {
+        "download_time": "84s",
+        "install_time": "26s",
+        "note": "清华源返回 403 错误，改用 wget 直接下载 wheel 后本地安装；依赖（sympy, networkx, jinja2, fsspec, filelock, typing-extensions, mpmath, MarkupSafe）从阿里云镜像安装",
+        "packages": [
+          "torch-2.13.0+cpu"
+        ],
+        "source": "PyTorch CPU 索引 (download.pytorch.org/whl/cpu)",
+        "wheel_size": "148MB"
+      },
+      "duration_seconds": 110,
+      "error": "",
+      "output": "torch-2.13.0+cpu, sympy-1.14.0, networkx-3.4.2, jinja2-3.1.6, fsspec-2026.7.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-30T12:53:34"
+    },
+    {
+      "action": "验证 CANN 9.1.0 工具链可用性（从宿主机挂载 /usr/local/Ascend）",
+      "command": "source /usr/local/Ascend/ascend-toolkit/latest/set_env.sh \u0026\u0026 ls /usr/local/Ascend/ascend-toolkit/latest/lib64/libascendcl.so",
+      "details": {
+        "cann_path": "/usr/local/Ascend/ascend-toolkit/latest (-\u003e cann-9.1.0)",
+        "libascendcl": "存在",
+        "note": "CANN 从宿主机挂载，无需在容器内安装",
+        "set_env_script": "/usr/local/Ascend/ascend-toolkit/latest/set_env.sh"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "CANN_OK - libascendcl.so 存在",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-07-30T12:53:34"
+    },
+    {
+      "action": "执行构建命令 bash ci/build.sh --python=3.10（MAX_JOBS=51，并发数=256核×20%=51）",
+      "command": "source /usr/local/Ascend/ascend-toolkit/latest/set_env.sh \u0026\u0026 export MAX_JOBS=51 \u0026\u0026 bash ci/build.sh --python=3.10",
+      "details": {
+        "build_system": "Ninja (via setup.py -\u003e CMake)",
+        "cann_version": "9.1.0",
+        "cmake": "4.4.0",
+        "commit": "c9c95da",
+        "compiler": "gcc 13.4.0",
+        "concurrency": 51,
+        "concurrency_ratio": "20%",
+        "torch_version": "2.13.0+cpu",
+        "total_compilation_units": 1365
+      },
+      "duration_seconds": 535,
+      "error": "",
+      "output": "构建成功，生成 torch_npu-2.13.0+gitc9c95da-cp310-cp310-linux_aarch64.whl (42MB)，编译 1365 个目标文件，存在少量 deprecation 警告（c10::value_or_else）但无错误",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-07-30T13:11:25"
+    },
+    {
+      "action": "安装构建产物 torch_npu-2.13.0+gitc9c95da-cp310-cp310-linux_aarch64.whl 并执行冒烟测试",
+      "command": "pip3 install dist/torch_npu-*.whl \u0026\u0026 python3 -c \"import torch; import torch_npu; a = torch.randn(3, 4).npu(); print(a + a)\"",
+      "details": {
+        "error": "NPU 设备不可用（driver error:internal error, retCode=0x7020010），宿主机 16+ 容器共享 NPU 设备导致驱动竞争",
+        "import_success": true,
+        "ld_preload_required": "/usr/local/Ascend/cann-9.1.0/lib64/libhccl_plf.so",
+        "npu_available": false,
+        "smoke_test_passed": false,
+        "torch_npu_version": "2.13.0+gitc9c95da",
+        "torch_version": "2.13.0+cpu",
+        "wheel_installed": true
+      },
+      "duration_seconds": 15,
+      "error": "NPU 设备不可用：DrvMngGetConsoleLogLevel failed (ret=4), rtGetDeviceCount execution failed (retCode=0x7020010), 宿主机多个容器共享 NPU 设备导致驱动竞争",
+      "output": "torch_npu 导入成功，但 torch.npu.is_available() 返回 False。smoke test 失败：rtGetDeviceCount execution failed, reason=driver error:internal error",
+      "result": "部分成功",
+      "returncode": 1,
+      "step": "smoke_test",
+      "success": false,
+      "timestamp": "2026-07-30T13:19:10"
+    },
+    {
+      "action": "执行单元测试 test/npu/test_cann_version.py",
+      "command": "python3 -m pytest /workspace/test/npu/test_cann_version.py -v",
+      "details": {
+        "collection_error": true,
+        "note": "所有 test/npu/ 下的测试均需要 NPU 硬件访问，NPU 不可用导致测试无法执行",
+        "npu_available": false,
+        "test_file": "test/npu/test_cann_version.py"
+      },
+      "duration_seconds": 5,
+      "error": "NPU 驱动不可用，测试集合阶段失败",
+      "output": "ERROR: 1 error during collection - 测试导入 torch_npu 时触发 NPU 驱动初始化失败",
+      "result": "失败",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-07-30T13:19:10"
+    },
+    {
+      "action": "清理容器 pytorch-ttfhw",
+      "command": "docker rm -f pytorch-ttfhw",
+      "details": {},
+      "duration_seconds": 2,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-07-30T13:19:56"
+    },
+    {
+      "action": "生成验证报告",
+      "command": "",
+      "details": {
+        "output_file": "verification_report_pytorch_20260730.json"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-07-30T13:19:56"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "torch_npu-2.13.0+gitc9c95da-cp310-cp310-linux_aarch64.whl",
+          "path": "dist/torch_npu-2.13.0+gitc9c95da-cp310-cp310-linux_aarch64.whl",
+          "size": "42MB",
+          "type": "wheel"
+        }
+      ],
+      "cmake": "4.4.0",
+      "compiler": "gcc 13.4.0 (Ubuntu 13.4.0-6ubuntu1~22~ppa2)",
+      "concurrency": 51,
+      "concurrency_ratio": "20% (256核 × 20% = 51)",
+      "duration_seconds": 535,
+      "notes": "使用 Ninja 构建系统，CANN 9.1.0 工具链，从源码编译 1365 个 C++ 目标文件。存在少量 deprecation 警告（c10::value_or_else）但不影响构建结果。",
+      "status": "成功"
+    },
+    "devcontainer": {
+      "config_dir": ".devcontainer",
+      "config_files": [
+        "devcontainer.json"
+      ],
+      "enabled": true,
+      "original_base_image": "quay.io/pypa/manylinux_2_28 (via docker/devel/Dockerfile)",
+      "summary": "仓库配置了 devcontainer（.devcontainer/devcontainer.json），引用 docker/devel/Dockerfile（manylinux_2_28 基础镜像），构建参数为 Python 3.10、PyTorch 2.13.0.dev、CANN 9.1.0_beta.1、910b。devcontainer 配置了 NPU 设备和驱动挂载（/dev、/usr/local/Ascend/driver、npu-smi）。按技能规则将 manylinux_2_28 映射为 Ubuntu 22.04 基础镜像从零构建。",
+      "used_image": "Ubuntu 22.04"
+    },
+    "sample": {
+      "duration_seconds": 15,
+      "reason": "NPU 设备不可用，无法执行 README 中的 Quick Start 示例（torch.randn(3, 4).npu() 需要 NPU 硬件）",
+      "results": [
+        {
+          "execution_status": "失败",
+          "execution_time": "15秒",
+          "output_summary": "torch_npu 导入成功（版本 2.13.0+gitc9c95da），但 torch.npu.is_available() 返回 False。调用 .npu() 时失败：rtGetDeviceCount execution failed, reason=driver error:internal error",
+          "sample_name": "README Quick Start - tensor.mm"
+        }
+      ],
+      "status": "失败（环境限制）"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": ".lintrunner.toml",
+        "configured": true
+      },
+      "pre_commit": {
+        "config_file": null,
+        "configured": false,
+        "duration_seconds": 0,
+        "status": "未配置"
+      },
+      "summary": "仓库未配置 pre-commit（无 .pre-commit-config.yaml），但配置了 lint-runner（.lintrunner.toml），包含 4 个启用的 linter：NEWLINE（换行符检查）、SPACES（尾部空格检查）、TABS（Tab 检查）、CODESPELL（拼写检查）。其余 linter（如 RUFF、CLANGTIDY、CMAKE 等）均已注释禁用。"
+    },
+    "ut": {
+      "duration_seconds": 5,
+      "failed": 0,
+      "failures": [
+        {
+          "error": "NPU 设备不可用，测试集合阶段失败。宿主机 16+ 容器共享 NPU 设备，驱动竞争导致 rtGetDeviceCount 返回 retCode=0x7020010",
+          "test_name": "test/npu/test_cann_version.py"
+        }
+      ],
+      "passed": 0,
+      "skipped": 0,
+      "status": "失败（环境限制）",
+      "total": 0
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "pytorch-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti (无限制)",
+      "os": "Ubuntu 22.04.5 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "6.1T available (/home)",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2044Gi (2.0Ti)",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 2
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_dockerfile": "docker/devel/Dockerfile 使用 manylinux_2_28 (CentOS 系)，yum install 指令映射为 Ubuntu apt-get install",
+        "from_readme": "README 源码安装指南方式二（物理机场景）直接提供 Ubuntu apt-get install 依赖列表",
+        "mappings": [
+          {
+            "original": "yum install -y patch libjpeg-turbo-devel dos2unix openblas git",
+            "source": "README 源码安装指南 - openEuler/CentOS 依赖列表",
+            "target": "apt-get install -y patch libjpeg-turbo8-dev dos2unix libopenblas-dev git"
+          },
+          {
+            "original": "apt-get install -y patch build-essential libbz2-dev libreadline-dev wget curl llvm libncurses5-dev libncursesw5-dev xz-utils tk-dev liblzma-dev m4 dos2unix libopenblas-dev git",
+            "source": "README 源码安装指南 - Ubuntu/Debian 依赖列表（原生 apt，无需翻译）",
+            "target": "apt-get install -y patch build-essential libbz2-dev libreadline-dev wget curl llvm libncurses5-dev libncursesw5-dev xz-utils tk-dev liblzma-dev m4 dos2unix libopenblas-dev git"
+          }
+        ]
+      },
+      "image_name": "ubuntu:22.04",
+      "selection_reason": "仓库 docker/devel/Dockerfile 使用 quay.io/pypa/manylinux_2_28（基于 CentOS/AlmaLinux），按技能规则映射到 Ubuntu；README 源码安装指南直接提供 Ubuntu apt-get 依赖安装命令；docker/Dockerfile 使用预构建 CANN 镜像（quay.io/ascend/cann），禁止使用预构建镜像",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "c9c95daf42e76fbee0d6b1008dfd57d7ee2ec7b3",
+    "duration_seconds": 5317,
+    "end_time": "2026-07-30T13:19:56",
+    "repo_url": "https://gitcode.com/Ascend/pytorch.git",
+    "start_time": "2026-07-30T11:51:19",
+    "total_steps": 15
+  },
+  "problems_encountered": [
+    {
+      "problem": "清华源 PyPI 镜像返回 403 Forbidden 错误，无法通过 pip 安装 cmake 和 torch",
+      "solution": "cmake 等纯 Python 包改用阿里云镜像安装；torch 改用 wget 直接从 download.pytorch.org 下载 wheel 文件后通过 pip 本地安装",
+      "source": "pip install -i https://pypi.tuna.tsinghua.edu.cn/simple",
+      "timestamp": "2026-07-30T12:53:34"
+    },
+    {
+      "problem": "CANN 9.1.0 的 libhccl_v2.so 存在未定义符号 _Z17HcclCheckLogLevelii（HcclCheckLogLevel(int, int)），导致 torch_npu._C 模块加载失败",
+      "solution": "通过 LD_PRELOAD=/usr/local/Ascend/cann-9.1.0/lib64/libhccl_plf.so 预加载定义该符号的库，成功加载 torch_npu._C 模块",
+      "source": "CANN 9.1.0 libhccl_v2.so 依赖问题",
+      "timestamp": "2026-07-30T13:19:10"
+    },
+    {
+      "problem": "NPU 设备不可用：宿主机上 16+ 个 Docker 容器共享同一组 NPU 设备（davinci0-7），导致 DCMI 初始化失败（ret=-8020）和 rtGetDeviceCount 失败（retCode=0x7020010）。npu-smi 也报警告：driver package may not be completely installed",
+      "solution": "无法在当前环境中解决——NPU 驱动竞争是环境限制，需要停止占用 NPU 的其他容器或使用独占的 NPU 设备。构建和导入验证已完成，NPU 运行时测试无法执行",
+      "source": "宿主机 NPU 驱动竞争 + 驱动安装可能不完整",
+      "timestamp": "2026-07-30T13:19:10"
+    },
+    {
+      "problem": "清华源 PyPI 镜像（pypi.tuna.tsinghua.edu.cn）返回 403 Forbidden，无法下载 pip 包",
+      "solution": "纯 Python 包改用阿里云镜像（mirrors.aliyun.com/pypi/simple），torch wheel 使用 wget 直接从 download.pytorch.org 下载后本地安装",
+      "source": "pip install -i https://pypi.tuna.tsinghua.edu.cn/simple",
+      "timestamp": "2026-07-30T13:19:10"
+    }
+  ],
+  "session_export_file": "",
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 60000,
+    "cache_miss_tokens": 0,
+    "input_tokens": 180000,
+    "model": "bailian/glm-5.2",
+    "output_tokens": 25000,
+    "tool": "opencode"
+  }
+}

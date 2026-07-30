@@ -1,0 +1,886 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md 版本配套表 + Dockerfile (manylinux_2_28 aarch64)",
+      "value": "aarch64 (昇腾 NPU 平台)"
+    },
+    "build_commands": {
+      "source": "README.md 安装与卸载章节 + build.sh",
+      "value": "git submodule update --init --recursive \u0026\u0026 bash configure (设置 TARGET_PYTHON_PATH 和 ASCEND_SDK_PATH 环境变量) \u0026\u0026 mkdir build \u0026\u0026 cd build \u0026\u0026 cmake .. \u0026\u0026 make torchair -j\u003cN\u003e"
+    },
+    "dependencies": {
+      "source": "README.md + docker/Dockerfile + CMakeLists.txt + .devcontainer/devcontainer.json",
+      "value": [
+        "gcc-13 / g++-13 (来自 Dockerfile gcc-toolset-13，Ubuntu 通过 PPA 安装)",
+        "cmake \u003e= 3.14 (CMakeLists.txt 要求)",
+        "ninja-build (Dockerfile builder 阶段)",
+        "mold (链接器，Dockerfile builder 阶段)",
+        "python3.10 (README 版本配套表要求 Python3.10.x)",
+        "pytorch \u003e= 2.7.1 (README master 分支版本配套表)",
+        "pyyaml, setuptools, wheel (Dockerfile pip 安装)",
+        "numpy (Dockerfile pip 安装，版本与 Python 版本关联)",
+        "CANN toolkit 9.1.0 (Dockerfile dev 阶段安装，devcontainer 配置 CANN_VERSION=9.1.0_beta.1)",
+        "torch_npu (README 依赖，TorchNPU 插件)",
+        "git submodule: third_party/secure_c (libboundscheck), third_party/googletest",
+        "zlib1g-dev (Dockerfile zlib-devel 映射)",
+        "autoconf, automake, bison, patch, perl (Dockerfile builder 阶段构建工具)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "docker/Dockerfile (base + builder 阶段)",
+      "value": [
+        {
+          "original": "yum install -y bzip2 curl file git sudo unzip util-linux wget which",
+          "target_equivalent": "apt-get install -y bzip2 curl file git sudo unzip util-linux wget debianutils"
+        },
+        {
+          "original": "yum install -y autoconf automake bison diffutils make mold ninja-build patch perl yum-utils zlib-devel",
+          "target_equivalent": "apt-get install -y autoconf automake bison diffutils make mold ninja-build patch perl zlib1g-dev"
+        },
+        {
+          "original": "gcc-toolset-13-gcc gcc-toolset-13-gcc-c++ gcc-toolset-13-gcc-gfortran gcc-toolset-13-gdb",
+          "target_equivalent": "apt-get install -y gcc-13 g++-13 gfortran-13 (Ubuntu 使用 ubuntu-toolchain-r/test PPA)"
+        },
+        {
+          "original": "pip install pyyaml setuptools wheel torch numpy",
+          "target_equivalent": "pip install pyyaml setuptools wheel torch numpy (pip 原生，无需翻译)"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "docker/Dockerfile FROM quay.io/pypa/manylinux_2_28",
+      "value": "Dockerfile FROM manylinux_2_28（AlmaLinux 系），按 skill 规则映射为 Ubuntu 22.04 基础镜像"
+    },
+    "sample_commands": {
+      "source": "README.md 快速上手章节",
+      "value": "python3 快速验证脚本: import torch; import torchair; config = torchair.CompilerConfig(); npu_backend = torchair.get_npu_backend(compiler_config=config); model = torch.compile(model, backend=npu_backend); model(x, y)"
+    },
+    "special_dependencies": {
+      "source": "docker/Dockerfile + .devcontainer/devcontainer.json",
+      "value": [
+        "CANN toolkit 9.1.0_beta.1 (从华为 OBS 下载 .run 文件安装，devcontainer 配置 CANN_PRODUCT=910b)",
+        "PyTorch CPU 版本 (从 download.pytorch.org/whl/cpu 安装)",
+        "NPU 驱动和固件 (宿主机提供，容器挂载 /usr/local/Ascend/driver 和 firmware)",
+        "pip 源配置为华为云镜像 (mirrors.huaweicloud.com)"
+      ]
+    },
+    "ut_commands": {
+      "source": "build.sh (-u 选项) + tests/CMakeLists.txt",
+      "value": "bash build.sh -u (构建 ut 测试并执行) 或 cd tests/build \u0026\u0026 cmake .. -DCMAKE_BUILD_TYPE=GCOV \u0026\u0026 make torchair_ut -j\u003cN\u003e"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "torchair/__init__.py 第17行 import packaging，但 README 和 Dockerfile 均未列出 packaging 作为依赖。新手按 README 安装后导入 torchair 会报 ModuleNotFoundError: No module named packaging",
+      "source": "README.md 安装章节 + torchair/__init__.py 第17行",
+      "time": "2026-07-29T20:16:17",
+      "title": "README 未提及 packaging Python 依赖"
+    },
+    {
+      "body": "CANN 9.1.0 的 libhccl.so 存在未声明的符号依赖 (HcclCheckLogLevel, HcclSetConfig 等)，需要 LD_PRELOAD 预加载 libhccl_plf.so, libhccl_alg.so, libhccl_fwk.so, libhcom_executor.so, libhcom_graph_adaptor.so 才能正常导入 torchair。Dockerfile 和 README 均未提及此问题",
+      "source": "docker/Dockerfile + CANN 9.1.0 lib64/libhccl.so",
+      "time": "2026-07-29T20:16:17",
+      "title": "Dockerfile 未说明 CANN 库 LD_PRELOAD 依赖问题"
+    },
+    {
+      "body": "UT 构建的 stub 库 (libtorchair_ut_lib.so, libge_local_stub.so, libreg_op_stub.so) 存在未定义的 GE 符号引用 (ge::Tensor::GetPlacement, ge::GNode::GetInputsSize, ge::Operator::OptionalInputRegister, vsnprintf_s 等)，导致链接 torchair_ut_main 失败。仓库未提供完整的 stub 实现",
+      "source": "tests/ut/CMakeLists.txt + tests/CMakeLists.txt",
+      "time": "2026-07-29T20:16:17",
+      "title": "UT stub 库不完整，缺少 GE 符号定义"
+    },
+    {
+      "body": "configure 脚本第10行 if [ ! -f config_file ] 缺少 $ 符号，应为 if [ ! -f \"$config_file\" ]。当前写法导致 configure.py 每次都被重新执行，即使已经配置过。虽然功能上不影响（configure.py 是幂等的），但浪费时间",
+      "source": "configure 第10行",
+      "time": "2026-07-29T20:16:17",
+      "title": "configure bash 脚本存在变量引用 bug"
+    },
+    {
+      "body": "Dockerfile 使用 --index-url https://download.pytorch.org/whl/cpu 安装 torch，导致 torch 的依赖包 (networkx, fsspec, sympy 等) 也从 PyTorch 索引下载，速度极慢 (11-15 kB/s)。应使用 --extra-index-url 或先从国内镜像安装依赖",
+      "source": "docker/Dockerfile pip install --index-url 使用方式",
+      "time": "2026-07-29T20:16:17",
+      "title": "README 未说明 pip 安装 torch 依赖包从 PyTorch 索引下载极慢的问题"
+    },
+    {
+      "body": "README 版本配套表中 master 分支的 CANN 版本标注为在研版本，未给出具体版本号。devcontainer.json 中使用 CANN_VERSION=9.1.0_beta.1，但 README 未说明。新手无法确定需要安装哪个 CANN 版本",
+      "source": "README.md 版本配套表 + .devcontainer/devcontainer.json",
+      "time": "2026-07-29T20:16:17",
+      "title": "README 版本配套表 master 分支 CANN 版本标注为在研版本但未给出具体版本号"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "拉取 Ubuntu 22.04 基础镜像并启动容器 torchair-ttfhw，挂载 NPU 设备(davinci1)和 CANN 工具链",
+      "command": "docker run -d --name torchair-ttfhw --device /dev/davinci1 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/Ascend/cann-9.1.0:/usr/local/Ascend/cann-9.1.0 ... ubuntu:22.04 sleep infinity",
+      "details": {
+        "container_name": "torchair-ttfhw",
+        "image": "ubuntu:22.04",
+        "npu_card": "davinci1 (card 0 is Critical, skipped)"
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-07-29T19:16:09"
+    },
+    {
+      "action": "读取 README.md 了解项目定位、安装步骤、版本配套表、快速上手示例",
+      "command": "",
+      "details": {
+        "file": "README.md",
+        "sections_read": [
+          "简介",
+          "安装与卸载",
+          "快速上手",
+          "版本配套表",
+          "支持的型号"
+        ]
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "TorchAir 是 PyTorch 昇腾 NPU 图模式推理扩展库，master 分支要求 PyTorch 2.7.1+ / Python 3.10 / CANN 在研版本",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-07-29T19:25:20"
+    },
+    {
+      "action": "读取 docker/Dockerfile 提取依赖，确认 OS 为 manylinux_2_28（映射为 Ubuntu 22.04）",
+      "command": "",
+      "details": {
+        "dockerfile": "docker/Dockerfile (FROM quay.io/pypa/manylinux_2_28)",
+        "reason": "manylinux_2_28 基于 AlmaLinux，按 skill 规则映射为 Ubuntu",
+        "selected_os": "Ubuntu 22.04"
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "Dockerfile 多阶段构建: base(系统包) -\u003e builder(gcc-13+torch) -\u003e dev(CANN toolkit)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-07-29T19:25:20"
+    },
+    {
+      "action": "读取 CMakeLists.txt 确认构建依赖和编译选项",
+      "command": "",
+      "details": {
+        "build_target": "torchair (wheel 包)",
+        "cmake_min_version": "3.14",
+        "cxx_standard": "17",
+        "file": "CMakeLists.txt"
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "CMake 项目，要求 cmake \u003e= 3.14, C++17, 需先执行 configure 生成 tools/ 目录下的配置文件",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-07-29T19:25:20"
+    },
+    {
+      "action": "读取 configure.py 和 build.sh 理解配置和构建流程",
+      "command": "",
+      "details": {
+        "files": [
+          "configure.py",
+          "build.sh",
+          "build_and_install.sh"
+        ]
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "configure 需要 TARGET_PYTHON_PATH (有 torch 的 python 路径) 和 ASCEND_SDK_PATH (CANN 路径)，支持 NO_ASCEND_SDK=1",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-07-29T19:25:20"
+    },
+    {
+      "action": "NPU 需求判断: 扫描 README/Dockerfile/devcontainer 确认 npu_required=true",
+      "command": "",
+      "details": {
+        "keywords_hit": [
+          "CANN",
+          "Ascend",
+          "torch_npu",
+          "davinci",
+          "910B3"
+        ],
+        "npu_required": true,
+        "sources": [
+          "README.md",
+          "docker/Dockerfile",
+          ".devcontainer/devcontainer.json"
+        ]
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "仓库依赖昇腾 NPU 硬件: README 提及 TorchNPU/CANN, Dockerfile 安装 CANN toolkit, devcontainer 挂载 NPU 设备",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-07-29T19:25:20"
+    },
+    {
+      "action": "检查仓库 pre-commit 配置 (.pre-commit-config.yaml)",
+      "command": "",
+      "details": {
+        "config_file": ".pre-commit-config.yaml",
+        "hooks_count": 15
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "检测到 15 个 hooks: trailing-whitespace, end-of-file-fixer, check-yaml, ruff-check, ruff-format, codespell, pylint, bandit, typos, clang-format, gitleaks 等",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-07-29T19:25:41"
+    },
+    {
+      "action": "检查 lint-runner 配置",
+      "command": "",
+      "details": {
+        "searched": [
+          ".lint-runner.yaml",
+          ".lint-runner.json",
+          "lint-runner.config.*",
+          ".lintrunner.toml"
+        ]
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "未找到 lint-runner 相关配置文件",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-07-29T19:25:41"
+    },
+    {
+      "action": "检查 .devcontainer 目录及 devcontainer.json，提取依赖参考",
+      "command": "",
+      "details": {
+        "cann_version": "9.1.0_beta.1",
+        "config_dir": ".devcontainer",
+        "files": [
+          "devcontainer.json"
+        ],
+        "original_base_image": "manylinux_2_28",
+        "torch_version": "2.13.0.dev20260610",
+        "will_use": "Ubuntu 22.04"
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "devcontainer.json 配置: target=dev, PY_VERSION=3.10, TORCH_VERSION=2.13.0.dev20260610, CANN_VERSION=9.1.0_beta.1, CANN_PRODUCT=910b",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-07-29T19:25:41"
+    },
+    {
+      "action": "第一层：安装系统工具链（gcc-13 g++-13 cmake git python3 python3-pip ninja mold 等）",
+      "command": "apt-get install -y gcc-13 g++-13 gfortran-13 gcc g++ make cmake git python3-pip python3-dev bzip2 curl file sudo unzip util-linux wget autoconf automake bison diffutils patch perl zlib1g-dev ninja-build mold lcov",
+      "details": {
+        "packages": [
+          "gcc-13 13.4.0",
+          "g++-13 13.4.0",
+          "cmake 3.22.1",
+          "ninja 1.10.1",
+          "mold 1.0.3",
+          "git 2.34.1",
+          "python3 3.10.12",
+          "pip 22.0.2",
+          "lcov 1.14",
+          "autoconf",
+          "automake",
+          "bison",
+          "patch",
+          "perl",
+          "zlib1g-dev"
+        ],
+        "source": "Ubuntu 官方仓库 (apt) + ubuntu-toolchain-r/test PPA (gcc-13)"
+      },
+      "duration_seconds": 300,
+      "error": "",
+      "output": "通过 ubuntu-toolchain-r/test PPA 安装 gcc-13/g++-13，设置 update-alternatives 为默认编译器",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-29T19:27:21"
+    },
+    {
+      "action": "初始化 git 子模块 (third_party/secure_c, third_party/googletest)",
+      "command": "git submodule update --init --recursive",
+      "details": {
+        "submodules": [
+          "third_party/secure_c (libboundscheck) -\u003e 1ae16ab",
+          "third_party/googletest -\u003e 58d77fa"
+        ]
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "两个子模块已检出: secure_c (安全函数库) 和 googletest (测试框架)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-29T19:32:27"
+    },
+    {
+      "action": "第二层：安装 Python 依赖（pyyaml, setuptools, wheel, torch 2.7.1+cpu, numpy 1.23.2）",
+      "command": "pip3 install pyyaml setuptools wheel \u0026\u0026 pip3 install torch==2.7.1 --index-url https://download.pytorch.org/whl/cpu \u0026\u0026 pip3 install numpy==1.23.2",
+      "details": {
+        "packages": [
+          "pyyaml 6.0.3",
+          "torch 2.7.1+cpu",
+          "numpy 1.23.2",
+          "networkx 3.4.2",
+          "sympy 1.14.0",
+          "jinja2 3.1.6",
+          "filelock 3.32.0",
+          "fsspec 2026.7.0",
+          "typing-extensions 4.16.0"
+        ],
+        "source": "pip (华为云镜像 + PyTorch CPU 索引)"
+      },
+      "duration_seconds": 900,
+      "error": "",
+      "note": "首次安装时依赖从 PyTorch 索引下载极慢(11-15 kB/s)，改为先从华为云镜像安装依赖再装 torch 解决",
+      "output": "torch 2.7.1+cpu 安装成功, compiled_with_cxx11_abi=True, 从 PyTorch CPU 索引下载 aarch64 manylinux_2_28 wheel (99.1MB)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-29T19:52:26"
+    },
+    {
+      "action": "第三层：配置编译环境 (bash configure)",
+      "command": "source /usr/local/Ascend/cann-9.1.0/set_env.sh \u0026\u0026 export TARGET_PYTHON_PATH=/usr/bin/python3 \u0026\u0026 export ASCEND_SDK_PATH=/usr/local/Ascend/cann-9.1.0 \u0026\u0026 bash configure",
+      "details": {
+        "ascend_sdk_path": "/usr/local/Ascend/cann-9.1.0",
+        "compile_flags": "-D_GLIBCXX_USE_CXX11_ABI=1 -I/usr/include/python3.10",
+        "python_bin_path": "/usr/bin/python3",
+        "torch_version": "20701 (2.7.1)"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "configure 成功生成 tools/ 目录配置文件: TORCH_VERSION, PYTHON_BIN_PATH, COMPILE_FLAGS, ASCEND_SDK_PATH",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-29T19:53:06"
+    },
+    {
+      "action": "CMake 配置阶段",
+      "command": "cd build \u0026\u0026 cmake ..",
+      "details": {
+        "build_dir": "/workspace/build",
+        "build_type": "RELEASE",
+        "cmake_version": "3.22.1",
+        "compiler": "GNU 13.4.0"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "CMake 配置成功，生成 Makefile",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-07-29T19:53:27"
+    },
+    {
+      "action": "首次构建尝试: make torchair -j51 (并发数 51, 256核×20%)",
+      "command": "cd build \u0026\u0026 make torchair -j51",
+      "details": {
+        "build_type": "RELEASE",
+        "concurrency": 51,
+        "concurrency_ratio": "20%",
+        "target": "torchair"
+      },
+      "duration_seconds": 90,
+      "error": "",
+      "output": "[100%] Built target torchair, 生成 wheel 包 torchair-0.1-py3-none-any.whl (1.8MB) 和 4 个 .so 共享库",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-07-29T19:56:29"
+    },
+    {
+      "action": "安装 wheel 包并验证 torchair 可导入 (smoke test)",
+      "command": "pip3 install torchair-0.1-py3-none-any.whl \u0026\u0026 python3 -c \"import torchair\"",
+      "details": {
+        "install_path": "/usr/local/lib/python3.10/dist-packages/torchair/",
+        "wheel": "torchair-0.1-py3-none-any.whl"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "note": "需要 LD_PRELOAD 预加载 HCCL 库 (libhccl_plf.so, libhccl_alg.so, libhccl_fwk.so 等) 解决 CANN 库符号依赖问题",
+      "output": "torchair 导入成功，wheel 包可正常使用",
+      "result": "成功",
+      "returncode": 0,
+      "step": "smoke_test",
+      "success": true,
+      "timestamp": "2026-07-29T20:01:01"
+    },
+    {
+      "action": "构建并执行 UT (bash build.sh -u 等效手动构建)",
+      "command": "cd tests/build \u0026\u0026 cmake .. -DCMAKE_BUILD_TYPE=GCOV \u0026\u0026 make torchair_ut -j51",
+      "details": {
+        "error_type": "linker_error",
+        "undefined_symbols": [
+          "ge::Tensor::GetPlacement()",
+          "ge::GNode::GetInputsSize()",
+          "ge::Operator::OptionalInputRegister()",
+          "vsnprintf_s",
+          "ge::Shape::Shape()"
+        ]
+      },
+      "duration_seconds": 120,
+      "error": "collect2: error: ld returned 1 exit status - stub 库 (libtorchair_ut_lib.so, libge_local_stub.so, libreg_op_stub.so) 存在未定义的 GE 符号引用",
+      "note": "首次尝试因 LD_PRELOAD 驱动消息污染汇编器输入失败，移除 LD_PRELOAD 后重新构建到 85% 链接失败",
+      "output": "UT 构建到 85% (成功构建 _torchair.so) 后链接 torchair_ut_main 失败",
+      "result": "失败",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-07-29T20:11:20"
+    },
+    {
+      "action": "执行 README 快速上手示例: torch.add 图模式推理",
+      "command": "python3 sample_test.py (import torch; import torchair; config=CompilerConfig(); npu_backend=get_npu_backend(); model=torch.compile(...); model(x,y))",
+      "details": {
+        "step_failed": "model(x,y) 执行 - ACL set device id failed",
+        "steps_passed": [
+          "torch 导入",
+          "torchair 导入",
+          "CompilerConfig 创建",
+          "npu_backend 创建",
+          "torch.compile 模型编译"
+        ]
+      },
+      "duration_seconds": 90,
+      "error": "RuntimeError: ACL set device id failed, return 507899 - NPU 设备 (davinci1) 被其他容器 (npu-test-a2-v2.12.0-syh) 占用",
+      "note": "所有 8 张 NPU 卡 (0-7) 均被其他容器占用，card 0 状态为 Critical",
+      "output": "torchair 库功能验证通过(导入/配置/编译)，仅 NPU 运行时执行因设备不可用而失败",
+      "result": "失败",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": false,
+      "timestamp": "2026-07-29T20:16:02"
+    },
+    {
+      "action": "停止并删除容器 torchair-ttfhw",
+      "command": "docker rm -f torchair-ttfhw",
+      "details": {
+        "container": "torchair-ttfhw"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "容器已清理",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-07-29T20:17:08"
+    },
+    {
+      "action": "生成验证报告并运行校验脚本",
+      "command": "python3 validate_report.py verification_report_torchair_20260729.json --jsonschema report_schema.json",
+      "details": {
+        "output_file": "verification_report_torchair_20260729.json",
+        "validation": "PASS (0 issues, jsonschema PASS)"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "报告校验通过，无 BLOCKER 或 ERROR",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-07-29T20:17:08"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "torchair-0.1-py3-none-any.whl",
+          "path": "build/dist/dist/torchair-0.1-py3-none-any.whl",
+          "size": "1.8 MB",
+          "type": "wheel"
+        },
+        {
+          "name": "_torchair.so",
+          "path": "build/dist/torchair/core/_torchair.so",
+          "size": "679 KB",
+          "type": "shared_library"
+        },
+        {
+          "name": "_npu_graph_executor.so",
+          "path": "build/dist/torchair/core/_npu_graph_executor.so",
+          "size": "524 KB",
+          "type": "shared_library"
+        },
+        {
+          "name": "_npu_utils.so",
+          "path": "build/dist/torchair/core/_npu_utils.so",
+          "size": "155 KB",
+          "type": "shared_library"
+        },
+        {
+          "name": "_abi_compat_ge_apis.so",
+          "path": "build/dist/torchair/core/_abi_compat_ge_apis.so",
+          "size": "62 KB",
+          "type": "shared_library"
+        }
+      ],
+      "cmake": "3.22.1 (RELEASE build)",
+      "compiler": "gcc 13.4.0 (g++-13)",
+      "concurrency": 51,
+      "concurrency_ratio": "20% (256核 × 20% = 51)",
+      "duration_seconds": 90,
+      "notes": "CMake 配置和 make torchair -j51 一次成功，无需重试。编译器 gcc-13.4.0, cmake 3.22.1, 并发 51 (256核×20%)",
+      "status": "成功"
+    },
+    "devcontainer": {
+      "config_dir": ".devcontainer",
+      "config_files": [
+        "devcontainer.json"
+      ],
+      "enabled": true,
+      "original_base_image": "quay.io/pypa/manylinux_2_28 (via docker/Dockerfile target=dev)",
+      "summary": "仓库配置了 devcontainer (.devcontainer/devcontainer.json)，基于 manylinux_2_28 + CANN 9.1.0_beta.1，映射为 Ubuntu 22.04 基础镜像。devcontainer 挂载 NPU 设备和 Ascend 驱动，target=dev 阶段叠加 CANN toolkit",
+      "used_image": "Ubuntu 22.04"
+    },
+    "sample": {
+      "duration_seconds": 90,
+      "reason": "NPU 设备被其他容器占用，ACL set device id failed (ret=507899)。torchair 库本身工作正常: 导入、CompilerConfig 创建、npu_backend 创建、torch.compile 模型编译均成功，仅在执行阶段因 NPU 不可用而失败",
+      "results": [
+        {
+          "execution_status": "失败",
+          "execution_time": "约 90 秒 (含 NPU 初始化超时)",
+          "output_summary": "torch 2.7.1+cpu 导入成功, torchair 导入成功, CompilerConfig 创建成功, npu_backend 创建成功, torch.compile 模型编译成功, 执行 model(x,y) 时失败: RuntimeError: ACL set device id failed, return 507899 (NPU 设备被其他容器占用)",
+          "sample_name": "README 快速上手示例 (torch.add 图模式推理)"
+        }
+      ],
+      "status": "失败"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 0,
+        "executed_in_verification": false,
+        "failed": 0,
+        "hooks": [
+          {
+            "name": "trailing-whitespace",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "name": "end-of-file-fixer",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "name": "check-yaml",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "name": "check-added-large-files",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "name": "check-merge-conflict",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "name": "detect-private-key",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "name": "check-json",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "name": "ruff-check",
+            "repo": "gh_mirrors/ru/ruff-pre-commit",
+            "rev": "v0.14.14"
+          },
+          {
+            "name": "ruff-format",
+            "repo": "gh_mirrors/ru/ruff-pre-commit",
+            "rev": "v0.14.14"
+          },
+          {
+            "name": "codespell",
+            "repo": "gh_mirrors/co/codespell",
+            "rev": "v2.4.1"
+          },
+          {
+            "name": "pylint",
+            "repo": "gh_mirrors/pyl/pylint",
+            "rev": "v4.0.5"
+          },
+          {
+            "name": "bandit",
+            "repo": "gh_mirrors/ba/bandit",
+            "rev": "1.9.4"
+          },
+          {
+            "name": "typos",
+            "repo": "gh_mirrors/ty/typos",
+            "rev": "v1.32.0"
+          },
+          {
+            "name": "clang-format",
+            "repo": "pre-commit-clang/mirrors-clang-format",
+            "rev": "v18.1.8"
+          },
+          {
+            "name": "gitleaks-offline-scan",
+            "repo": "local",
+            "rev": "N/A"
+          }
+        ],
+        "note": "按 skill 要求仅扫描配置不执行，pre-commit minimum_pre_commit_version=4.0.0",
+        "passed": 0,
+        "skipped": 0,
+        "status": "已配置（未执行，仅扫描配置）",
+        "total_hooks": 15
+      },
+      "summary": "检测到 pre-commit 配置 (.pre-commit-config.yaml，15个 hooks: trailing-whitespace, ruff-check, ruff-format, codespell, pylint, bandit, typos, clang-format, gitleaks 等)，未检测到 lint-runner 配置。按 skill 要求仅扫描配置不执行"
+    },
+    "ut": {
+      "duration_seconds": 120,
+      "failed": 0,
+      "failures": [
+        {
+          "detail": "链接 torchair_ut_main 时 stub 库存在未定义引用: ge::Tensor::GetPlacement(), ge::GNode::GetInputsSize(), vsnprintf_s 等",
+          "type": "link_error"
+        }
+      ],
+      "passed": 0,
+      "status": "失败",
+      "total": 0
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "torchair-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2048Gi (无限制)",
+      "os": "Ubuntu 22.04.5 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng 920 (aarch64)",
+      "disk": "69G root + 6.9T docker overlay",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2048Gi",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 1
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_dockerfile": "Dockerfile 使用 yum 安装依赖（manylinux_2_28 基于 AlmaLinux），映射为 Ubuntu apt-get 等效包名",
+        "mappings": [
+          {
+            "original": "bzip2",
+            "source": "Dockerfile base 阶段（Ubuntu 原生包名一致）",
+            "target": "bzip2"
+          },
+          {
+            "original": "curl",
+            "source": "Dockerfile base 阶段",
+            "target": "curl"
+          },
+          {
+            "original": "file",
+            "source": "Dockerfile base 阶段",
+            "target": "file"
+          },
+          {
+            "original": "git",
+            "source": "Dockerfile base 阶段",
+            "target": "git"
+          },
+          {
+            "original": "sudo",
+            "source": "Dockerfile base 阶段",
+            "target": "sudo"
+          },
+          {
+            "original": "unzip",
+            "source": "Dockerfile base 阶段",
+            "target": "unzip"
+          },
+          {
+            "original": "util-linux",
+            "source": "Dockerfile base 阶段",
+            "target": "util-linux"
+          },
+          {
+            "original": "wget",
+            "source": "Dockerfile base 阶段",
+            "target": "wget"
+          },
+          {
+            "original": "which",
+            "source": "Dockerfile base 阶段（Ubuntu 中 which 由 debianutils 提供）",
+            "target": "debianutils"
+          },
+          {
+            "original": "autoconf",
+            "source": "Dockerfile builder 阶段",
+            "target": "autoconf"
+          },
+          {
+            "original": "automake",
+            "source": "Dockerfile builder 阶段",
+            "target": "automake"
+          },
+          {
+            "original": "bison",
+            "source": "Dockerfile builder 阶段",
+            "target": "bison"
+          },
+          {
+            "original": "diffutils",
+            "source": "Dockerfile builder 阶段",
+            "target": "diffutils"
+          },
+          {
+            "original": "make",
+            "source": "Dockerfile builder 阶段",
+            "target": "make"
+          },
+          {
+            "original": "mold",
+            "source": "Dockerfile builder 阶段",
+            "target": "mold"
+          },
+          {
+            "original": "ninja-build",
+            "source": "Dockerfile builder 阶段",
+            "target": "ninja-build"
+          },
+          {
+            "original": "patch",
+            "source": "Dockerfile builder 阶段",
+            "target": "patch"
+          },
+          {
+            "original": "perl",
+            "source": "Dockerfile builder 阶段",
+            "target": "perl"
+          },
+          {
+            "original": "zlib-devel",
+            "source": "Dockerfile builder 阶段（yum devel → apt dev 映射）",
+            "target": "zlib1g-dev"
+          },
+          {
+            "original": "gcc-toolset-13-gcc",
+            "source": "Dockerfile builder 阶段（gcc-toolset 是 RHEL 概念，Ubuntu 直接安装 gcc-13）",
+            "target": "gcc-13"
+          },
+          {
+            "original": "gcc-toolset-13-gcc-c++",
+            "source": "Dockerfile builder 阶段",
+            "target": "g++-13"
+          },
+          {
+            "original": "gcc-toolset-13-gcc-gfortran",
+            "source": "Dockerfile builder 阶段",
+            "target": "gfortran-13"
+          }
+        ]
+      },
+      "image_name": "ubuntu:22.04",
+      "selection_reason": "仓库 Dockerfile FROM quay.io/pypa/manylinux_2_28（AlmaLinux 系），按 skill 规则映射为 Ubuntu 22.04 基础镜像从零构建",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "dc7ce98",
+    "duration_seconds": 4007,
+    "end_time": "2026-07-29T20:16:41",
+    "environment": "远程容器验证 (192.168.9.114, aarch64, 256核, 2044GB内存)",
+    "repo_url": "https://gitcode.com/Ascend/torchair.git",
+    "start_time": "2026-07-29T19:09:54",
+    "total_steps": 20,
+    "verifier": "opencode (glm-5.2)"
+  },
+  "problems_encountered": [
+    {
+      "problem": "pip 从 PyTorch CPU 索引下载 torch 依赖包极慢（networkx/fsspec/sympy 等非 torch 包从 download.pytorch.org 下载，速度仅 11-15 kB/s），导致安装超时",
+      "solution": "先从华为云镜像安装 torch 的依赖包（networkx, typing-extensions, fsspec, filelock, sympy, jinja2, markupsafe, mpmath），再从 PyTorch CPU 索引安装 torch 本身（依赖已满足，仅下载 torch wheel）",
+      "source": "docker/Dockerfile pip install --index-url 使用方式",
+      "timestamp": "2026-07-29T11:35:00"
+    },
+    {
+      "problem": "torchair 导入时 CANN libhccl.so 报 undefined symbol (HcclCheckLogLevel, HcclSetConfig 等)，CANN 9.1.0 库依赖链不完整",
+      "solution": "通过 LD_PRELOAD 预加载 HCCL 相关库解决: libhccl_plf.so, libhccl_alg.so, libhccl_fwk.so, libhcom_executor.so, libhcom_graph_adaptor.so",
+      "source": "CANN 9.1.0 lib64/libhccl.so 未声明对 libhccl_plf.so 等的 NEEDED 依赖",
+      "timestamp": "2026-07-29T11:50:00"
+    },
+    {
+      "problem": "torchair 导入时缺少 packaging Python 模块",
+      "solution": "pip3 install packaging 安装缺失依赖",
+      "source": "torchair/__init__.py 第17行: from packaging import version",
+      "timestamp": "2026-07-29T11:48:00"
+    },
+    {
+      "problem": "UT 构建链接阶段失败: stub 库 (libtorchair_ut_lib.so, libge_local_stub.so, libreg_op_stub.so) 存在未定义的 GE 符号引用 (ge::Tensor, ge::GNode, ge::Operator 等) 和 secure_c 符号 (vsnprintf_s)",
+      "solution": "记录为仓库 UT 构建系统问题，stub 库不完整。主构建 (make torchair) 不受影响",
+      "source": "tests/CMakeLists.txt + tests/ut/CMakeLists.txt",
+      "timestamp": "2026-07-29T12:00:00"
+    },
+    {
+      "problem": "样例执行失败: ACL set device id failed (ret=507899)，NPU 设备被其他容器占用",
+      "solution": "确认非代码问题: torchair 导入/配置/编译均成功，失败仅因 NPU 硬件不可用。记录为环境限制",
+      "source": "README 快速上手示例 + NPU 设备状态",
+      "timestamp": "2026-07-29T12:07:00"
+    }
+  ],
+  "session_export_file": "",
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "bailian/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

@@ -1,0 +1,734 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md + /proc/cpuinfo",
+      "value": "aarch64 (鲲鹏920处理器, CPU implementer=0x48, CPU part=0xd01)"
+    },
+    "build_commands": {
+      "source": "README.md + 安装指南 + build.sh",
+      "value": "一键安装: sh build.sh all（构建全部组件）；也可分别构建: sh build.sh uadk / sh build.sh engine / sh build.sh zlib / sh build.sh gzip 等。注意: 4.19内核仅支持用户态，不支持内核态驱动"
+    },
+    "dependencies": {
+      "source": "README.md + 安装指南 + build.sh + common.sh",
+      "value": [
+        "make (yum: make)",
+        "gcc 7.4.1+ (yum: gcc)",
+        "kernel-devel (yum: kernel-devel-$(uname -r)，4.19内核仅用户态使用)",
+        "libtool (yum: libtool)",
+        "automake (yum: automake)",
+        "autoconf (yum: autoconf)",
+        "numactl-devel (yum: numactl-devel)",
+        "openssl-devel (yum: openssl-devel，OpenSSL 1.1.1x 或 3.0.x)",
+        "lz4-devel (yum: lz4-devel)",
+        "libzstd-devel (yum: libzstd-devel)",
+        "chrpath (yum: chrpath)",
+        "cmake (yum: cmake)",
+        "libunwind-devel (yum: libunwind-devel)",
+        "patch (yum: patch)",
+        "perl (yum: perl)",
+        "bzip2 (yum: bzip2)",
+        "python3 (yum: python3，pre-commit 需要)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库无 Dockerfile",
+      "value": "仓库中不存在 Dockerfile，依赖来源为安装指南中的 yum install 命令"
+    },
+    "recommended_image": {
+      "source": "README.md + 安装指南 (docs/zh/installation_guide.md)",
+      "value": "仓库无 Dockerfile，README 和安装指南明确推荐 openEuler 操作系统，支持 openEuler 22.03 LTS SP1/SP2/SP3/SP4、openEuler 24.03 LTS SP1/SP2/SP3、EulerOS-V2.0 SP12、TencentOS 5.4。选择 openEuler 24.03 LTS 基础镜像"
+    },
+    "sample_commands": {
+      "source": "docs/zh/quick_start.md",
+      "value": "openssl speed -elapsed -engine kae rsa2048（RSA 同步性能测试）；openssl speed -elapsed -async_jobs 36 -engine kae rsa2048（RSA 异步性能测试）；使用 KAEGzip 工具进行文件压缩/解压"
+    },
+    "special_dependencies": {
+      "source": "README.md + 安装指南",
+      "value": [
+        "KAE 硬件设备 (HPRE/SEC/ZIP 加速引擎，需 License 或 BIOS 免 License)",
+        "UACCE 内核框架 (用户态加速器框架)",
+        "OpenSSL 1.1.1x 或 3.0.x 系列 (KAE 加解密引擎依赖)",
+        "kernel-devel 匹配运行内核版本 (内核驱动编译需要)",
+        "KAE_ALLOW_NON_KUNPENG_BUILD=1 环境变量 (非鲲鹏 CPU 构建时需要，当前为鲲鹏 CPU 无需)"
+      ]
+    },
+    "ut_commands": {
+      "source": "安装指南 + quick_start.md",
+      "value": "通过 openssl speed -engine kae rsa2048 验证 KAE 加解密性能；通过压缩/解压测试验证 KAEZlib。需 KAE 硬件设备支持"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "README 和快速入门文档未明确说明当系统无 KAE 硬件设备时，KAE 引擎和工具会自动回退到软件模式。新手在无硬件环境下测试时会看到 \"WD framework is not enabled\" 和 \"KAE Hardware Not Available, fallback to software\" 等警告，文档中缺乏对此情况的说明。",
+      "source": "README.md + docs/zh/quick_start.md",
+      "time": "2026-07-30T12:44:00",
+      "title": "README 未说明无 KAE 硬件时的软件回退行为"
+    },
+    {
+      "body": "安装指南中的依赖安装命令 yum install -y ... libzstd-devel ... 在 openEuler 24.03 中实际包名为 zstd-devel，libzstd-devel 包不存在。虽然不影响主要组件构建（CPU part 0xd01 不支持 zstd），但新手按文档安装时会遇到包未找到的错误。",
+      "source": "docs/zh/installation_guide.md - 源码安装前提条件",
+      "time": "2026-07-30T12:44:00",
+      "title": "安装指南中 libzstd-devel 包名在 openEuler 24.03 中不存在"
+    },
+    {
+      "body": "common.sh 中的 build_check_OS_version 函数优先通过 rpm -q kernel-devel 获取内核版本，而非使用 uname -r。在容器环境中，kernel-devel 版本(6.6.0)可能与运行内核版本(4.19.90)不一致，导致选择了错误的内核驱动目录和 OpenSSL 配置参数。虽然不影响用户态组件构建，但可能导致混淆。",
+      "source": "scripts/buildScript/common.sh - build_check_OS_version 函数",
+      "time": "2026-07-30T12:44:00",
+      "title": "build_check_OS_version 使用 kernel-devel 版本而非运行内核版本"
+    },
+    {
+      "body": "安装指南说明 4.19 内核仅支持用户态使用，但 build.sh all 命令仍会尝试构建内核驱动，导致因 kernel-devel 版本不匹配而失败。文档未提供 4.19 内核下的替代构建命令（如分别执行 sh build.sh uadk/engine3/zlib/gzip）。",
+      "source": "docs/zh/installation_guide.md + build.sh",
+      "time": "2026-07-30T12:44:00",
+      "title": "4.19 内核下 build.sh all 不会自动跳过内核驱动"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "拉取 openEuler 24.03 LTS 基础镜像并启动容器 KAE-ttfhw，挂载 /tmp/KAE 到 /workspace",
+      "command": "docker run -d --name KAE-ttfhw -v /tmp/KAE:/workspace -w /workspace hub.oepkgs.net/openeuler/openeuler:24.03-lts sleep infinity",
+      "details": {
+        "container_name": "KAE-ttfhw",
+        "image": "hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+        "mount": "/tmp/KAE:/workspace"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Container ID: 09f78c5a8ff2, 容器正常运行",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-07-30T12:29:22"
+    },
+    {
+      "action": "检查仓库 pre-commit 和 lint-runner 配置（仅检查配置存在性，不执行）",
+      "command": "ls -la .pre-commit-config.yaml; find . -name \".lint-runner*\" -o -name \"lintrunner*\"",
+      "details": {
+        "exclude": "^(KAEKernelDriver|uadk|scripts)/",
+        "hooks": [
+          "check-yaml (pre-commit-hooks v6.0.0)",
+          "check-json (pre-commit-hooks v6.0.0)",
+          "check-xml (pre-commit-hooks v6.0.0)",
+          "check-merge-conflict (pre-commit-hooks v6.0.0)",
+          "detect-private-key (pre-commit-hooks v6.0.0)",
+          "check-added-large-files (pre-commit-hooks v6.0.0)",
+          "detect-secrets (detect-secrets v1.5.0)",
+          "clang-format (mirrors-clang-format v18.1.8)"
+        ],
+        "lint_runner_config": "未找到 lint-runner 配置文件",
+        "pre_commit_config": ".pre-commit-config.yaml 存在"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": ".pre-commit-config.yaml 存在；8 个 hooks；排除 KAEKernelDriver/uadk/scripts 目录；无 lint-runner 配置",
+      "result": "pre-commit 已配置，lint-runner 未配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-07-30T12:29:55"
+    },
+    {
+      "action": "检查仓库 .devcontainer 目录",
+      "command": "ls -la .devcontainer 2\u003e/dev/null",
+      "details": {
+        "config_dir": null,
+        "files": []
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": ".devcontainer 目录不存在",
+      "result": "未配置 devcontainer",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-07-30T12:29:55"
+    },
+    {
+      "action": "第一层：安装系统工具链（gcc gcc-c++ make cmake git python3 python3-pip）",
+      "command": "dnf install -y gcc gcc-c++ make cmake git python3 python3-pip",
+      "details": {
+        "packages": [
+          "gcc-12.3.1",
+          "gcc-c++-12.3.1",
+          "make-4.4.1",
+          "cmake-3.27.9",
+          "git",
+          "python3-3.11.6",
+          "python3-pip"
+        ],
+        "source": "openEuler 官方仓库 (dnf)"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "gcc 12.3.1, make 4.4.1, cmake 3.27.9, python3 3.11.6",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-30T12:34:35"
+    },
+    {
+      "action": "第二层：安装构建依赖（来自安装指南: make libtool numactl-devel openssl-devel chrpath libunwind-devel patch automake autoconf perl bzip2 kernel-devel lz4-devel zstd-devel）",
+      "command": "dnf install -y make libtool numactl-devel openssl-devel chrpath libunwind-devel patch automake autoconf perl bzip2 kernel-devel lz4-devel zstd-devel",
+      "details": {
+        "note": "安装指南中包名 libzstd-devel 在 openEuler 24.03 中为 zstd-devel；kernel-devel 版本6.6.0与运行内核4.19不匹配，内核驱动无法编译",
+        "packages": [
+          "libtool-2.4.7",
+          "numactl-devel-2.0.16",
+          "openssl-devel-3.0.12",
+          "chrpath-0.16",
+          "libunwind-devel-1.7.2",
+          "patch-2.7.6",
+          "automake-1.16.5",
+          "autoconf-2.71",
+          "perl-5.38.0",
+          "bzip2-1.0.8",
+          "kernel-devel-6.6.0 (注意: 容器内核为4.19，kernel-devel版本不匹配)",
+          "lz4-devel-1.9.4",
+          "zstd-devel-1.5.5"
+        ],
+        "source": "openEuler 官方仓库 (dnf)"
+      },
+      "duration_seconds": 45,
+      "error": "",
+      "output": "所有依赖包安装成功。OpenSSL 3.0.12, kernel-devel 6.6.0 (与运行内核4.19不匹配)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-30T12:34:35"
+    },
+    {
+      "action": "验证所有依赖安装情况",
+      "command": "rpm -q gcc make cmake libtool numactl-devel openssl-devel chrpath libunwind-devel patch automake autoconf perl bzip2 lz4-devel zstd-devel kernel-devel",
+      "details": {
+        "kernel_mismatch": "kernel-devel 6.6.0 vs 运行内核 4.19.90",
+        "openssl_version": "OpenSSL 3.0.12 (3.0.x 系列)",
+        "verified_packages": [
+          "gcc-12.3.1",
+          "make-4.4.1",
+          "cmake-3.27.9",
+          "libtool-2.4.7",
+          "numactl-devel-2.0.16",
+          "openssl-devel-3.0.12",
+          "chrpath-0.16",
+          "libunwind-devel-1.7.2",
+          "patch-2.7.6",
+          "automake-1.16.5",
+          "autoconf-2.71",
+          "perl-5.38.0",
+          "bzip2-1.0.8",
+          "lz4-devel-1.9.4",
+          "zstd-devel-1.5.5",
+          "kernel-devel-6.6.0"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "所有依赖包已确认安装",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-07-30T12:34:35"
+    },
+    {
+      "action": "首次构建尝试: sh build.sh all（包含内核驱动）",
+      "command": "BUILD_JOBS=51 sh build.sh all",
+      "details": {
+        "concurrency": 51,
+        "concurrency_ratio": "20%",
+        "error": "kernel-devel 6.6.0 与运行内核 4.19.90 不匹配；4.19内核仅支持用户态使用"
+      },
+      "duration_seconds": 5,
+      "error": "内核驱动构建失败: kernel-devel版本(6.6.0)与运行内核(4.19.90)不匹配，且4.19内核仅支持用户态使用，不支持内核态驱动",
+      "output": "make: *** /lib/modules/4.19.90-2604.3.0.0369.oe2003sp4.aarch64/build: No such file or directory. Stop.",
+      "result": "失败（内核驱动构建失败）",
+      "returncode": 2,
+      "step": "build_attempt",
+      "success": false,
+      "timestamp": "2026-07-30T12:38:50"
+    },
+    {
+      "action": "问题定位: 4.19内核仅支持用户态，跳过内核驱动，分别构建用户态组件（UADK、engine3、zlib、gzip）",
+      "command": "sh build.sh uadk \u0026\u0026 sh build.sh engine3 \u0026\u0026 sh build.sh zlib \u0026\u0026 sh build.sh gzip",
+      "details": {
+        "solution": "跳过内核驱动构建，使用 sh build.sh uadk/engine3/zlib/gzip 分别构建用户态组件",
+        "source": "安装指南: 4.19内核仅支持用户态使用"
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-07-30T12:38:50"
+    },
+    {
+      "action": "构建 UADK 用户态驱动框架（并发数 51）",
+      "command": "BUILD_JOBS=51 sh build.sh uadk",
+      "details": {
+        "component": "UADK",
+        "concurrency": 51,
+        "version": "2.10.0"
+      },
+      "duration_seconds": 11,
+      "error": "",
+      "output": "libwd.so.2.10.0, libwd_comp.so.2.10.0, libwd_crypto.so.2.10.0, libwd_dae.so.2.10.0, libwd_udma.so.2.10.0 安装到 /usr/local/lib/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_uadk",
+      "success": true,
+      "timestamp": "2026-07-30T12:38:50"
+    },
+    {
+      "action": "构建 KAE OpenSSL 3.0 引擎（并发数 51）",
+      "command": "BUILD_JOBS=51 sh build.sh engine3",
+      "details": {
+        "component": "KAEOpensslEngine",
+        "concurrency": 51,
+        "openssl": "3.0.12",
+        "version": "2.2.0"
+      },
+      "duration_seconds": 9,
+      "error": "",
+      "output": "kae.so.2.2.0 安装到 /usr/local/lib/engines-3.0/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_engine3",
+      "success": true,
+      "timestamp": "2026-07-30T12:38:50"
+    },
+    {
+      "action": "构建 KAEZlib 加速压缩库（并发数 51）",
+      "command": "BUILD_JOBS=51 sh build.sh zlib",
+      "details": {
+        "component": "KAEZlib",
+        "concurrency": 51,
+        "version": "1.2.11"
+      },
+      "duration_seconds": 12,
+      "error": "",
+      "output": "libz.so.1.2.11, libkaezip.so.2.2.0 安装到 /usr/local/kaezip/lib/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_zlib",
+      "success": true,
+      "timestamp": "2026-07-30T12:38:50"
+    },
+    {
+      "action": "构建 KAEGzip 压缩工具（并发数 51）",
+      "command": "BUILD_JOBS=51 sh build.sh gzip",
+      "details": {
+        "component": "KAEGzip",
+        "concurrency": 51,
+        "version": "1.13"
+      },
+      "duration_seconds": 22,
+      "error": "",
+      "output": "KAEGzip 安装到 /usr/local/kaegzip/gzip",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_gzip",
+      "success": true,
+      "timestamp": "2026-07-30T12:38:50"
+    },
+    {
+      "action": "验证 KAE OpenSSL 引擎加载: openssl engine -t kae",
+      "command": "OPENSSL_ENGINES=/usr/local/lib/engines-3.0 openssl engine -t kae",
+      "details": {
+        "engine_status": "available",
+        "note": "KAE 引擎正确加载并注册，但当前环境无 KAE 硬件设备(HPRE/SEC/ZIP)，引擎以软件回退模式运行",
+        "warnings": "WD framework is not enabled on the system, errno = 2 (无 UACCE 内核模块)"
+      },
+      "duration_seconds": 2,
+      "error": "WD framework is not enabled on the system, errno = 2!",
+      "output": "(kae) uadk hardware engine support [ available ]",
+      "result": "成功（引擎可用，但无硬件加速）",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-07-30T12:44:00"
+    },
+    {
+      "action": "RSA 2048 同步性能测试（软件基线 vs KAE 引擎）",
+      "command": "openssl speed -elapsed -seconds 3 rsa2048; openssl speed -elapsed -seconds 3 -engine kae rsa2048",
+      "details": {
+        "kae_engine": {
+          "sign_s": 894.7,
+          "verify_s": 37306.3
+        },
+        "note": "无 KAE 硬件，KAE 引擎回退到软件算法，性能与软件基线一致",
+        "software_baseline": {
+          "sign_s": 895.3,
+          "verify_s": 37235
+        }
+      },
+      "duration_seconds": 12,
+      "error": "WD framework is not enabled on the system",
+      "output": "软件: 895.3 sign/s, 37235.0 verify/s; KAE: 894.7 sign/s, 37306.3 verify/s",
+      "result": "成功（软件回退模式，无硬件加速效果）",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-07-30T12:44:00"
+    },
+    {
+      "action": "RSA 2048 异步性能测试（36 async jobs, KAE 引擎）",
+      "command": "openssl speed -elapsed -seconds 3 -async_jobs 36 -engine kae rsa2048",
+      "details": {
+        "kae_async": {
+          "sign_s": 895.3,
+          "verify_s": 37314.7
+        },
+        "note": "异步模式同样因无硬件而回退到软件"
+      },
+      "duration_seconds": 6,
+      "error": "",
+      "output": "895.3 sign/s, 37314.7 verify/s",
+      "result": "成功（软件回退模式）",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-07-30T12:44:00"
+    },
+    {
+      "action": "KAEGzip 压缩/解压测试",
+      "command": "/usr/local/kaegzip/gzip -c /tmp/test2.txt \u003e /tmp/test2.txt.gz; /usr/local/kaegzip/gzip -dc /tmp/test2.txt.gz",
+      "details": {
+        "compress": "成功，输出标准 gzip 格式 (magic bytes 1f 8b 08)",
+        "decompress": "成功，解压后内容与原始内容一致",
+        "fallback": "KAE Hardware Not Available, fallback to software."
+      },
+      "duration_seconds": 3,
+      "error": "WD framework is not enabled on the system, errno = 2!",
+      "output": "压缩: 25字节→45字节 gzip 文件; 解压: 恢复为原始内容 \"test compression for KAE\"",
+      "result": "成功（软件回退模式）",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-07-30T12:44:00"
+    },
+    {
+      "action": "KAEZlib minigzip 压缩/解压测试",
+      "command": "./minigzipsh \u003c /tmp/zlib_test.txt \u003e /tmp/zlib_test.txt.gz; ./minigzipsh -d \u003c /tmp/zlib_test.txt.gz",
+      "details": {
+        "compress": "成功",
+        "decompress": "成功，解压后内容与原始内容一致",
+        "note": "使用 KAEZlib 构建的 minigzipsh 工具测试"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "压缩→解压后输出: \"KAEZlib minigzip test\"，与原始内容一致",
+      "result": "成功（软件回退模式）",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-07-30T12:44:00"
+    },
+    {
+      "action": "停止并删除容器 KAE-ttfhw",
+      "command": "docker rm -f KAE-ttfhw",
+      "details": {},
+      "duration_seconds": 2,
+      "error": "",
+      "output": "KAE-ttfhw",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-07-30T12:44:40"
+    },
+    {
+      "action": "生成验证报告并运行校验",
+      "command": "python3 validate_report.py verification_report_KAE_20260730.json",
+      "details": {
+        "output_file": "verification_report_KAE_20260730.json"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-07-30T12:44:40"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "libwd.so",
+          "path": "/usr/local/lib/libwd.so.2.10.0",
+          "size": "330KB",
+          "type": "library"
+        },
+        {
+          "name": "libwd_comp.so",
+          "path": "/usr/local/lib/libwd_comp.so.2.10.0",
+          "size": "133KB",
+          "type": "library"
+        },
+        {
+          "name": "libwd_crypto.so",
+          "path": "/usr/local/lib/libwd_crypto.so.2.10.0",
+          "size": "716KB",
+          "type": "library"
+        },
+        {
+          "name": "libwd_dae.so",
+          "path": "/usr/local/lib/libwd_dae.so.2.10.0",
+          "size": "library",
+          "type": "library"
+        },
+        {
+          "name": "libwd_udma.so",
+          "path": "/usr/local/lib/libwd_udma.so.2.10.0",
+          "size": "library",
+          "type": "library"
+        },
+        {
+          "name": "kae.so (OpenSSL 3.0 Engine)",
+          "path": "/usr/local/lib/engines-3.0/kae.so.2.2.0",
+          "size": "3.8MB",
+          "type": "library"
+        },
+        {
+          "name": "libz.so (KAEZlib)",
+          "path": "/usr/local/kaezip/lib/libz.so.1.2.11",
+          "size": "library",
+          "type": "library"
+        },
+        {
+          "name": "libkaezip.so",
+          "path": "/usr/local/kaezip/lib/libkaezip.so.2.2.0",
+          "size": "library",
+          "type": "library"
+        },
+        {
+          "name": "KAEGzip",
+          "path": "/usr/local/kaegzip/gzip",
+          "size": "binary",
+          "type": "binary"
+        }
+      ],
+      "cmake": "cmake 3.27.9",
+      "compiler": "gcc 12.3.1 (openEuler)",
+      "concurrency": 51,
+      "concurrency_ratio": "20% (256核 × 20% = 51)",
+      "duration_seconds": 54,
+      "notes": "4.19内核仅支持用户态，跳过内核驱动构建。CPU part 0xd01不支持zstd/lz4/snappy，仅构建UADK/OpenSSL引擎/KAEZlib/KAEGzip四个组件。内核驱动因kernel-devel版本(6.6.0)与运行内核(4.19.90)不匹配而跳过，符合安装指南\"4.19内核仅支持用户态使用\"的说明。",
+      "status": "成功（用户态组件）"
+    },
+    "devcontainer": {
+      "config_dir": null,
+      "config_files": [],
+      "enabled": false,
+      "original_base_image": "无 (仓库无 Dockerfile 和 .devcontainer)",
+      "summary": "仓库未配置 devcontainer，无 Dockerfile。根据 README 和安装指南明确推荐 openEuler 操作系统，选择 openEuler 24.03 LTS 基础镜像从零构建",
+      "used_image": "openEuler 24.03 LTS (hub.oepkgs.net/openeuler/openeuler:24.03-lts)"
+    },
+    "sample": {
+      "duration_seconds": 5,
+      "reason": "所有样例在无 KAE 硬件环境下以软件回退模式成功执行。KAE 硬件加速功能需要 HPRE/SEC/ZIP 加速器设备（需 License 或 BIOS 免 License）和 UACCE 内核框架支持。",
+      "results": [
+        {
+          "execution_status": "成功（软件回退）",
+          "execution_time": "3秒",
+          "output_summary": "压缩输出标准 gzip 格式文件，解压后内容与原始一致。stderr 输出 \"KAE Hardware Not Available, fallback to software.\"",
+          "sample_name": "KAEGzip 压缩/解压"
+        },
+        {
+          "execution_status": "成功（软件回退）",
+          "execution_time": "2秒",
+          "output_summary": "使用 KAEZlib 构建的 minigzipsh 工具完成压缩→解压，输出内容与原始一致",
+          "sample_name": "KAEZlib minigzip 压缩/解压"
+        }
+      ],
+      "status": "成功（软件回退模式）"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 2,
+        "executed_in_verification": false,
+        "failed": 0,
+        "hooks": [
+          {
+            "id": "check-yaml",
+            "repo": "pre-commit-hooks v6.0.0"
+          },
+          {
+            "id": "check-json",
+            "repo": "pre-commit-hooks v6.0.0"
+          },
+          {
+            "id": "check-xml",
+            "repo": "pre-commit-hooks v6.0.0"
+          },
+          {
+            "id": "check-merge-conflict",
+            "repo": "pre-commit-hooks v6.0.0"
+          },
+          {
+            "id": "detect-private-key",
+            "repo": "pre-commit-hooks v6.0.0"
+          },
+          {
+            "id": "check-added-large-files",
+            "repo": "pre-commit-hooks v6.0.0"
+          },
+          {
+            "id": "detect-secrets",
+            "repo": "detect-secrets v1.5.0"
+          },
+          {
+            "id": "clang-format",
+            "repo": "mirrors-clang-format v18.1.8"
+          }
+        ],
+        "note": "pre-commit 仅检查配置存在性，不安装工具、不执行",
+        "passed": 0,
+        "skipped": 0,
+        "status": "已配置（未执行，仅检查配置）",
+        "total_hooks": 8
+      },
+      "summary": "检测到 pre-commit 配置（8个 hooks: check-yaml/check-json/check-xml/check-merge-conflict/detect-private-key/check-added-large-files/detect-secrets/clang-format），排除 KAEKernelDriver/uadk/scripts 目录；未检测到 lint-runner 配置"
+    },
+    "ut": {
+      "duration_seconds": 20,
+      "failed": 0,
+      "failures": [],
+      "note": "无正式单元测试套件，测试方式为 quick_start.md 中的性能对比测试。1) openssl engine -t kae 引擎加载成功; 2) RSA 2048 同步性能测试成功（软件回退）; 3) RSA 2048 异步性能测试成功（软件回退）。当前环境无 KAE 硬件设备(HPRE/SEC/ZIP)，所有测试以软件回退模式运行，性能与软件基线一致。UADK 测试程序(hisi_hpre_test等)未被默认构建编译。",
+      "passed": 3,
+      "status": "成功（软件回退模式）",
+      "total": 3
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "KAE-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2044GB (无限制)",
+      "os": "openEuler 24.03 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "69G (3.9G available)",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2044GB",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_dockerfile": "仓库无 Dockerfile，依赖来源为 README 和安装指南中的 yum install 命令",
+        "from_readme": "安装指南中列出: yum install -y make kernel-devel-$(uname -r) libtool numactl-devel openssl-devel lz4-devel libzstd-devel chrpath cmake libunwind-devel patch",
+        "mappings": [
+          {
+            "original": "make",
+            "source": "安装指南 - 源码安装前提条件",
+            "target": "make"
+          },
+          {
+            "original": "kernel-devel",
+            "source": "安装指南 - 源码安装前提条件",
+            "target": "kernel-devel"
+          },
+          {
+            "original": "libtool",
+            "source": "安装指南 - 源码安装前提条件",
+            "target": "libtool"
+          },
+          {
+            "original": "numactl-devel",
+            "source": "安装指南 - 源码安装前提条件",
+            "target": "numactl-devel"
+          },
+          {
+            "original": "openssl-devel",
+            "source": "安装指南 - 源码安装前提条件",
+            "target": "openssl-devel"
+          },
+          {
+            "original": "lz4-devel",
+            "source": "安装指南 - 源码安装前提条件",
+            "target": "lz4-devel"
+          },
+          {
+            "original": "libzstd-devel",
+            "source": "安装指南 - 源码安装前提条件",
+            "target": "libzstd-devel"
+          },
+          {
+            "original": "chrpath",
+            "source": "安装指南 - 源码安装前提条件",
+            "target": "chrpath"
+          },
+          {
+            "original": "cmake",
+            "source": "安装指南 - 源码安装前提条件",
+            "target": "cmake"
+          },
+          {
+            "original": "libunwind-devel",
+            "source": "安装指南 - 源码安装前提条件",
+            "target": "libunwind-devel"
+          },
+          {
+            "original": "patch",
+            "source": "安装指南 - 源码安装前提条件",
+            "target": "patch"
+          }
+        ]
+      },
+      "image_name": "hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+      "selection_reason": "仓库无 Dockerfile，README 和安装指南明确推荐 openEuler 作为操作系统（使用 yum install 安装依赖），且支持的 OS 列表全部为 RPM 系发行版（openEuler/EulerOS/TencentOS），选择 openEuler 24.03 LTS 基础镜像从零构建",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "kae2",
+    "commit": "a5306e9",
+    "duration_seconds": 1454,
+    "end_time": "2026-07-30T12:44:40",
+    "environment": "openEuler 24.03 LTS 容器 (aarch64, Kunpeng-920, 256核, 2044GB) on 192.168.9.114",
+    "repo_url": "https://gitcode.com/boostkit/KAE.git",
+    "start_time": "2026-07-30T12:20:26",
+    "total_steps": 19,
+    "verifier": "opencode (ttfhw-verify skill)"
+  },
+  "problems_encountered": [
+    {
+      "problem": "执行 sh build.sh all 时内核驱动构建失败: kernel-devel 版本(6.6.0, openEuler 24.03容器自带)与运行内核版本(4.19.90, 宿主机)不匹配，且 build_check_OS_version 函数通过 rpm -q kernel-devel 获取内核版本而非 uname -r，导致选择了错误的驱动目录(KAEKernelDriver-OLK-6.6)",
+      "solution": "根据安装指南\"4.19内核仅支持用户态使用\"的说明，跳过内核驱动构建，分别执行 sh build.sh uadk / engine3 / zlib / gzip 构建用户态组件",
+      "source": "build.sh + scripts/buildScript/common.sh build_check_OS_version 函数 + 安装指南",
+      "timestamp": "2026-07-30T12:38:50"
+    }
+  ],
+  "session_export_file": "",
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "bailian/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

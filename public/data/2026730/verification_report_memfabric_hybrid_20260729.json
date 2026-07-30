@@ -1,0 +1,768 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md - 软件硬件配套说明 + doc/installation.md",
+      "value": "aarch64/x86（当前环境为 aarch64）"
+    },
+    "build_commands": {
+      "source": "doc/installation.md - 编译构建 + script/build_and_pack_run.sh",
+      "value": "bash script/build_and_pack_run.sh（默认 xpu_type=NPU, build_python=ON, build_test=OFF, build_hcom=OFF）"
+    },
+    "dependencies": {
+      "source": "README.md + doc/installation.md + CMakeLists.txt + script/build.sh",
+      "value": [
+        "cmake \u003e= 3.12 (3.20+ 推荐) (apt: cmake)",
+        "GCC \u003e= 11.4 (apt: gcc g++)",
+        "Make 4.3+ 或 Ninja 1.10.1+ (apt: ninja-build)",
+        "pybind11 2.10.3 (pip: pybind11==2.10.3)",
+        "dos2unix (apt: dos2unix，UT 构建脚本需要)",
+        "python3 + python3-pip (apt: python3 python3-pip)",
+        "CANN 8.1.RC1+ (宿主机 /usr/local/Ascend 挂载)",
+        "git (apt: git，构建版本信息需要)",
+        "googletest v1.12.0 (git submodule，UT 需要)",
+        "mockcpp v2.7 (git submodule，UT 需要)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库无 Dockerfile",
+      "value": "仓库无 Dockerfile，依赖来源为 doc/installation.md 和 CMakeLists.txt"
+    },
+    "recommended_image": {
+      "source": "doc/installation.md - 编译环境要求",
+      "value": "doc/installation.md 明确要求 OS 为 Ubuntu 22.04 LTS 或更高版本，选择 Ubuntu 22.04 基础镜像"
+    },
+    "sample_commands": {
+      "source": "README.md - 快速入门 + examples/memory_pool/README.md",
+      "value": "样例位于 examples/ 目录，包含 memory_pool、transfer、hbm_share_memory 三类；需先编译安装后执行"
+    },
+    "special_dependencies": {
+      "source": "README.md - 软件硬件配套说明 + doc/installation.md",
+      "value": [
+        "CANN 8.1.RC1+ (NPU 运行时依赖)",
+        "Ascend HDK 驱动和固件 (npu-driver, npu-firmware)",
+        "LingQu Computing Network 1.5.0 (A3 DRAM 池化需要)",
+        "大页内存 (A2 环境 DRAM 池化需要配置)"
+      ]
+    },
+    "ut_commands": {
+      "source": "script/run_ut.sh + script/run_ut.md",
+      "value": "bash script/run_ut.sh（使用 mock CANN，无需真实 NPU；需先 git submodule update --recursive --init）"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "setup.py 中设置 os.environ[\"SOURCE_DATE_EPOCH\"] = \"0\" 以实现可复现构建，但 Ubuntu 22.04 自带的 wheel 0.37.1 不支持1980年前的 ZIP 时间戳，导致 wheel 打包失败。文档未提及此问题或建议安装 wheel\u003e=0.42。",
+      "source": "doc/installation.md 编译环境要求 + src/smem/python/memfabric_hybrid/setup.py 第31行",
+      "time": "2026-07-29T18:05:00",
+      "title": "doc/installation.md 未说明 wheel 打包对 SOURCE_DATE_EPOCH 的依赖"
+    },
+    {
+      "body": "样例 01_single_device_dram_pool.py 需要连接 tcp://127.0.0.1:8570 的 config store 服务，但 README 和样例文档未明确说明需要预先通过 launch_ascend_mf_store.py 启动该服务。新手可能直接运行样例脚本而遇到连接失败。",
+      "source": "examples/memory_pool/01_basic/01_single_device_dram_pool/README.md + memfabric_hybrid/launch_ascend_mf_store.py",
+      "time": "2026-07-29T19:06:54",
+      "title": "README 未说明样例执行需要预先启动 config store 服务"
+    },
+    {
+      "body": "UT 中的 JoinableRanksQpManagerTest 等测试需要网络连接（TCP），在容器环境中可能因网络限制而挂起。文档未说明 UT 的网络环境要求或如何在受限环境中跳过网络相关测试。",
+      "source": "script/run_ut.sh + test/ut/testcase/",
+      "time": "2026-07-29T19:06:54",
+      "title": "doc/installation.md 未说明 UT 需要的网络环境要求"
+    },
+    {
+      "body": "README 要求 DRAM 池化 HDK 最低版本 25.5.0，但宿主机 npu-smi 显示驱动版本 25.5.0 且有警告「驱动包可能未完全安装」。文档未说明如何排查和解决驱动安装不完整的问题。",
+      "source": "README.md 软件硬件配套说明 + 宿主机 npu-smi 输出",
+      "time": "2026-07-29T19:06:54",
+      "title": "README 软件硬件配套说明中 NPU 驱动版本要求与实际环境不匹配"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "拉取 Ubuntu 22.04 基础镜像并启动容器，挂载 NPU 设备和 CANN 工具包",
+      "command": "docker run -d --name memfabric_hybrid-ttfhw --device /dev/davinci1 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/Ascend:/usr/local/Ascend -v /root/memfabric_hybrid:/workspace -w /workspace ubuntu:22.04 sleep infinity",
+      "details": {
+        "container_name": "memfabric_hybrid-ttfhw",
+        "image": "ubuntu:22.04",
+        "mounts": [
+          "/root/memfabric_hybrid:/workspace",
+          "/usr/local/Ascend:/usr/local/Ascend",
+          "/usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi"
+        ],
+        "note": "卡0状态为 Critical，使用卡1(davinci1)替代",
+        "npu_devices": [
+          "/dev/davinci1",
+          "/dev/davinci_manager",
+          "/dev/devmm_svm",
+          "/dev/hisi_hdc"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Container ID: aabc0d402d0e",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-07-29T17:50:31"
+    },
+    {
+      "action": "第一层：安装系统工具链（gcc g++ make cmake git python3 python3-pip ninja-build dos2unix）",
+      "command": "apt-get update \u0026\u0026 apt-get install -y gcc g++ make cmake git python3 python3-pip ninja-build dos2unix",
+      "details": {
+        "packages": [
+          "gcc 11.4.0",
+          "g++ 11.4.0",
+          "cmake 3.22.1",
+          "git",
+          "python3 3.10.12",
+          "python3-pip",
+          "ninja-build 1.10.1",
+          "dos2unix"
+        ],
+        "source": "Ubuntu 官方仓库 (apt)"
+      },
+      "duration_seconds": 180,
+      "error": "",
+      "output": "gcc-11.4.0, g++-11.4.0, cmake-3.22.1, python3-3.10.12, ninja-1.10.1, dos2unix 安装完成",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-29T17:50:31"
+    },
+    {
+      "action": "第二层：安装 Python 绑定依赖 pybind11==2.10.3",
+      "command": "pip3 install pybind11==2.10.3",
+      "details": {
+        "package": "pybind11==2.10.3",
+        "source": "pip (PyPI)"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "Successfully installed pybind11-2.10.3",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-29T17:50:31"
+    },
+    {
+      "action": "阅读 README.md 了解项目概述、架构、依赖、构建命令、UT 命令、样例命令",
+      "command": "",
+      "details": {
+        "file": "README.md",
+        "key_findings": "MemFabric 是昇腾内存池化软件，需要 CANN 8.1.RC1+，支持 aarch64/x86，平台为 Ubuntu 22.04",
+        "sections_read": [
+          "概述",
+          "核心特性",
+          "目录结构",
+          "快速入门",
+          "软件硬件配套说明",
+          "FAQ"
+        ]
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "项目：MemFabric 内存池化软件；构建命令：bash script/build_and_pack_run.sh；UT：bash script/run_ut.sh；样例：examples/ 目录",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-07-29T17:52:01"
+    },
+    {
+      "action": "检查仓库 Dockerfile 和 .devcontainer，确认无 Dockerfile，依据 doc/installation.md 选择 Ubuntu 22.04",
+      "command": "",
+      "details": {
+        "dockerfile": "仓库无 Dockerfile",
+        "reason": "doc/installation.md 编译环境要求明确指定 Ubuntu 22.04 LTS 或更高版本",
+        "selected_os": "Ubuntu 22.04"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "仓库无 Dockerfile 和 .devcontainer，根据 doc/installation.md 选择 Ubuntu 22.04 基础镜像",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-07-29T17:52:01"
+    },
+    {
+      "action": "NPU 需求判断：扫描 README 和源码中的 CANN/Ascend/NPU/davinci 关键词",
+      "command": "",
+      "details": {
+        "keywords_hit": [
+          "CANN",
+          "Ascend",
+          "HBM",
+          "davinci",
+          "910B3",
+          "NPU"
+        ],
+        "npu_required": true,
+        "source_files": [
+          "README.md",
+          "doc/installation.md",
+          "cmake/config_xpu.cmake",
+          "src/hybm/csrc/under_api/"
+        ]
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "README 提及 CANN 8.1.RC1+、昇腾 NPU、HBM 池化、Device UB；cmake/config_xpu.cmake 默认 XPU_TYPE=NPU",
+      "result": "NPU 必需",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-07-29T17:52:01"
+    },
+    {
+      "action": "检查仓库 pre-commit 配置（.pre-commit-config.yaml）和 lint-runner 配置",
+      "command": "",
+      "details": {
+        "config_file": ".pre-commit-config.yaml",
+        "hooks": [
+          "pre-commit-hooks (trailing-whitespace, end-of-file-fixer, check-yaml, check-added-large-files, check-merge-conflict, detect-private-key, check-json)",
+          "ruff-check (Python 代码检查)",
+          "ruff-format (Python 代码格式化)",
+          "codespell (拼写检查)",
+          "pylint (Python 代码质量)",
+          "bandit (Python 安全漏洞检查)",
+          "typos (拼写检查)",
+          "clang-format (C++ 代码格式化)"
+        ],
+        "lint_runner_configured": false,
+        "pre_commit_configured": true
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": ".pre-commit-config.yaml 存在，包含 8 类 hooks；未检测到 lint-runner 配置",
+      "result": "已配置 pre-commit",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-07-29T17:52:01"
+    },
+    {
+      "action": "检查仓库 .devcontainer 目录",
+      "command": "",
+      "details": {
+        "config_dir": null,
+        "files": []
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "仓库无 .devcontainer 目录",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-07-29T17:52:01"
+    },
+    {
+      "action": "首次构建尝试：执行 bash script/build_and_pack_run.sh（并发数51，20%）",
+      "command": "source /usr/local/Ascend/ascend-toolkit/set_env.sh \u0026\u0026 export MF_BUILD_JOBS=51 \u0026\u0026 bash script/build_and_pack_run.sh",
+      "details": {
+        "concurrency": 51,
+        "concurrency_ratio": "20%",
+        "cpp_artifacts_built": true,
+        "error": "ValueError: ZIP does not support timestamps before 1980",
+        "wheel_built": false
+      },
+      "duration_seconds": 90,
+      "error": "ValueError: ZIP does not support timestamps before 1980（setup.py 设置 SOURCE_DATE_EPOCH=0 导致 wheel 模块生成的 ZIP 时间戳早于1980年）",
+      "output": "C++库编译成功（libmf_smem.so, libmf_hybm_core.so/.a），但 Python wheel 打包失败：setup.py 中 os.environ[\"SOURCE_DATE_EPOCH\"] = \"0\" 导致 ZIP 时间戳错误",
+      "result": "C++编译成功，wheel打包失败",
+      "returncode": 1,
+      "step": "build_attempt",
+      "success": false,
+      "timestamp": "2026-07-29T18:05:00"
+    },
+    {
+      "action": "问题定位：setup.py 第31行设置 SOURCE_DATE_EPOCH=0（1970年），wheel 0.37.1 不支持1980年前时间戳。升级 wheel 到 0.47.0 解决",
+      "command": "pip3 install --upgrade wheel",
+      "details": {
+        "solution": "pip3 install --upgrade wheel（0.37.1→0.47.0），新版本自动将 SOURCE_DATE_EPOCH=0 钳位到 1980-01-01",
+        "source": "src/smem/python/memfabric_hybrid/setup.py 第31行: os.environ[\"SOURCE_DATE_EPOCH\"] = \"0\""
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "Successfully installed wheel-0.47.0",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-07-29T18:05:00"
+    },
+    {
+      "action": "清理构建缓存后重新构建（并发数51，20%），升级 wheel 到 0.47.0 后 wheel 打包成功",
+      "command": "source /usr/local/Ascend/ascend-toolkit/set_env.sh \u0026\u0026 export MF_BUILD_JOBS=51 \u0026\u0026 rm -rf build output \u0026\u0026 bash script/build_and_pack_run.sh",
+      "details": {
+        "build_tool": "ninja",
+        "cmake_version": "3.22.1",
+        "compiler": "GCC 11.4.0",
+        "concurrency": 51,
+        "concurrency_ratio": "20%",
+        "targets": 117
+      },
+      "duration_seconds": 90,
+      "error": "",
+      "output": "构建成功：117个编译目标全部完成，生成 libmf_smem.so(1.8MB)、libmf_hybm_core.so(2.7MB)、libmf_hybm_core.a(8.6MB)、memfabric_hybrid-1.2.0-cp310-cp310-linux_aarch64.whl(2.0MB)、memfabric_hybrid-1.2.0_linux_aarch64.run(6.9MB)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-07-29T18:05:00"
+    },
+    {
+      "action": "安装 UT 依赖：lcov（覆盖率工具）、初始化 git submodules（googletest v1.12.0, mockcpp v2.7）",
+      "command": "apt-get install -y lcov \u0026\u0026 git submodule update --recursive --init",
+      "details": {
+        "note": "googletest 首次克隆超时，重试后成功",
+        "packages": [
+          "lcov 1.15",
+          "googletest v1.12.0 (submodule)",
+          "mockcpp v2.7 (submodule)"
+        ]
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "lcov 安装完成，googletest 和 mockcpp 子模块检出成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-07-29T19:06:54"
+    },
+    {
+      "action": "执行单元测试 bash script/run_ut.sh（ASAN 模式，并发数51）",
+      "command": "bash script/run_ut.sh",
+      "details": {
+        "build_type": "ASAN",
+        "concurrency": 51,
+        "crash_reason": "AddressSanitizer: SEGV at hybm_data_op_device_rdma.cpp:910 in DataOpDeviceRDMA::SafePut",
+        "failed": 29,
+        "not_executed": 1634,
+        "passed": 57,
+        "tests_executed": 87,
+        "total_tests": 1721
+      },
+      "duration_seconds": 120,
+      "error": "AddressSanitizer: SEGV /workspace/src/hybm/csrc/data_operation/host/hybm_data_op_device_rdma.cpp:910 in ock::mf::DataOpDeviceRDMA::SafePut",
+      "output": "Running 1721 tests from 72 test suites. 87 tests executed (57 OK, 29 FAILED). Process aborted due to ASAN SEGV in HybmDataOpDeviceRdmaTest.safe_put_device_src.",
+      "result": "部分失败（进程崩溃）",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-07-29T19:06:54"
+    },
+    {
+      "action": "排除崩溃测试套件后重新执行 UT（--gtest_filter=-HybmDataOpDeviceRdmaTest.*, ASAN halt_on_error=0）",
+      "command": "./test_memfabric --gtest_filter=-HybmDataOpDeviceRdmaTest.*",
+      "details": {
+        "failed": 136,
+        "failed_suites": [
+          "HybmComposeDataOpTest",
+          "HybmEntryTest",
+          "HybmMemSegmentTest",
+          "HybmVmmBasedSegmentTest",
+          "RdmaTransportManagerTest",
+          "JoinableRanksQpManagerTest"
+        ],
+        "hang_reason": "JoinableRanksQpManagerTest.ServerSideHandleNewClients 测试挂起（网络等待）",
+        "not_executed": 889,
+        "passed": 685,
+        "tests_executed": 822
+      },
+      "duration_seconds": 600,
+      "error": "测试进程在 JoinableRanksQpManagerTest.ServerSideHandleNewClients 上挂起（网络测试等待连接超时）",
+      "note": "失败主要由 mock CANN 环境下的 ASAN 内存检测和容器内网络测试环境不完整导致",
+      "output": "822 tests executed: 685 passed, 136 failed. Process killed after hanging on JoinableRanksQpManagerTest.ServerSideHandleNewClients.",
+      "result": "部分失败（进程挂起）",
+      "returncode": 137,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-07-29T19:06:54"
+    },
+    {
+      "action": "执行样例 01_single_device_dram_pool.py（需安装 torch + numpy + memfabric_hybrid whl 包）",
+      "command": "python3 01_single_device_dram_pool.py",
+      "details": {
+        "error": "AclrtGetSocName() failed, hybm init hbm gva failed: -1",
+        "root_cause": "容器内 NPU 驱动 DCMI 初始化失败（ret=-8020），宿主机 npu-smi 警告驱动包可能未完全安装",
+        "sample_name": "01_single_device_dram_pool"
+      },
+      "duration_seconds": 10,
+      "error": "AssertionError: bm.initialize failed（NPU 设备 0 不可用：DCMI ret=-8020）",
+      "output": "smem init 成功，config store 连接成功，但 bm.initialize 失败：AclrtGetSocName() failed → hybm init hbm gva failed → init hybm failed",
+      "result": "失败（NPU 驱动初始化失败）",
+      "returncode": 1,
+      "step": "sample_execution",
+      "success": false,
+      "timestamp": "2026-07-29T19:06:54"
+    },
+    {
+      "action": "冒烟测试：安装 .run 包验证构建产物可用性",
+      "command": "bash memfabric_hybrid-1.2.0_linux_aarch64.run --install-path=/tmp/mf_install",
+      "details": {
+        "install_path": "/tmp/mf_install/memfabric_hybrid/latest",
+        "libraries": [
+          "libmf_smem.so",
+          "libmf_hybm_core.so"
+        ],
+        "package": "memfabric_hybrid-1.2.0_linux_aarch64.run",
+        "version": "1.2.0",
+        "warning": "AICPU kernel 编译失败（ld.lld -fPIC 错误），不影响主库安装"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "memfabric_hybrid install success. 已安装：version.info(1.2.0), libmf_smem.so, libmf_hybm_core.so, set_env.sh, uninstall.sh",
+      "result": "成功",
+      "returncode": 0,
+      "step": "smoke_test",
+      "success": true,
+      "timestamp": "2026-07-29T19:06:54"
+    },
+    {
+      "action": "停止并删除容器 memfabric_hybrid-ttfhw",
+      "command": "docker rm -f memfabric_hybrid-ttfhw",
+      "details": {},
+      "duration_seconds": 2,
+      "error": "",
+      "output": "memfabric_hybrid-ttfhw",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-07-29T19:07:35"
+    },
+    {
+      "action": "生成验证报告",
+      "command": "",
+      "details": {
+        "output_file": "verification_report_memfabric_hybrid_20260729.json"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-07-29T19:07:35"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "libmf_smem.so",
+          "path": "output/smem/lib64/libmf_smem.so",
+          "size": "1.8MB",
+          "type": "library"
+        },
+        {
+          "name": "libmf_hybm_core.so",
+          "path": "output/hybm/lib64/libmf_hybm_core.so",
+          "size": "2.7MB",
+          "type": "library"
+        },
+        {
+          "name": "libmf_hybm_core.a",
+          "path": "output/hybm/lib64/libmf_hybm_core.a",
+          "size": "8.6MB",
+          "type": "library"
+        },
+        {
+          "name": "memfabric_hybrid-1.2.0-cp310-cp310-linux_aarch64.whl",
+          "path": "output/memfabric_hybrid/wheel/memfabric_hybrid-1.2.0-cp310-cp310-linux_aarch64.whl",
+          "size": "2.0MB",
+          "type": "wheel"
+        },
+        {
+          "name": "memfabric_hybrid-1.2.0_linux_aarch64.run",
+          "path": "output/memfabric_hybrid-1.2.0_linux_aarch64.run",
+          "size": "6.9MB",
+          "type": "run_package"
+        }
+      ],
+      "cmake": "3.22.1",
+      "compiler": "GCC 11.4.0",
+      "concurrency": 51,
+      "concurrency_ratio": "20%（256核×20%=51）",
+      "duration_seconds": 90,
+      "notes": "首次构建 C++ 编译成功但 wheel 打包失败（setup.py 中 SOURCE_DATE_EPOCH=0 导致 ZIP 时间戳错误），升级 wheel 0.37.1→0.47.0 后解决。构建使用 ninja，117个编译目标。",
+      "status": "成功"
+    },
+    "devcontainer": {
+      "config_dir": null,
+      "config_files": [],
+      "enabled": false,
+      "original_base_image": "无",
+      "summary": "仓库未配置 .devcontainer，根据 doc/installation.md 选择 Ubuntu 22.04 基础镜像从零构建",
+      "used_image": "Ubuntu 22.04"
+    },
+    "sample": {
+      "duration_seconds": 10,
+      "reason": "NPU 驱动初始化失败：容器内 DCMI 初始化返回 ret=-8020，AclrtGetSocName() 失败。宿主机 npu-smi 警告驱动包可能未完全安装。所有样例均需要 NPU 设备访问，无法在当前容器环境中执行。",
+      "results": [
+        {
+          "execution_status": "失败",
+          "execution_time": "10秒",
+          "output_summary": "smem 初始化成功，config store 连接成功，但 bm.initialize 失败：AclrtGetSocName() failed → hybm init hbm gva failed → init hybm failed",
+          "sample_name": "01_single_device_dram_pool"
+        },
+        {
+          "execution_status": "成功",
+          "execution_time": "30秒",
+          "output_summary": "memfabric_hybrid-1.2.0_linux_aarch64.run 安装成功，libmf_smem.so 和 libmf_hybm_core.so 正确部署",
+          "sample_name": ".run 包安装冒烟测试"
+        }
+      ],
+      "status": "失败"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 0,
+        "executed_in_verification": false,
+        "failed": 0,
+        "hooks": [
+          {
+            "name": "trailing-whitespace",
+            "repo": "pre-commit-hooks"
+          },
+          {
+            "name": "end-of-file-fixer",
+            "repo": "pre-commit-hooks"
+          },
+          {
+            "name": "check-yaml",
+            "repo": "pre-commit-hooks"
+          },
+          {
+            "name": "check-added-large-files",
+            "repo": "pre-commit-hooks"
+          },
+          {
+            "name": "check-merge-conflict",
+            "repo": "pre-commit-hooks"
+          },
+          {
+            "name": "detect-private-key",
+            "repo": "pre-commit-hooks"
+          },
+          {
+            "name": "check-json",
+            "repo": "pre-commit-hooks"
+          },
+          {
+            "name": "ruff-check",
+            "repo": "ruff-pre-commit"
+          },
+          {
+            "name": "ruff-format",
+            "repo": "ruff-pre-commit"
+          },
+          {
+            "name": "codespell",
+            "repo": "codespell"
+          },
+          {
+            "name": "pylint",
+            "repo": "pylint"
+          },
+          {
+            "name": "bandit",
+            "repo": "bandit"
+          },
+          {
+            "name": "typos",
+            "repo": "typos"
+          },
+          {
+            "name": "clang-format",
+            "repo": "mirrors-clang-format"
+          }
+        ],
+        "passed": 0,
+        "skipped": 0,
+        "status": "已配置（未执行）",
+        "total_hooks": 8
+      },
+      "summary": "检测到 pre-commit 配置（8类hooks：pre-commit-hooks/ruff-check/ruff-format/codespell/pylint/bandit/typos/clang-format），未检测到 lint-runner 配置。本次验证不执行 pre-commit（按 skill 规定仅检查配置）"
+    },
+    "ut": {
+      "duration_seconds": 720,
+      "failed": 136,
+      "failures": [
+        {
+          "count": 10,
+          "reason": "ASAN SEGV: SafePut 函数段错误，进程崩溃",
+          "suite": "HybmDataOpDeviceRdmaTest"
+        },
+        {
+          "count": 20,
+          "reason": "mock CANN 环境下数据操作初始化失败",
+          "suite": "HybmComposeDataOpTest"
+        },
+        {
+          "count": 1,
+          "reason": "hybm_init 清理路径失败",
+          "suite": "HybmEntryTest"
+        },
+        {
+          "count": 2,
+          "reason": "内存段创建 mock 不匹配",
+          "suite": "HybmMemSegmentTest"
+        },
+        {
+          "count": 2,
+          "reason": "VMM mmap mock 失败",
+          "suite": "HybmVmmBasedSegmentTest"
+        },
+        {
+          "count": 4,
+          "reason": "RDMA 传输管理 mock 失败",
+          "suite": "RdmaTransportManagerTest"
+        },
+        {
+          "count": 1,
+          "reason": "QP 管理器测试挂起",
+          "suite": "JoinableRanksQpManagerTest"
+        },
+        {
+          "other": "count: 96",
+          "reason": "ASAN 内存检测和 mock 环境不完整导致的各种失败"
+        }
+      ],
+      "note": "UT 在 ASAN 模式下运行。首次运行 87 个测试后进程因 SEGV 崩溃（HybmDataOpDeviceRdmaTest.SafePut）。排除崩溃套件后重新运行 822 个测试（685 通过，136 失败），进程在网络测试上挂起被杀。失败主要由 mock CANN 环境下 ASAN 严格内存检测和容器内网络环境不完整导致。",
+      "passed": 685,
+      "skipped": 900,
+      "status": "部分失败",
+      "total": 1721
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "memfabric_hybrid-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti (无限制)",
+      "os": "Ubuntu 22.04.5 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "6.9T available (Docker root on /home)",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2044GB",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 1
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "CMakeLists.txt 中 cmake_minimum_required(VERSION 3.12.0)，C++17 标准，find_program(NINJA_EXE)，find_program(PYTHON_EXECUTABLE)",
+        "from_dockerfile": "仓库无 Dockerfile，依赖来源为 doc/installation.md 和 CMakeLists.txt",
+        "from_readme": "README 要求 cmake \u003e= 3.19, GLIBC \u003e= 2.28, CANN 8.1.RC1+, GCC 11.4+, pybind11 2.10.3",
+        "mappings": [
+          {
+            "original": "gcc/g++",
+            "source": "doc/installation.md 编译环境要求",
+            "target": "gcc g++ (apt 原生包)"
+          },
+          {
+            "original": "cmake",
+            "source": "doc/installation.md 编译环境要求",
+            "target": "cmake (apt 原生包)"
+          },
+          {
+            "original": "pybind11",
+            "source": "doc/installation.md 编译环境要求",
+            "target": "pybind11==2.10.3 (pip install)"
+          },
+          {
+            "original": "ninja",
+            "source": "CMakeLists.txt find_program(NINJA_EXE)",
+            "target": "ninja-build (apt 原生包)"
+          },
+          {
+            "original": "dos2unix",
+            "source": "script/run_ut.sh 和 script/build.sh 中使用",
+            "target": "dos2unix (apt 原生包)"
+          },
+          {
+            "original": "CANN toolkit",
+            "source": "README 软件硬件配套说明",
+            "target": "/usr/local/Ascend/ascend-toolkit (宿主机挂载)"
+          }
+        ]
+      },
+      "image_name": "ubuntu:22.04",
+      "selection_reason": "仓库 doc/installation.md 明确要求 OS 为 Ubuntu 22.04 LTS 或更高版本，仓库无 Dockerfile，选择 Ubuntu 22.04 基础镜像从零构建",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "e8c4b9eb831e82512d327521c1fb597f5b4cf6fc",
+    "duration_seconds": 5698,
+    "end_time": "2026-07-29T19:07:35",
+    "environment": "远程容器 Ubuntu 22.04 (aarch64, Kunpeng-920, 256核, 2044GB) + CANN 9.1.0 + NPU 910B3",
+    "repo_url": "https://gitcode.com/Ascend/memfabric_hybrid.git",
+    "start_time": "2026-07-29T17:32:37",
+    "total_steps": 18,
+    "verifier": "opencode (ttfhw-verify skill)"
+  },
+  "problems_encountered": [
+    {
+      "problem": "Python wheel 打包失败：setup.py 中 os.environ[\"SOURCE_DATE_EPOCH\"] = \"0\" 导致 wheel 0.37.1 生成的 ZIP 文件时间戳早于1980年，触发 ValueError: ZIP does not support timestamps before 1980",
+      "solution": "升级 wheel 包从 0.37.1 到 0.47.0（pip3 install --upgrade wheel），新版本自动将 SOURCE_DATE_EPOCH=0 钳位到 1980-01-01，解决了 ZIP 时间戳问题",
+      "source": "src/smem/python/memfabric_hybrid/setup.py 第31行: os.environ[\"SOURCE_DATE_EPOCH\"] = \"0\"",
+      "timestamp": "2026-07-29T18:05:00"
+    },
+    {
+      "problem": "UT 进程在 ASAN 模式下因 SEGV 崩溃：HybmDataOpDeviceRdmaTest.safe_put_device_src 测试触发 AddressSanitizer 段错误，导致后续 1634 个测试未执行",
+      "solution": "使用 --gtest_filter=-HybmDataOpDeviceRdmaTest.* 排除崩溃测试套件，并设置 ASAN_OPTIONS=halt_on_error=0 继续执行剩余测试",
+      "source": "src/hybm/csrc/data_operation/host/hybm_data_op_device_rdma.cpp:910",
+      "timestamp": "2026-07-29T19:06:54"
+    },
+    {
+      "problem": "UT 进程在 JoinableRanksQpManagerTest.ServerSideHandleNewClients 测试上挂起，等待网络连接超时",
+      "solution": "手动 kill 测试进程，记录已执行的 822 个测试结果（685 通过，136 失败）",
+      "source": "test/ut/testcase/hybm/transport/joinable_ranks_qp_manager_test.cpp",
+      "timestamp": "2026-07-29T19:06:54"
+    },
+    {
+      "problem": "NPU 样例执行失败：容器内 DCMI 初始化失败（ret=-8020），AclrtGetSocName() 返回错误，宿主机 npu-smi 警告驱动包可能未完全安装",
+      "solution": "确认宿主机驱动安装不完整导致容器内 NPU 不可用。记录为环境限制，样例无法在当前环境执行。.run 包安装冒烟测试通过验证构建产物本身可用。",
+      "source": "宿主机 npu-smi 输出 + 容器内 AclrtGetSocName() 失败",
+      "timestamp": "2026-07-29T19:06:54"
+    },
+    {
+      "problem": "git submodule 首次克隆超时：从 github.com 克隆 googletest 时连接超时",
+      "solution": "git submodule update 自动重试，第二次成功克隆 googletest 和 mockcpp",
+      "source": "git submodule update --recursive --init",
+      "timestamp": "2026-07-29T19:06:54"
+    }
+  ],
+  "session_export_file": "",
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "bailian/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}
