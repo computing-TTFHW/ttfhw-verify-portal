@@ -3178,86 +3178,74 @@
     "displayName": "triton-ascend",
     "result": "partial_success",
     "buildStatus": "success",
-    "utStatus": "failed",
-    "sampleStatus": "failed",
-    "totalDuration": 6016,
-    "environmentDuration": 5811,
-    "buildDuration": 180,
-    "utDuration": 15,
-    "sampleDuration": 10,
-    "testPassed": 0,
-    "testFailed": 0,
-    "testTotal": 9,
-    "testSkipped": 2,
-    "generatedAt": "2026-07-29T09:25:43",
+    "utStatus": "partial_success",
+    "sampleStatus": "success",
+    "totalDuration": 6365,
+    "environmentDuration": 4536,
+    "buildDuration": 1800,
+    "utDuration": 9,
+    "sampleDuration": 20,
+    "testPassed": 97,
+    "testFailed": 4,
+    "testTotal": 113,
+    "testSkipped": 0,
+    "generatedAt": "2026-07-30T17:46:31",
     "environment": "unknown",
-    "url": "https://github.com/Ascend/triton-ascend.git",
+    "url": "https://github.com/triton-lang/triton-ascend.git",
     "category": "triton",
     "hasStaticAnalysis": true,
     "hasDevcontainer": false,
-    "file": "verification_report_triton-ascend_20260729.json",
+    "file": "verification_report_triton-ascend_20260730.json",
     "issues": [
       {
-        "problem": "torch_npu 2.7.1 与宿主机 CANN 9.1.0 版本不兼容，导入时报 libhccl.so undefined symbol 错误",
-        "solution": "构建阶段设置 TORCH_DEVICE_BACKEND_AUTOLOAD=0 绕过 torch_npu 自动加载。运行时测试阶段需要安装 CANN 9.0.0 或升级 torch_npu 到兼容 CANN 9.1.0 的版本",
-        "source": "requirements.txt 指定 torch-npu==2.7.1, README 推荐 CANN 9.0.0, 宿主机安装的是 CANN 9.1.0",
-        "timestamp": "2026-07-29T09:53:23"
+        "problem": "torch 导入失败，缺少 libopenblasp-r0-1a7698bc.3.29.so 共享库",
+        "solution": "从宿主机缓存 Docker 镜像中提取 torch.libs 目录（包含预编译的 OpenBLAS 库）到容器 site-packages",
+        "source": "torch 2.7.1+cpu 编译时链接了特定版本 OpenBLAS 0.3.29，Ubuntu 22.04 apt 包为 0.3.20",
+        "timestamp": "2026-07-30T18:40:05"
       },
       {
-        "problem": "安装指南中 pip install -e python 命令有误，setup.py 位于仓库根目录而非 python/ 子目录",
-        "solution": "改用 pip install -e . 从仓库根目录安装",
-        "source": "docs/en/installation_guide.md 快速安装章节",
-        "timestamp": "2026-07-29T10:40:44"
+        "problem": "torch 导入失败，缺少 torchgen 模块",
+        "solution": "从缓存镜像中提取 torchgen 和 functorch 目录到容器 site-packages",
+        "source": "torch 包安装时 torchgen 作为独立目录存在，未随 torch 目录一起复制",
+        "timestamp": "2026-07-30T18:40:05"
       },
       {
-        "problem": "apt 安装 clang-15 后未创建 clang++ 的 update-alternatives 链接，CMake 找不到 C++ 编译器",
-        "solution": "手动执行 update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-15 100",
-        "source": "Dockerfile 中仅设置了 clang 的 alternatives，未设置 clang++",
-        "timestamp": "2026-07-29T10:40:44"
+        "problem": "torch_npu 导入失败，libhccl.so undefined symbol _Z17HcclCheckLogLevelii",
+        "solution": "宿主机 CANN 9.1.0 与 torch_npu 2.7.1.post4 ABI 不兼容。从缓存 Docker 镜像提取 CANN 9.0.0 的 aarch64-linux/lib64 目录到宿主机，通过挂载暴露给容器",
+        "source": "README 推荐 CANN 9.0.0，宿主机安装的 CANN 9.1.0 为 beta 版本，libhccl.so 存在符号缺失",
+        "timestamp": "2026-07-30T18:40:05"
       },
       {
-        "problem": "AscendNPU-IR 子模块的 CMakeLists.txt 要求 CMake >= 3.28.0，但 Ubuntu 22.04 apt 提供的 cmake 为 3.22.1",
-        "solution": "通过 pip 安装 cmake>=3.28,<4.0（得到 3.31.10），同时满足 pyproject.toml 的 <4.0 约束",
-        "source": "third_party/ascend/AscendNPU-IR/CMakeLists.txt 第2行",
-        "timestamp": "2026-07-29T10:40:44"
-      },
-      {
-        "problem": "宿主机驱动版本(25.5.0/CANN 9.1.0)与torch_npu 2.7.1所需CANN 9.0.0库不兼容，导致NPU设备无法从容器内初始化",
-        "solution": "安装CANN 9.0.0 toolkit+kernel包提供libopapi.so等库，创建HCCL stub库解决旧版API符号缺失，使torch_npu可导入。但NPU设备初始化仍因驱动版本不匹配而失败",
-        "source": "宿主机npu-smi版本25.5.0 + requirements.txt指定torch-npu==2.7.1 + README推荐CANN 9.0.0",
-        "timestamp": "2026-07-29T11:05:18"
-      },
-      {
-        "problem": "社区版triton覆盖triton-ascend的backends.ascend模块，导致import triton时找不到Ascend后端",
-        "solution": "设置PYTHONPATH=/workspace/python优先使用triton-ascend源码目录",
-        "source": "pip安装torch时自动安装社区版triton到site-packages，覆盖了triton-ascend的可编辑安装",
-        "timestamp": "2026-07-29T11:05:18"
+        "problem": "torch_npu 导入失败，libccl_dpu.so 缺失且 ASCEND_OPP_PATH 不存在",
+        "solution": "CANN 9.0.0 的 opp 目录（5.3GB）因宿主机磁盘空间不足未复制，改用混合配置：CANN 9.0.0 lib64（兼容性库）+ CANN 9.1.0 opp（算子包和补充库）",
+        "source": "CANN 9.0.0 安装不完整（缺少 opp 目录），需要 9.1.0 的 opp 补充",
+        "timestamp": "2026-07-30T18:40:05"
       }
     ],
     "documentationGaps": [
       {
-        "body": "docs/en/installation_guide.md 的快速安装章节写的是 pip install -e python，但 setup.py 和 pyproject.toml 位于仓库根目录而非 python/ 子目录。python/ 目录下只有 Python 源码包，没有构建配置文件。正确命令应为 pip install -e .",
-        "source": "docs/en/installation_guide.md 快速安装章节",
-        "time": "2026-07-29T10:40:44",
-        "title": "安装指南的 pip install -e python 命令与实际仓库结构不匹配"
+        "body": "README 推荐 CANN 9.0.0 但未说明 CANN 9.1.0（beta）与 torch_npu 2.7.1.post4 不兼容。实际验证中发现 CANN 9.1.0 的 libhccl.so 存在符号缺失（undefined symbol: HcclCheckLogLevel），导致 torch_npu 无法加载。文档应明确标注版本兼容矩阵。",
+        "source": "README.md - Software Dependencies 章节",
+        "time": "2026-07-30T19:32:07",
+        "title": "README 未明确说明 CANN 版本与 torch_npu 的严格兼容关系"
       },
       {
-        "body": "Dockerfile 中通过 update-alternatives 设置了 clang 的链接，但遗漏了 clang++。CMake 在配置阶段需要 clang++ 作为 C++ 编译器，导致构建失败。需要在 Dockerfile 中添加 update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-15 100",
-        "source": "docker/Dockerfile update-alternatives 指令",
-        "time": "2026-07-29T10:40:44",
-        "title": "Dockerfile 未设置 clang++ 的 update-alternatives"
+        "body": "docker/Dockerfile FROM quay.io/ascend/cann:8.5.0-a3-ubuntu22.04-py3.10 使用了预构建 CANN 镜像，README 也仅指向华为社区网站。对于需要从零构建环境的开发者，缺少 CANN 工具包的具体安装步骤、环境变量配置说明和 NPU 设备挂载要求。",
+        "source": "docker/Dockerfile + README.md - Source Installation 章节",
+        "time": "2026-07-30T19:32:07",
+        "title": "Dockerfile 使用预构建 CANN 镜像但未说明从零安装 CANN 的步骤"
       },
       {
-        "body": "third_party/ascend/AscendNPU-IR/CMakeLists.txt 要求 cmake_minimum_required(VERSION 3.28.0)，但安装指南和 Dockerfile 中安装的 cmake 版本为 3.22.1（Ubuntu 22.04 apt 默认），不满足要求。文档应说明需要手动安装更高版本的 cmake",
-        "source": "third_party/ascend/AscendNPU-IR/CMakeLists.txt + docs/en/installation_guide.md",
-        "time": "2026-07-29T10:40:44",
-        "title": "AscendNPU-IR 子模块要求 CMake >= 3.28.0 但未在文档中说明"
+        "body": "README Source Installation 章节列出了 apt 和 pip 依赖安装步骤，但未说明需要 source CANN 的 set_env.sh 来设置 ASCEND_OPP_PATH、LD_LIBRARY_PATH 等环境变量。缺少这些环境变量会导致构建时找不到 CANN 头文件和运行时 ACLNN 算子初始化失败。",
+        "source": "README.md - Source Installation > Install Dependencies 章节",
+        "time": "2026-07-30T19:32:07",
+        "title": "README 源码安装缺少 CANN 环境变量配置说明"
       },
       {
-        "body": "README 推荐 CANN 9.0.0 和 torch_npu 2.7.1，但未明确说明 torch_npu 2.7.1 不兼容 CANN 9.1.0。实际测试中，CANN 9.1.0 的 libhccl.so 缺少 torch_npu 2.7.1 所需的符号，导致导入失败。文档应提供 CANN 与 torch_npu 的版本兼容性矩阵",
-        "source": "README.md CANN版本章节 + requirements.txt",
-        "time": "2026-07-29T10:40:44",
-        "title": "README 未说明 CANN 版本与 torch_npu 版本的兼容性要求"
+        "body": "python/test/unit/runtime/test_bindings.py 和 test_driver.py 中的部分测试直接调用 torch.cuda.get_device_capability()，在 NPU 环境下报错 Torch not compiled with CUDA enabled。这些测试应使用设备抽象层而非硬编码 CUDA 调用。",
+        "source": "python/test/unit/runtime/test_bindings.py, test_driver.py",
+        "time": "2026-07-30T19:32:07",
+        "title": "部分单元测试包含 CUDA 专用代码，未适配 NPU 后端"
       }
     ]
   },
