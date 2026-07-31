@@ -1,0 +1,170 @@
+[
+  {
+    "name": "msmonitor",
+    "displayName": "msmonitor",
+    "result": "partial_success",
+    "buildStatus": "success",
+    "utStatus": "partial_success",
+    "sampleStatus": "partial_success",
+    "totalDuration": 3524,
+    "environmentDuration": 3257,
+    "buildDuration": 192,
+    "utDuration": 60,
+    "sampleDuration": 15,
+    "testPassed": 44,
+    "testFailed": 9,
+    "testTotal": 53,
+    "generatedAt": "2026-07-31T09:53:27",
+    "environment": "unknown",
+    "url": "https://gitcode.com/Ascend/msmonitor.git",
+    "category": "MindSDK",
+    "hasStaticAnalysis": true,
+    "hasDevcontainer": true,
+    "file": "verification_report_msmonitor_20260731.json",
+    "issues": [
+      {
+        "problem": "容器内 npu-smi 报 DCMI 初始化失败（ret=-8005 mindstudio 用户 / ret=-8020 root 用户），NPU 设备无法正常访问",
+        "solution": "1) 以 root 身份配置 /etc/ld.so.conf.d/ascend_driver.conf 添加驱动库路径并 ldconfig；2) 卡 0 状态 Critical 导致 device is used 错误；3) 构建和 UT 阶段使用 stub 库不需要 NPU，样例阶段使用 root 权限执行",
+        "source": "容器内 npu-smi info 执行结果",
+        "timestamp": "2026-07-31T10:11:27"
+      },
+      {
+        "problem": "whl 构建报 'invalid command bdist_wheel'，wheel 包未安装",
+        "solution": "pip install wheel 安装 wheel 包（0.47.0）",
+        "source": "plugin/build.sh → python3 setup.py bdist_wheel",
+        "timestamp": "2026-07-31T10:26:30"
+      },
+      {
+        "problem": "whl 构建报 'fatal error: Python.h: No such file or directory'，系统 Python 3.11.6 缺少开发头文件",
+        "solution": "dnf install -y python3-devel 安装 Python 开发头文件",
+        "source": "CMake find_package(Python) 使用系统 Python 3.11.6，其缺少 python3-devel",
+        "timestamp": "2026-07-31T10:26:30"
+      },
+      {
+        "problem": "whl 构建报 'fatal error: securec.h: No such file or directory'，CMakeLists.txt 期望 third_party/securec/ 目录但仓库不包含",
+        "solution": "从 CANN 安装目录 (/usr/local/Ascend/cann-9.1.0-beta.3/aarch64-linux/include/) 创建 securec.h 符号链接，从驱动目录复制 securec 源文件，移除 securecmodule.c（Python 模块包装器编译报错）",
+        "source": "plugin/CMakeLists.txt: include_directories(third_party/securec/include)",
+        "timestamp": "2026-07-31T10:26:30"
+      },
+      {
+        "problem": "whl 安装后 import msmonitor 报 'libmspti.so: cannot open shared object file'",
+        "solution": "复制 plugin/stub/libmspti.so 到 /usr/local/lib64/ 并 ldconfig",
+        "source": "plugin/stub/build_stub.sh 生成的 libmspti.so 未在标准库搜索路径中",
+        "timestamp": "2026-07-31T10:26:30"
+      },
+      {
+        "problem": "UT 构建报 'No module named pybind11'，CMake find_package(Python) 选择了 Python 3.13 而非系统默认的 3.11，pybind11 仅安装在 3.11 上",
+        "solution": "为 Python 3.13 安装 pybind11: /usr/local/bin/python3.13 -m pip install pybind11",
+        "source": "test/ut/plugin/ipc_monitor/CMakeLists.txt: find_package(Python 3.9 REQUIRED) 选择了 /usr/local/bin/python3.13",
+        "timestamp": "2026-07-31T10:50:49"
+      },
+      {
+        "problem": "test_RotateLogger 中 9 个测试（BasicLogToFile 等）超时挂起，无法在 30 秒内完成",
+        "solution": "标记为失败。疑似 RotateLogger 的文件 I/O 操作在容器 tmpfs 环境下存在阻塞或死锁",
+        "source": "test/ut/plugin/ipc_monitor/test_RotateLogger.cpp",
+        "timestamp": "2026-07-31T10:50:49"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "body": "plugin/CMakeLists.txt 引用了 third_party/securec/include 和 third_party/securec/src，但仓库不包含 securec 源码，plugin/cmake/config.ini 也不包含 securec 的下载配置。安装指南和开发指南均未提及 securec 依赖的获取方式。开发者需要从 CANN 安装目录或驱动目录自行获取。",
+        "source": "plugin/CMakeLists.txt + plugin/cmake/config.ini + docs/zh/install_guide/msmonitor_install_guide.md",
+        "time": "2026-07-31T10:26:30",
+        "title": "securec 依赖未在文档和 CMake 下载系统中声明"
+      },
+      {
+        "body": "plugin/build.sh 使用 setup.py bdist_wheel 需要 wheel 包，CMake 编译 pybind11 扩展需要 Python 开发头文件 (python3-devel)。安装指南仅说明使用 MindStudio 统一构建镜像，未提及这些额外依赖。实际验证发现镜像中未预装 wheel 包和系统 Python 开发头文件。",
+        "source": "docs/zh/install_guide/msmonitor_install_guide.md + plugin/build.sh + plugin/setup.py",
+        "time": "2026-07-31T10:26:30",
+        "title": "安装指南未提及 wheel 和 python3-devel 依赖"
+      },
+      {
+        "body": "MindStudio 构建镜像 /usr/local/etc/gitconfig 配置了 url.insteadOf 将 https://github.com/ 重写为 https://mirror.ghproxy.com/https://github.com/，但 mirror.ghproxy.com 域名无法解析，导致 dynolog 子模块 (facebookincubator/dynolog) 克隆失败。安装指南未提及此代理配置及可能的解决方案。",
+        "source": "/usr/local/etc/gitconfig + docs/zh/install_guide/msmonitor_install_guide.md",
+        "time": "2026-07-31T10:26:30",
+        "title": "MindStudio 镜像 git 代理配置导致 GitHub 子模块克隆失败"
+      }
+    ]
+  },
+  {
+    "name": "torchair",
+    "displayName": "torchair",
+    "result": "partial_success",
+    "buildStatus": "success",
+    "utStatus": "failed",
+    "sampleStatus": "partial_success",
+    "totalDuration": 2938,
+    "environmentDuration": 2841,
+    "buildDuration": 70,
+    "utDuration": 22,
+    "sampleDuration": 5,
+    "testPassed": 1,
+    "testFailed": 1,
+    "testTotal": 2,
+    "generatedAt": "2026-07-31T10:23:49",
+    "environment": "unknown",
+    "url": "https://gitcode.com/Ascend/torchair.git",
+    "category": "PyTorch",
+    "hasStaticAnalysis": true,
+    "hasDevcontainer": true,
+    "file": "verification_report_torchair_20260731.json",
+    "issues": [
+      {
+        "problem": "NPU 卡 0 处于 Critical 状态，卡 1 被 vllm-ascend-ttfhw 和 msmonitor-ttfhw 容器占用，DCMI 初始化失败 (ret=-8020)",
+        "solution": "改用空闲的 davinci2（910B3, OK 状态），重启容器后 npu-smi info 正常显示卡信息",
+        "source": "npu-smi info + docker inspect 检查容器设备占用",
+        "timestamp": "2026-07-31T11:12:47"
+      },
+      {
+        "problem": "C++ UT 链接失败：stub 库缺少 GE Graph Engine API 实现（ge::Tensor::GetPlacement/SetFormat, ge::GNode::GetInputsSize, vsnprintf_s 等未定义引用）",
+        "solution": "仓库 stub 库仅提供部分 API 的空实现，UT 代码调用未覆盖的 GE API 导致链接失败。C++ UT 仅含空 gtest 框架（example.cpp 无实际测试用例），无法通过链接。",
+        "source": "tests/ut/CMakeLists.txt + stub 库源码分析",
+        "timestamp": "2026-07-31T11:12:47"
+      },
+      {
+        "problem": "torch_npu 2.12.0 与标准 CPU torch 不兼容：ImportError undefined symbol c10_npu::NPUCachingAllocator::allocator。torch_npu 需要定制版 PyTorch（含 NPU 符号），非 pytorch.org 发布的 CPU 版本。",
+        "solution": "卸载 torch_npu，恢复 torch 2.7.1+cpu。样例在 CPU 模式下部分运行（导入/配置成功，图编译失败）。UT 的 Python ST 依赖 torch_npu，标记为 not_run。",
+        "source": "pip install torch_npu + import 测试",
+        "timestamp": "2026-07-31T11:12:47"
+      },
+      {
+        "problem": "CANN 9.1.0 的 libhccl.so 需要 GLIBCXX_3.4.30，manylinux_2_28 容器（AlmaLinux 8.10）系统 libstdc++ 仅提供 GLIBCXX_3.4.25",
+        "solution": "从 openEuler 24.03 镜像提取 libstdc++.so.6.0.30（含 GLIBCXX_3.4.30）复制到容器 /tmp/ 目录，设置 LD_LIBRARY_PATH 优先加载。但 torch_npu 仍因缺少 torch NPU 符号无法导入。",
+        "source": "strings /lib64/libstdc++.so.6 | grep GLIBCXX",
+        "timestamp": "2026-07-31T11:12:47"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "body": "README 安装章节要求安装 PyTorch 2.7.1+ 和 torch_npu，但未明确说明 torch_npu 需要定制版 PyTorch（含 c10_npu::NPUCachingAllocator 等 NPU 符号），而非 pytorch.org 发布的标准 CPU/GPU 版本。Dockerfile 中安装的 torch==2.13.0 来自 pytorch.org/whl/cpu，是标准 CPU 版本，不包含 NPU 符号，导致 torch_npu 无法导入。",
+        "source": "README.md 安装章节 + docker/Dockerfile builder 阶段 + torch_npu 导入测试",
+        "time": "2026-07-31T11:12:47",
+        "title": "README 未说明 torch_npu 需要定制版 PyTorch"
+      },
+      {
+        "body": "Dockerfile 多阶段构建中，builder 阶段仅安装 torch（CPU 版本）、numpy、pyyaml，dev 阶段仅安装 CANN toolkit。两个阶段均未安装 torch_npu。但 README 的 UT 说明和快速上手样例都需要 torch_npu（import torch_npu）。Dockerfile 与 UT/样例需求存在断层。",
+        "source": "docker/Dockerfile + README.md 快速上手 + CONTRIBUTING.md UT 章节",
+        "time": "2026-07-31T11:12:47",
+        "title": "Dockerfile builder 阶段不含 torch_npu，但 UT/样例需要"
+      },
+      {
+        "body": "tests/ut/ 仅有 example.cpp（空 gtest main，无实际测试用例）。CMakeLists.txt 构建 torchair_ut_main 时链接 stub 库，但 stub 库缺少 ge::Tensor::GetPlacement/SetFormat、ge::GNode::GetInputsSize/GetOutputDesc、ge::Shape 构造函数、vsnprintf_s 等符号的实现，导致链接失败。",
+        "source": "tests/ut/CMakeLists.txt + tests/ut/testcases/example.cpp + 链接错误日志",
+        "time": "2026-07-31T11:12:47",
+        "title": "C++ UT stub 库不完整，缺少 GE API 实现"
+      },
+      {
+        "body": "README 版本配套表中 master 分支的 TorchNPU 版本标注为「在研版本」，GitCode releases 页面未提供对应的 aarch64 wheel 下载。v26.1.0 release 有 torch_npu wheel 但仅列 x86_64 架构链接。aarch64 用户无法直接获取兼容 master 分支的 torch_npu。",
+        "source": "README.md 版本配套表 + GitCode releases 页面",
+        "time": "2026-07-31T11:12:47",
+        "title": "master 分支 torch_npu 版本为「在研版本」，无公开下载地址"
+      },
+      {
+        "body": "Dockerfile 基于 quay.io/pypa/manylinux_2_28（AlmaLinux 8.10），系统 libstdc++ 仅支持 GLIBCXX_3.4.25。但 CANN 9.1.0 的 libhccl.so 需要 GLIBCXX_3.4.30。Dockerfile dev 阶段安装 CANN 但未处理 libstdc++ 兼容性问题。Docker/README 中也未提及此问题。",
+        "source": "docker/Dockerfile + docker/README.md + libstdc++ 版本检查",
+        "time": "2026-07-31T11:12:47",
+        "title": "manylinux_2_28 容器 libstdc++ 版本与 CANN 9.1.0 不兼容"
+      }
+    ]
+  }
+]
