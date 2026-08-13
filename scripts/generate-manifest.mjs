@@ -63,7 +63,7 @@ const REPO_NAME_NORMALIZE = {
   'component-drivers': 'component_drivers', 'memfabric-hybrid': 'memfabric_hybrid',
   'openeuler-kernel': 'kernel', 'isula': 'iSulad',
   'agentsdk': 'AgentSDK', 'indexsdk': 'IndexSDK',
-  'kae': 'KAE', 'mindcluster': 'MindCluster', 'multimodalsdk': 'MultimodalSDK',
+  'kae': 'KAE', 'mindcluster': 'mind-cluster', 'multimodalsdk': 'MultimodalSDK',
   'ograc': 'oGRAC', 'plugin': 'Plugin', 'pymotor': 'PyMotor', 'ragsdk': 'RAGSDK',
   'recsdk': 'RecSDK', 'ultrascan': 'Ultrascan',
 }
@@ -344,7 +344,7 @@ async function processBatch(batchDir, batchId) {
       const summary = normalizeToSummary(filename, data)
 
       // Dedup: keep highest-scored file per repo
-      const key = summary.name.toLowerCase().replace(/[-_]/g, '-')
+      const key = summary.displayName.toLowerCase().replace(/[-_]/g, '-')
       let score = 0
       if (filename.startsWith('verification_report_WSL_')) score += 2000
       else if (filename.startsWith('verification_report_Ubuntu_')) score += 1000

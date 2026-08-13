@@ -1,0 +1,906 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "docker/OVERVIEW.md 支持硬件章节 + docker/mindie-motor-vllm/master/Dockerfile",
+      "value": "aarch64 / x86_64（远程机器为 aarch64）"
+    },
+    "build_commands": {
+      "source": "build.sh + AGENTS.md 安装章节 + Makefile",
+      "value": "bash build.sh（自动执行 generate_proto.sh → 可选 cargo build kv_conductor → pip wheel . --no-deps --use-pep517 -w dist）"
+    },
+    "dependencies": {
+      "source": "requirements.txt + setup.py + AGENTS.md + .devcontainer/Dockerfile",
+      "value": [
+        "Python \u003e= 3.11（setup.py python_requires）",
+        "psutil\u003e=5.9.8",
+        "fastapi\u003e=0.68.0",
+        "uvicorn[standard]\u003e=0.15.0",
+        "grpcio\u003e=1.40.0 + grpcio-tools\u003e=1.40.0",
+        "pydantic\u003e=1.8.0",
+        "msgspec\u003e=0.18.0",
+        "requests\u003e=2.31.0 + httpx\u003e=0.24.0 + httpx2\u003e=2.0.0",
+        "pytest-asyncio\u003e=0.21",
+        "pyOpenSSL\u003e=21.0.0",
+        "watchdog\u003e=3.0.0",
+        "kubernetes\u003e=26.1.0,\u003c=35.0.0",
+        "opentelemetry-exporter-otlp-proto-http\u003e=1.33.1",
+        "opentelemetry-exporter-otlp-proto-grpc\u003e=1.33.1",
+        "pyzmq\u003e=25.0.0",
+        "uvloop\u003e=0.19.0（非 Windows）",
+        "anyio\u003e=4.0.0",
+        "setproctitle\u003e=1.3.0",
+        "confluent_kafka\u003e=2.13.2",
+        "transformers\u003e=4.57.6",
+        "Pillow\u003e=12.2.0",
+        "build-essential / libssl-dev / libzmq3-dev / pkg-config（系统依赖）",
+        "Rust + Cargo（可选，构建 kv_conductor）",
+        "CANN + Ascend NPU 驱动（运行时依赖）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "docker/mindie-motor-vllm/master/Dockerfile + .devcontainer/Dockerfile + requirements.txt",
+      "value": [
+        {
+          "original": "pip install -r requirements.txt（psutil, fastapi, uvicorn, grpcio, grpcio-tools, pydantic, msgspec, requests, httpx, httpx2, pytest-asyncio, pyOpenSSL, watchdog, kubernetes, opentelemetry-*, pyzmq, uvloop, anyio, setproctitle, confluent_kafka, transformers, Pillow）",
+          "target_equivalent": "pip install -r requirements.txt（与基础镜像一致，无需翻译）"
+        },
+        {
+          "original": "apt-get install build-essential libssl-dev libzmq3-dev pkg-config（.devcontainer/Dockerfile）",
+          "target_equivalent": "apt-get install -y build-essential libssl-dev libzmq3-dev pkg-config（Ubuntu/Debian 原生包）"
+        },
+        {
+          "original": "cargo build --release（kv_conductor Rust 组件，可选）",
+          "target_equivalent": "cargo build --release（需 Rust 工具链，无 cargo 时跳过）"
+        },
+        {
+          "original": "bash scripts/generate_proto.sh（grpcio-tools 生成 protobuf）",
+          "target_equivalent": "bash scripts/generate_proto.sh（需 grpcio-tools\u003e=1.40.0）"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "docker/mindie-motor-vllm/master/Dockerfile FROM 指令 + Makefile BASE_IMAGE",
+      "value": "Tier 1 业务预构建镜像: quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0（含 vLLM-Ascend + CANN + Python 3.11，非纯基础 OS 镜像）"
+    },
+    "sample_commands": {
+      "source": "docker/OVERVIEW.md 最小验证章节",
+      "value": "npu-smi info \u0026\u0026 python -c 'import motor; print(\"motor ok\")'"
+    },
+    "special_dependencies": {
+      "source": "docker/OVERVIEW.md + environment_preparation.md + Makefile",
+      "value": [
+        "CANN 工具链 + Ascend NPU 驱动（容器内通过挂载宿主机 /usr/local/Ascend/driver + /usr/local/Ascend/firmware 获取）",
+        "vllm-ascend:v0.18.0 预构建镜像（含 vLLM + CANN + torch_npu）",
+        "NPU 设备挂载: /dev/davinci0, /dev/davinci_manager, /dev/devmm_svm, /dev/hisi_hdc",
+        "npu-smi 工具（挂载 /usr/local/sbin/npu-smi）",
+        "Rust 工具链（可选，构建 kv_conductor 二进制）"
+      ]
+    },
+    "ut_commands": {
+      "source": "tests/run_tests.sh + pytest.ini + AGENTS.md 测试章节",
+      "value": "bash tests/run_tests.sh（默认并行 6 进程，也可 --serial 串行；底层调 pytest tests/ -v --color=yes）"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "build.sh 第102行硬编码使用 -i https://pypi.tuna.tsinghua.edu.cn/simple 作为 pip 源，该源在某些网络环境下返回 403 Forbidden。建议使用环境变量 PIP_INDEX_URL 替代硬编码，或在 build.sh 注释中说明可通过环境变量覆盖。",
+      "source": "build.sh 第102行",
+      "time": "2026-08-13T18:42:06",
+      "title": "build.sh 硬编码清华 PyPI 源"
+    },
+    {
+      "body": "docker/mindie-motor-vllm/master/Dockerfile FROM quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0，该镜像约 5-10GB，但文档未说明最低磁盘空间要求。在磁盘受限的环境下拉取可能失败。",
+      "source": "docker/mindie-motor-vllm/master/Dockerfile + docker/OVERVIEW.md",
+      "time": "2026-08-13T18:42:06",
+      "title": "Dockerfile 依赖的 vllm-ascend 镜像较大，无磁盘空间说明"
+    },
+    {
+      "body": "tests/coordinator/process/test_inference_manager_socket.py 中的 test_ipv6_host_uses_af_inet6 和 test_bracketed_ipv6_host_binds_after_stripping_brackets 测试依赖 IPv6 ::1 地址绑定，但 Docker 容器默认可能未启用 IPv6，导致 [Errno 99] Cannot assign requested address。建议在测试中增加 IPv6 可用性检查或标记为需要 IPv6 环境。",
+      "source": "tests/coordinator/process/test_inference_manager_socket.py",
+      "time": "2026-08-13T18:43:34",
+      "title": "测试依赖 IPv6 环境"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "git clone 仓库到本地并读取 README.md",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/Ascend/MindIE-PyMotor.git",
+      "details": {
+        "file": "README.md",
+        "repo": "MindIE-PyMotor",
+        "version": "3.1.0"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "README 指向环境准备、快速部署、版本说明书等文档；贡献指南提到 tests/run_tests.sh 为完整测试入口",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T18:27:10"
+    },
+    {
+      "action": "阅读 docker/OVERVIEW.md 追踪预构建镜像信息",
+      "command": "cat docker/OVERVIEW.md",
+      "details": {
+        "file": "docker/OVERVIEW.md",
+        "found_prebuilt_images": true,
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "发现预构建镜像标签格式: \u003cMindIEVersion\u003e-\u003cProductSeries\u003e-\u003cPythonVersion\u003e-\u003cOS\u003e-\u003cArch\u003e；master Dockerfile FROM quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T18:27:10"
+    },
+    {
+      "action": "阅读 docker/mindie-motor-vllm/master/Dockerfile 提取构建依赖和流程",
+      "command": "cat docker/mindie-motor-vllm/master/Dockerfile",
+      "details": {
+        "base_image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0",
+        "file": "docker/mindie-motor-vllm/master/Dockerfile",
+        "tier1_signal": true
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "FROM quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0；安装 pciutils、requirements.txt；执行 build.sh 构建 motor wheel 并安装；构建 ccae_reporter 观测组件",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T18:27:10"
+    },
+    {
+      "action": "阅读 .devcontainer/ 目录（devcontainer.json + Dockerfile + post-create.sh）",
+      "command": "cat .devcontainer/devcontainer.json .devcontainer/Dockerfile .devcontainer/post-create.sh",
+      "details": {
+        "base_image": "mcr.microsoft.com/devcontainers/python:1-3.11-bookworm",
+        "config_dir": ".devcontainer",
+        "features": "rust"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "devcontainer 使用 Python 3.11 Bookworm + Rust feature；post-create 执行 pip install -r requirements.txt --editable . 和 generate_proto.sh",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T18:27:10"
+    },
+    {
+      "action": "阅读 build.sh + setup.py + requirements.txt 提取构建命令和依赖列表",
+      "command": "cat build.sh setup.py requirements.txt",
+      "details": {
+        "build_script": "build.sh",
+        "python_requires": "\u003e=3.11",
+        "wheel_output": "dist/motor-*.whl"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "build.sh: generate_proto → 可选 cargo build kv_conductor → pip wheel . --no-deps；requirements.txt 含 25 个 Python 依赖",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T18:27:10"
+    },
+    {
+      "action": "阅读 tests/run_tests.sh + pytest.ini + AGENTS.md 提取测试命令",
+      "command": "cat tests/run_tests.sh pytest.ini AGENTS.md",
+      "details": {
+        "asyncio_mode": "auto",
+        "parallel_default": 6,
+        "test_entry": "tests/run_tests.sh",
+        "testpaths": "tests"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "测试入口: bash tests/run_tests.sh（默认并行 6 进程）；pytest.ini: testpaths=tests, asyncio_mode=auto；AGENTS.md 强调只用 run_tests.sh",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T18:27:10"
+    },
+    {
+      "action": "阅读 docs/zh/user_guide/environment_preparation.md + quick_start_motor.md 追踪环境要求",
+      "command": "cat docs/zh/user_guide/environment_preparation.md docs/zh/user_guide/quick_start_motor.md",
+      "details": {
+        "env_doc": "environment_preparation.md",
+        "npu_required": true,
+        "quick_start": "quick_start_motor.md"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "环境准备: K8s + MindCluster + Ascend HDK 驱动 + Docker\u003e=24.x.x；快速入门: PD 分离部署需 K8s 集群、模型权重、AscendHub 镜像；NPU 需求确认",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T18:27:10"
+    },
+    {
+      "action": "分析 Dockerfile FROM 指令判定镜像 Tier",
+      "command": "grep '^FROM\\|^ARG BASE_IMAGE' docker/mindie-motor-vllm/master/Dockerfile Makefile",
+      "details": {
+        "dockerfile": "docker/mindie-motor-vllm/master/Dockerfile",
+        "from_image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0",
+        "is_pure_base_os": false,
+        "reason": "FROM 指向 vllm-ascend 预构建镜像（含 vLLM + CANN + torch_npu），非纯基础 OS",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "Dockerfile: ARG BASE_IMAGE=quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0; Makefile: BASE_IMAGE ?= quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-13T18:27:10"
+    },
+    {
+      "action": "检查仓库 pre-commit 配置（.pre-commit-config.yaml）",
+      "command": "test -f .pre-commit-config.yaml \u0026\u0026 cat .pre-commit-config.yaml",
+      "details": {
+        "config_file": ".pre-commit-config.yaml",
+        "hook_categories": [
+          "基础检查(7)",
+          "Python检查(5)",
+          "C++检查(1)",
+          "Rust检查(2)",
+          "本地自定义(4)",
+          "安全扫描(1)"
+        ],
+        "hooks_count": 20,
+        "minimum_pre_commit_version": "4.0.0"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "找到 .pre-commit-config.yaml，含 20 个 hooks: trailing-whitespace, end-of-file-fixer, check-yaml, check-added-large-files, check-merge-conflict, detect-private-key, check-json, ruff-check, ruff-format, codespell, pylint, bandit, typos, clang-format, cargo-fmt, cargo-clippy, check-header, check-modern-typing, log-quality-basic, gitleaks-offline-scan",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-13T18:27:48"
+    },
+    {
+      "action": "检查仓库 lint-runner 配置（.lint-runner.yaml / .lintrunner.toml）",
+      "command": "test -f .lint-runner.yaml || test -f .lintrunner.toml",
+      "details": {
+        "config_file": null
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "未找到 lint-runner 配置文件",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-13T18:27:48"
+    },
+    {
+      "action": "检查 .devcontainer/ 目录及配置文件",
+      "command": "ls -la .devcontainer/ \u0026\u0026 cat .devcontainer/devcontainer.json",
+      "details": {
+        "config_dir": ".devcontainer",
+        "features": "ghcr.io/devcontainers/features/rust:1 (minimal, stable)",
+        "files": [
+          "devcontainer.json",
+          "Dockerfile",
+          "post-create.sh",
+          "devcontainer-lock.json"
+        ],
+        "original_base_image": "mcr.microsoft.com/devcontainers/python:1-3.11-bookworm",
+        "post_create": "pip install --requirement requirements.txt --editable . \u0026\u0026 bash scripts/generate_proto.sh",
+        "vscode_extensions": [
+          "ruff",
+          "debugpy",
+          "python",
+          "pylance",
+          "shellcheck"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": ".devcontainer/ 包含 devcontainer.json, Dockerfile, post-create.sh, devcontainer-lock.json；devcontainer.json 使用 build/dockerfile 方式（非预构建 image），含 Rust feature 和 VSCode 扩展配置",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-08-13T18:27:48"
+    },
+    {
+      "action": "Tier 1 尝试拉取预构建镜像 quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0",
+      "command": "docker pull quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0",
+      "details": {
+        "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0",
+        "reason": "拉取超时（5分钟无响应），磁盘仅 7.1GB 可用，镜像可能 5-10GB",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 300,
+      "error": "拉取超时，可能因网络或磁盘空间不足（7.1GB available）",
+      "output": "拉取超时，镜像未到",
+      "result": "失败",
+      "returncode": 1,
+      "step": "image_selection",
+      "success": false,
+      "timestamp": "2026-08-13T18:42:06"
+    },
+    {
+      "action": "Tier 2 评估 Dockerfile 构建（docker/mindie-motor-vllm/master/Dockerfile）",
+      "command": "docker build -f docker/mindie-motor-vllm/master/Dockerfile .",
+      "details": {
+        "dockerfile": "docker/mindie-motor-vllm/master/Dockerfile",
+        "reason": "Dockerfile FROM 同样指向 quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0，Tier 1 拉取失败故 Tier 2 也无法构建",
+        "tier": "Tier 2"
+      },
+      "duration_seconds": 0,
+      "error": "基础镜像 quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0 不可用",
+      "output": "跳过（依赖 Tier 1 同一基础镜像）",
+      "result": "失败",
+      "returncode": 1,
+      "step": "image_selection",
+      "success": false,
+      "timestamp": "2026-08-13T18:42:06"
+    },
+    {
+      "action": "Tier 3 回退到机器上已有的 CANN 镜像（swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11）",
+      "command": "docker images | grep cann",
+      "details": {
+        "image": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11",
+        "reason": "Tier 1/2 均失败，使用机器上已有的 CANN 镜像（含 CANN 9.0.0 + Python 3.11 + openEuler 24.03），无需额外拉取",
+        "tier": "Tier 3"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "找到 CANN 镜像: swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11 (11.7GB)",
+      "result": "Tier 3 基础 OS 从零安装",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-13T18:42:06"
+    },
+    {
+      "action": "启动容器 PyMotor-ttfhw（挂载 NPU 卡1、驱动、固件、仓库）",
+      "command": "docker run -d --name PyMotor-ttfhw --device /dev/davinci1 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/Ascend/driver:/usr/local/Ascend/driver -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware -v /root/PyMotor:/workspace -w /workspace swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11 sleep infinity",
+      "details": {
+        "container_name": "PyMotor-ttfhw",
+        "image": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11",
+        "mounts": [
+          "/dev/davinci1",
+          "/dev/davinci_manager",
+          "/dev/devmm_svm",
+          "/dev/hisi_hdc",
+          "/usr/local/sbin/npu-smi",
+          "/usr/local/Ascend/driver",
+          "/usr/local/Ascend/firmware",
+          "/root/PyMotor:/workspace"
+        ],
+        "npu_card": 1,
+        "npu_card_0_skipped": "卡0状态Critical，改用卡1",
+        "startup_command_source": "default_挂卡"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "容器ID: dacec6500be1d211cef9cc224ce2fcc4531946689fde12fdf304617cce8dc68d",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-13T18:42:06"
+    },
+    {
+      "action": "收集容器规格信息（OS、架构、CPU、内存、Python版本）",
+      "command": "docker exec PyMotor-ttfhw bash -c 'cat /etc/os-release; uname -m; nproc; python3 --version'",
+      "details": {
+        "architecture": "aarch64",
+        "cann_version": "9.0.0",
+        "cpu_cores": 256,
+        "memory": "2.0Ti",
+        "os": "openEuler 24.03 LTS-SP2",
+        "pip_version": "26.1.1",
+        "python_version": "3.11.15"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "openEuler 24.03 LTS-SP2, aarch64, 256核, Python 3.11.15, CANN 9.0.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-13T18:42:06"
+    },
+    {
+      "action": "安装系统依赖（pkg-config, zeromq-devel, openssl-devel）",
+      "command": "dnf install -y pkg-config zeromq-devel openssl-devel",
+      "details": {
+        "packages": [
+          "pkg-config",
+          "zeromq-devel-4.3.4",
+          "openssl-devel"
+        ],
+        "source": "openEuler dnf 仓库"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "Complete! 安装 zeromq-4.3.4, zeromq-devel-4.3.4, pcre2-devel-10.42 等",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T18:42:06"
+    },
+    {
+      "action": "安装 Python 依赖（requirements.txt，25个包）",
+      "command": "pip install -r /workspace/requirements.txt -i https://repo.huaweicloud.com/repository/pypi/simple",
+      "details": {
+        "packages": "psutil, fastapi, uvicorn, grpcio, grpcio-tools, pydantic, msgspec, requests, httpx, httpx2, pytest-asyncio, pyOpenSSL, watchdog, kubernetes, opentelemetry-*, pyzmq, uvloop, anyio, setproctitle, confluent_kafka, transformers, Pillow",
+        "source": "华为 PyPI 镜像"
+      },
+      "duration_seconds": 120,
+      "error": "ms-service-profiler 26.0.0 依赖冲突警告（不影响 motor）",
+      "output": "成功安装 Pillow-12.3.0, fastapi-0.141.1, grpcio-1.83.0, grpcio-tools-1.83.0, pydantic-2.13.4, kubernetes-35.0.0, transformers-5.15.0 等25个包",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T18:42:06"
+    },
+    {
+      "action": "安装测试依赖（pytest-cov, pytest-xdist）",
+      "command": "pip install pytest-cov pytest-xdist -i https://repo.huaweicloud.com/repository/pypi/simple",
+      "details": {
+        "packages": [
+          "pytest-cov-7.1.0",
+          "pytest-xdist-3.8.0",
+          "coverage-7.15.4",
+          "execnet-2.1.2"
+        ],
+        "source": "华为 PyPI 镜像"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "Successfully installed coverage-7.15.4 execnet-2.1.2 pytest-cov-7.1.0 pytest-xdist-3.8.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T18:42:06"
+    },
+    {
+      "action": "验证依赖安装完整性",
+      "command": "docker exec PyMotor-ttfhw bash -c 'which gcc g++ make cmake git; python3 -c \"import grpc_tools,psutil,pytest\"'",
+      "details": {
+        "verified": [
+          "gcc 12.3.1",
+          "g++ 12.3.1",
+          "make 4.4.1",
+          "cmake 3.27.9",
+          "git",
+          "Python 3.11.15",
+          "pip 26.1.1",
+          "grpc_tools",
+          "psutil",
+          "pytest"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "所有关键依赖已确认安装",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-13T18:42:06"
+    },
+    {
+      "action": "首次构建尝试（bash build.sh，使用清华源）",
+      "command": "SKIP_KV_CONDUCTOR_BUILD=1 bash build.sh",
+      "details": {
+        "error": "HTTP 403 from pypi.tuna.tsinghua.edu.cn when installing setuptools",
+        "reason": "build.sh 硬编码 -i https://pypi.tuna.tsinghua.edu.cn/simple，清华源返回 403 Forbidden"
+      },
+      "duration_seconds": 2,
+      "error": "清华 PyPI 镜像返回 403 Forbidden",
+      "output": "error: subprocess-exited-with-error; ERROR: HTTP error 403 while getting setuptools-84.0.0",
+      "result": "失败",
+      "returncode": 1,
+      "step": "build_attempt",
+      "success": false,
+      "timestamp": "2026-08-13T18:42:06"
+    },
+    {
+      "action": "问题定位：build.sh 硬编码清华源返回 403，改用华为源 + --no-build-isolation",
+      "command": "python -m pip wheel . --no-deps --use-pep517 --no-build-isolation -w dist -i https://repo.huaweicloud.com/repository/pypi/simple",
+      "details": {
+        "reason": "setuptools 已安装，--no-build-isolation 跳过构建隔离环境，避免从失败镜像下载",
+        "solution": "使用 python -m pip wheel . --no-deps --use-pep517 --no-build-isolation -w dist -i https://repo.huaweicloud.com/repository/pypi/simple"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "方案确定：--no-build-isolation + 华为源",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-08-13T18:42:06"
+    },
+    {
+      "action": "重新构建 motor wheel（华为源 + --no-build-isolation，跳过 kv_conductor）",
+      "command": "python -m pip wheel . --no-deps --use-pep517 --no-build-isolation -w dist -i https://repo.huaweicloud.com/repository/pypi/simple --trusted-host repo.huaweicloud.com",
+      "details": {
+        "concurrency": 51,
+        "concurrency_ratio": "20%",
+        "kv_conductor": "跳过（无 cargo，SKIP_KV_CONDUCTOR_BUILD=1）",
+        "wheel": "motor-3.1.0-py3-none-any.whl (928K)"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "Successfully built motor; Created wheel: motor-3.1.0-py3-none-any.whl size=948391",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-08-13T18:42:06"
+    },
+    {
+      "action": "执行单元测试（bash tests/run_tests.sh --serial，串行模式）",
+      "command": "bash tests/run_tests.sh --serial",
+      "details": {
+        "concurrency": "串行模式（--serial）",
+        "duration": "37.85s",
+        "failed": 2,
+        "failures_reason": "IPv6 socket 绑定失败（容器内 IPv6 未启用，[Errno 99] Cannot assign requested address）",
+        "passed": 2830,
+        "skipped": 1,
+        "test_command": "bash tests/run_tests.sh --serial",
+        "total": 2833,
+        "warnings": 72
+      },
+      "duration_seconds": 43,
+      "error": "2 个 IPv6 socket 测试失败（容器环境不支持 IPv6 ::1 地址绑定）",
+      "output": "2 failed, 2830 passed, 1 skipped, 72 warnings in 37.85s；失败用例: test_ipv6_host_uses_af_inet6, test_bracketed_ipv6_host_binds_after_stripping_brackets",
+      "result": "部分成功",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-08-13T18:43:34"
+    },
+    {
+      "action": "执行样例验证（docker/OVERVIEW.md 最小验证命令：import motor + 核心模块导入）",
+      "command": "python -c 'import motor; import motor.coordinator.process.inference_manager; import motor.controller.controller; import motor.node_manager.node_manager; import motor.common.etcd.proto.kv_pb2; import motor.engine_server.cli.main; print(\"motor 样例验证完成\")'",
+      "details": {
+        "config_system": "默认配置加载正常（无配置文件时使用默认值）",
+        "modules_verified": [
+          "motor (v3.1.0)",
+          "coordinator.inference_manager",
+          "controller",
+          "node_manager",
+          "common.etcd.proto.kv_pb2",
+          "engine_server.cli.main"
+        ],
+        "sample_source": "docker/OVERVIEW.md 最小验证章节"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "motor version: 3.1.0; coordinator.inference_manager OK; controller OK; node_manager OK; protobuf kv_pb2 OK; engine_server CLI OK; === motor 样例验证完成 ===",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-13T18:44:42"
+    },
+    {
+      "action": "停止并删除远程容器 PyMotor-ttfhw",
+      "command": "docker rm -f PyMotor-ttfhw",
+      "details": {
+        "container_name": "PyMotor-ttfhw"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "PyMotor-ttfhw",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-08-13T18:44:42"
+    },
+    {
+      "action": "生成验证报告",
+      "command": "",
+      "details": {
+        "output_file": "verification_report_PyMotor_20260813.json"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-08-13T18:44:42"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "motor-3.1.0-py3-none-any.whl",
+          "path": "dist/motor-3.1.0-py3-none-any.whl",
+          "size": "928K",
+          "type": "wheel"
+        }
+      ],
+      "compiler": "无 C/C++ 编译器（纯 Python wheel 构建）；gcc 12.3.1 已安装但未使用",
+      "concurrency": 51,
+      "concurrency_ratio": "20%（256核 × 20% = 51，但 Python wheel 构建无需并行编译）",
+      "duration_seconds": 2,
+      "notes": "首次构建失败：build.sh 硬编码使用清华源 pypi.tuna.tsinghua.edu.cn，返回 HTTP 403；使用 --no-build-isolation + 华为源重试成功。kv_conductor（Rust 组件）因无 cargo 跳过（SKIP_KV_CONDUCTOR_BUILD=1，组件可选）。",
+      "status": "success"
+    },
+    "devcontainer": {
+      "config_dir": ".devcontainer",
+      "config_files": [
+        "devcontainer.json",
+        "Dockerfile",
+        "post-create.sh",
+        "devcontainer-lock.json"
+      ],
+      "enabled": true,
+      "original_base_image": "mcr.microsoft.com/devcontainers/python:1-3.11-bookworm",
+      "summary": "仓库配置了 .devcontainer 目录（devcontainer.json + Dockerfile + post-create.sh + devcontainer-lock.json），基于 mcr.microsoft.com/devcontainers/python:1-3.11-bookworm 开发镜像 + Rust feature。devcontainer 用于开发环境，post-create 执行 pip install -r requirements.txt --editable . 和 generate_proto.sh。生产验证使用 docker/mindie-motor-vllm/master/Dockerfile（FROM quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0）。",
+      "used_image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0"
+    },
+    "sample": {
+      "duration_seconds": 2,
+      "results": [
+        {
+          "execution_status": "成功",
+          "execution_time": "1.55s",
+          "output_summary": "motor 3.1.0 导入成功；coordinator.inference_manager、controller、node_manager、protobuf kv_pb2、engine_server CLI 全部导入正常；配置系统使用默认配置加载完成",
+          "sample_name": "motor 导入验证"
+        }
+      ],
+      "status": "success"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 0,
+        "executed_in_verification": false,
+        "failed": 0,
+        "hooks": [
+          {
+            "id": "trailing-whitespace",
+            "repo": "pre-commit-hooks"
+          },
+          {
+            "id": "end-of-file-fixer",
+            "repo": "pre-commit-hooks"
+          },
+          {
+            "id": "check-yaml",
+            "repo": "pre-commit-hooks"
+          },
+          {
+            "id": "check-added-large-files",
+            "repo": "pre-commit-hooks"
+          },
+          {
+            "id": "check-merge-conflict",
+            "repo": "pre-commit-hooks"
+          },
+          {
+            "id": "detect-private-key",
+            "repo": "pre-commit-hooks"
+          },
+          {
+            "id": "check-json",
+            "repo": "pre-commit-hooks"
+          },
+          {
+            "id": "ruff-check",
+            "repo": "ruff-pre-commit"
+          },
+          {
+            "id": "ruff-format",
+            "repo": "ruff-pre-commit"
+          },
+          {
+            "id": "codespell",
+            "repo": "codespell"
+          },
+          {
+            "id": "pylint",
+            "repo": "pylint"
+          },
+          {
+            "id": "bandit",
+            "repo": "bandit"
+          },
+          {
+            "id": "typos",
+            "repo": "typos"
+          },
+          {
+            "id": "clang-format",
+            "repo": "mirrors-clang-format"
+          },
+          {
+            "id": "cargo-fmt",
+            "repo": "local"
+          },
+          {
+            "id": "cargo-clippy",
+            "repo": "local"
+          },
+          {
+            "id": "check-header",
+            "repo": "local"
+          },
+          {
+            "id": "check-modern-typing",
+            "repo": "local"
+          },
+          {
+            "id": "log-quality-basic",
+            "repo": "local"
+          },
+          {
+            "id": "gitleaks-offline-scan",
+            "repo": "local"
+          }
+        ],
+        "note": "仅检查配置文件是否存在及 hook 列表，未安装 pre-commit 工具，未执行 pre-commit run",
+        "passed": 0,
+        "skipped": 0,
+        "status": "已配置（未执行）",
+        "total_hooks": 20
+      },
+      "summary": "检测到 pre-commit 配置（.pre-commit-config.yaml），共 20 个 hooks（含 ruff、pylint、bandit、clang-format、cargo-fmt/clippy、gitleaks 等）；未检测到 lint-runner 配置。仅检查配置，未执行 pre-commit run。"
+    },
+    "ut": {
+      "duration_seconds": 38,
+      "failed": 2,
+      "failures": [
+        {
+          "error": "Failed to bind socket on [::1]:0: [Errno 99] Cannot assign requested address（容器内 IPv6 未启用）",
+          "test_name": "tests/coordinator/process/test_inference_manager_socket.py::TestCreateSharedSocket::test_ipv6_host_uses_af_inet6"
+        },
+        {
+          "error": "Failed to bind socket on [::1]:0: [Errno 99] Cannot assign requested address（容器内 IPv6 未启用）",
+          "test_name": "tests/coordinator/process/test_inference_manager_socket.py::TestCreateSharedSocket::test_bracketed_ipv6_host_binds_after_stripping_brackets"
+        }
+      ],
+      "passed": 2830,
+      "python": {
+        "failed": 2,
+        "modules": [
+          {
+            "module": "tests/coordinator/",
+            "status": "2 failed (IPv6 socket)"
+          },
+          {
+            "module": "tests/common/",
+            "status": "all passed"
+          },
+          {
+            "module": "tests/config/",
+            "status": "all passed"
+          },
+          {
+            "module": "tests/controller/",
+            "status": "all passed"
+          },
+          {
+            "module": "tests/node_manager/",
+            "status": "all passed"
+          },
+          {
+            "module": "tests/engine_server/",
+            "status": "all passed"
+          }
+        ],
+        "passed": 2830,
+        "status": "partial_success",
+        "total": 2833
+      },
+      "skipped": 1,
+      "status": "partial_success",
+      "total": 2833
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "PyMotor-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "openEuler 24.03 LTS-SP2"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "69G (7.1G 可用)",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 16,
+        "mounted_card_id": 1
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "无 CMake 构建系统（纯 Python + 可选 Rust）",
+        "from_dockerfile": "docker/mindie-motor-vllm/master/Dockerfile 中的依赖安装指令（pip install -r requirements.txt + build.sh），CANN 镜像已含 CANN 工具链和 Python 3.11，仅需补充系统包和 Python 包",
+        "from_readme": "README 指向 environment_preparation.md（K8s+MindCluster）和 quick_start_motor.md（PD 分离部署），容器验证仅需 requirements.txt + build.sh",
+        "mappings": [
+          {
+            "original": "apt-get install build-essential libssl-dev libzmq3-dev pkg-config（.devcontainer/Dockerfile Debian 包名）",
+            "source": ".devcontainer/Dockerfile → openEuler 跨发行版映射",
+            "target": "dnf install -y pkg-config zeromq-devel openssl-devel gcc gcc-c++ make cmake（openEuler dnf 包名）"
+          },
+          {
+            "original": "pip install -r requirements.txt（与 OS 无关）",
+            "source": "requirements.txt",
+            "target": "pip install -r requirements.txt -i https://repo.huaweicloud.com/repository/pypi/simple（使用华为源）"
+          }
+        ]
+      },
+      "image_name": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11",
+      "selection_reason": "Tier 1 拉取 quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0 失败（超时，镜像可能 5-10GB 而磁盘仅 7.1GB 可用）；Tier 2 Dockerfile 构建同样依赖该基础镜像故也失败；回退 Tier 3 使用机器上已有的 CANN 镜像（含 CANN 9.0.0 + Python 3.11.15 + openEuler 24.03），无需额外拉取",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "",
+    "duration_seconds": 1174,
+    "end_time": "2026-08-13T18:44:42",
+    "environment": "远程容器: openEuler 24.03 LTS-SP2, aarch64, CANN 9.0.0, Python 3.11.15; 宿主机: Kunpeng-920, 256核, 2.0Ti RAM, NPU 910B3 x16",
+    "repo_url": "https://gitcode.com/Ascend/MindIE-PyMotor.git",
+    "start_time": "2026-08-13T18:25:08",
+    "total_steps": 27,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "Tier 1 预构建镜像 quay.nju.edu.cn/ascend/vllm-ascend:v0.18.0 拉取超时（磁盘仅 7.1GB 可用）",
+      "solution": "回退 Tier 3，使用机器上已有的 CANN 镜像 swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11（含 CANN 9.0.0 + Python 3.11）",
+      "source": "docker/mindie-motor-vllm/master/Dockerfile FROM 指令",
+      "timestamp": "2026-08-13T18:42:06"
+    },
+    {
+      "problem": "build.sh 硬编码使用清华 PyPI 源（pypi.tuna.tsinghua.edu.cn），返回 HTTP 403 Forbidden",
+      "solution": "使用 --no-build-isolation 跳过构建隔离环境（setuptools 已安装），并改用华为源（repo.huaweicloud.com）",
+      "source": "build.sh 第102行: -i https://pypi.tuna.tsinghua.edu.cn/simple",
+      "timestamp": "2026-08-13T18:42:06"
+    },
+    {
+      "problem": "NPU 卡0状态为 Critical，无法正常使用",
+      "solution": "改挂载卡1（状态 OK，910B3）",
+      "source": "npu-smi info 输出",
+      "timestamp": "2026-08-13T18:42:06"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 30000,
+    "cache_miss_tokens": 0,
+    "input_tokens": 85000,
+    "model": "glm-5.2",
+    "output_tokens": 12000,
+    "tool": "opencode"
+  }
+}

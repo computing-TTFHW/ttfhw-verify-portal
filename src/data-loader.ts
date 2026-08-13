@@ -60,7 +60,7 @@ const REPO_NAME_NORMALIZE: Record<string, string> = {
   'component-drivers': 'component_drivers', 'memfabric-hybrid': 'memfabric_hybrid',
   'openeuler-kernel': 'kernel', 'isula': 'iSulad',
   'agentsdk': 'AgentSDK', 'indexsdk': 'IndexSDK',
-  'kae': 'KAE', 'mindcluster': 'MindCluster', 'multimodalsdk': 'MultimodalSDK',
+  'kae': 'KAE', 'mindcluster': 'mind-cluster', 'multimodalsdk': 'MultimodalSDK',
   'ograc': 'oGRAC', 'plugin': 'Plugin', 'pymotor': 'PyMotor', 'ragsdk': 'RAGSDK',
   'recsdk': 'RecSDK', 'ultrascan': 'Ultrascan',
 }
