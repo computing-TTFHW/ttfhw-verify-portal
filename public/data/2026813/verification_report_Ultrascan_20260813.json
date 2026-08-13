@@ -1,0 +1,875 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md + docs/zh/installation_guide.md（适配鲲鹏920）",
+      "value": "aarch64 (鲲鹏920)，同时支持 x86_64"
+    },
+    "build_commands": {
+      "source": "docs/zh/installation_guide.md - 编译Ultrascan章节",
+      "value": "mkdir -p build \u0026\u0026 cd build \u0026\u0026 cmake .. \u0026\u0026 make -j（并发 = 核数×20%向下取整）"
+    },
+    "build_entry": {
+      "source": "CMakeLists.txt add_subdirectory(unit/tools/examples)",
+      "value": "单入口：根目录 cmake .. \u0026\u0026 make -j；默认 release 模式生成静态库和测试程序（build/bin/unit-*）"
+    },
+    "dependencies": {
+      "source": "docs/zh/installation_guide.md 软件要求 + .travis.yml + CMakeLists.txt",
+      "value": [
+        "gcc 10.3+ (dnf: gcc gcc-c++)",
+        "cmake 2.8.11+ (dnf: cmake)",
+        "ragel 6.9+ (dnf: ragel)",
+        "boost 1.57+ (dnf: boost-devel)",
+        "pcre 8.41+ 可选 (dnf: pcre pcre-devel)",
+        "sqlite3 可选 (dnf: sqlite sqlite-devel)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库无 Dockerfile；依赖来自 docs/zh/installation_guide.md 软件要求表与 .travis.yml",
+      "value": [
+        {
+          "original": "gcc 10.3及以上",
+          "target_equivalent": "dnf install -y gcc gcc-c++（openEuler 原生包）"
+        },
+        {
+          "original": "cmake 2.8.11及以上",
+          "target_equivalent": "dnf install -y cmake（openEuler 原生包）"
+        },
+        {
+          "original": "ragel 6.9及以上",
+          "target_equivalent": "dnf install -y ragel（openEuler 原生包，官方提供 6.10）"
+        },
+        {
+          "original": "boost 1.57及以上",
+          "target_equivalent": "dnf install -y boost-devel（openEuler 原生包，含头文件）"
+        },
+        {
+          "original": "pcre 8.41及以上（可选，hscollider）",
+          "target_equivalent": "dnf install -y pcre pcre-devel（openEuler 原生包）"
+        },
+        {
+          "original": "sqlite3（可选，hsbench）",
+          "target_equivalent": "dnf install -y sqlite sqlite-devel（openEuler 原生包）"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "docs/zh/installation_guide.md - 已验证环境章节（仓库无 Dockerfile）",
+      "value": "openEuler 22.03 LTS SP4 / openEuler 24.03 LTS SP3，选择 openEuler 24.03 LTS"
+    },
+    "sample_commands": {
+      "source": "docs/zh/quick_start.md + examples/README.md",
+      "value": "./bin/hsdump -e patterns.txt -o ./dump_output -U -X -N；./bin/hsbench -e ... -c ... -N -n1；examples: ./bin/simplegrep \u003cpattern\u003e \u003cfile\u003e"
+    },
+    "special_dependencies": {
+      "source": "docs/zh/installation_guide.md",
+      "value": [
+        "ragel 需 6.9+，openEuler 24.03 仓库提供 6.10，直接 dnf 安装",
+        "hscollider 依赖 pcre\u003e=8.41（可选工具）",
+        "hsbench 依赖 sqlite3（可选工具）"
+      ]
+    },
+    "ut_commands": {
+      "source": ".travis.yml script 段 + 安装指南",
+      "value": "./bin/unit-hyperscan \u0026\u0026 ./bin/unit-chimera（build/bin 下）"
+    },
+    "ut_entry": {
+      "source": "unit/CMakeLists.txt",
+      "value": "基于 gtest，生成 unit-hyperscan、unit-chimera 测试程序"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "安装指南提到 hscollider 编译依赖 PCRE 8.41+，但 Chimera（unit-chimera）仅在仓库目录存在 pcre/ 源码目录（PCRE_BUILD_SOURCE）时才构建。仅安装系统 pcre 包（pkg-config 发现）时 BUILD_CHIMERA=FALSE，unit-chimera 不生成。新开发者按安装指南仅安装系统依赖可能遗漏该点。",
+      "source": "CMakeLists.txt + cmake/pcre.cmake + docs/zh/installation_guide.md",
+      "time": "2026-08-13T10:28:33",
+      "title": "安装指南要求拷贝 pcre 源码才构建 Chimera，README 未说明"
+    },
+    {
+      "body": "CMakeLists 中 DUMP_SUPPORT 为 dependent option，release/relwithdebinfo 构建时强制 OFF，因此默认构建不生成 hsdump 工具。而 docs/zh/quick_start.md 的通用字节码样例直接使用 ./bin/hsdump，新开发者按默认构建后找不到该工具，需改用 DEBUG 构建。",
+      "source": "CMakeLists.txt:181 + docs/zh/quick_start.md",
+      "time": "2026-08-13T10:28:33",
+      "title": "release 默认构建不生成 hsdump 但快速入门样例依赖它"
+    },
+    {
+      "body": "tools/hscollider 链接时 libhs.a 位于 libdatabaseutil.a 之前，而后者引用 hs 库中 fat_hs_serialize_database 等符号，导致静态链接 undefined reference。需要为静态库添加 -Wl,--start-group/--end-group 或调整链接顺序才能编译通过。文档未提及此问题。",
+      "source": "tools/hscollider/CMakeLists.txt + CMakeLists.txt(src/fat_database.c 属于 hs_exec)",
+      "time": "2026-08-13T10:28:33",
+      "title": "hscollider 静态链接顺序缺陷未在文档说明"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "克隆仓库并阅读 README.md 了解项目结构与构建说明",
+      "command": "git clone -b master https://gitcode.com/boostkit/Ultrascan.git",
+      "details": {
+        "file": "README.md",
+        "sections": [
+          "项目介绍",
+          "目录结构",
+          "环境部署",
+          "快速入门"
+        ]
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "克隆成功，commit b4fe0f101e2fdd5053097518650a9d18627f0e09",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T09:12:03"
+    },
+    {
+      "action": "阅读安装指南确认依赖与编译方法",
+      "command": "cat docs/zh/installation_guide.md",
+      "details": {
+        "deps": [
+          "gcc\u003e=10.3",
+          "cmake\u003e=2.8.11",
+          "ragel\u003e=6.9",
+          "boost\u003e=1.57",
+          "pcre(可选)",
+          "sqlite(可选)"
+        ],
+        "file": "docs/zh/installation_guide.md"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "确认编译命令：cmake .. \u0026\u0026 make -j；明确要求 openEuler 环境",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T09:12:03"
+    },
+    {
+      "action": "阅读快速入门确认样例命令",
+      "command": "cat docs/zh/quick_start.md",
+      "details": {
+        "file": "docs/zh/quick_start.md",
+        "samples": [
+          "hsdump 通用字节码",
+          "hsbench 性能测试"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "确认 hsdump -e patterns.txt -o ./dump_output -U -X -N",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T09:12:03"
+    },
+    {
+      "action": "扫描仓库 Dockerfile 与 CI 配置确认构建环境",
+      "command": "find . -iname '*dockerfile*'; cat .travis.yml",
+      "details": {
+        "dockerfile_found": false,
+        "selected_os": "openEuler 24.03 LTS",
+        "travis": ".travis.yml (bionic, cmake+make)"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "无 Dockerfile；.travis.yml 使用 apt 安装 libboost-dev、ragel 源码、pcre 源码；安装指南明确要求 openEuler",
+      "result": "仓库无 Dockerfile，依据安装指南判定 openEuler",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-13T09:12:03"
+    },
+    {
+      "action": "选择基础镜像 openEuler 24.03 LTS",
+      "command": "docker pull hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+      "details": {
+        "image": "hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+        "reason": "README/安装指南明确要求 openEuler 环境，仓库无 Dockerfile"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "镜像已存在，拉取成功",
+      "result": "openEuler 24.03 LTS",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-13T09:12:03"
+    },
+    {
+      "action": "启动容器并挂载仓库到 /workspace",
+      "command": "docker run -d --name Ultrascan-ttfhw -v /tmp/Ultrascan-verify/repo:/workspace ... sleep infinity",
+      "details": {
+        "container_name": "Ultrascan-ttfhw",
+        "image": "hub.oepkgs.net/openeuler/openeuler:24.03-lts"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "Container ID fac58e10b545",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-13T09:12:03"
+    },
+    {
+      "action": "扫描仓库静态检查配置",
+      "command": "ls -a; cat .pre-commit-config.yaml",
+      "details": {
+        "hooks_count": 10,
+        "lint_runner": false,
+        "pre_commit_config": ".pre-commit-config.yaml"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "检测到 .pre-commit-config.yaml（10 个 hook：check-yaml/check-json/check-xml/check-merge-conflict/detect-private-key/check-added-large-files/no-commit-to-branch/detect-secrets/clang-format/golangci-lint-full）",
+      "result": "pre-commit 已配置，lint-runner 未配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-13T09:12:34"
+    },
+    {
+      "action": "扫描仓库 devcontainer 能力",
+      "command": "ls -a .devcontainer",
+      "details": {
+        "config_files": [],
+        "devcontainer_dir": null
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "仓库无 .devcontainer 目录",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-08-13T09:12:34"
+    },
+    {
+      "action": "安装系统工具链（gcc gcc-c++ make cmake git python3 python3-pip）",
+      "command": "dnf makecache \u0026\u0026 dnf install -y gcc gcc-c++ make cmake git python3 python3-pip",
+      "details": {
+        "packages": [
+          "gcc",
+          "gcc-c++",
+          "make",
+          "cmake",
+          "git",
+          "python3",
+          "python3-pip"
+        ],
+        "source": "openEuler 官方仓库 (dnf)"
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T09:12:34"
+    },
+    {
+      "action": "安装构建依赖（ragel boost-devel pcre pcre-devel sqlite sqlite-devel）",
+      "command": "dnf install -y ragel boost-devel pcre pcre-devel sqlite sqlite-devel",
+      "details": {
+        "packages": [
+          "ragel-7.0.4",
+          "boost-devel-1.83.0",
+          "pcre-8.45",
+          "pcre-devel",
+          "sqlite-3.42.0",
+          "sqlite-devel"
+        ],
+        "source": "openEuler 官方仓库 (dnf)"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "ragel 7.0.4 / boost-devel 1.83.0 / pcre 8.45 / sqlite 3.42.0 安装成功，均满足安装指南要求",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T09:33:39"
+    },
+    {
+      "action": "安装 pre-commit 与 golang（golangci-lint hook 依赖）",
+      "command": "pip3 install pre-commit; dnf install -y golang; export GOPROXY=https://goproxy.cn,direct",
+      "details": {
+        "golang": "1.21.4",
+        "pre_commit": "4.6.2"
+      },
+      "duration_seconds": 180,
+      "error": "",
+      "output": "pre-commit 4.6.2 安装成功；golang 1.21.4 安装成功；GOPROXY 使用 goproxy.cn 镜像",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T09:33:39"
+    },
+    {
+      "action": "执行 pre-commit run --all-files",
+      "command": "pre-commit run --all-files",
+      "details": {
+        "failed": [
+          "no-commit-to-branch",
+          "detect-secrets",
+          "clang-format"
+        ],
+        "passed": [
+          "check-yaml",
+          "check-merge-conflict",
+          "detect-private-key",
+          "check-added-large-files"
+        ],
+        "skipped": [
+          "check-json(无文件)",
+          "check-xml(无文件)",
+          "golangci-lint-full(无Go文件)"
+        ]
+      },
+      "duration_seconds": 300,
+      "error": "",
+      "output": "check-yaml Passed; check-merge-conflict Passed; detect-private-key Passed; check-added-large-files Passed; no-commit-to-branch Failed(在master分支运行); detect-secrets Failed(发现高熵字符串: src/util/dump_charclass.cpp:110, tools/hscollider/test_cases/corpora/anchors.txt); clang-format Failed(修改了chimera/等源码格式)",
+      "result": "部分通过（4 通过 3 失败 2 跳过 1 无文件）",
+      "returncode": 1,
+      "step": "static_analysis_execution",
+      "success": false,
+      "timestamp": "2026-08-13T09:33:39"
+    },
+    {
+      "action": "golangci-lint hook 因 Go proxy 网络超时失败，安装 golang 并设置 GOPROXY 国内镜像后解决",
+      "command": "dnf install -y golang \u0026\u0026 export GOPROXY=https://goproxy.cn,direct \u0026\u0026 pre-commit run golangci-lint-full",
+      "details": {
+        "hook": "golangci-lint-full",
+        "solution": "dnf install golang; export GOPROXY=https://goproxy.cn,direct"
+      },
+      "duration_seconds": 300,
+      "error": "",
+      "output": "golangci-lint-full (no files to check) Skipped - 仓库无 Go 源文件",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-08-13T09:33:39"
+    },
+    {
+      "action": "安装 libpcap-devel 以便构建 pcapscan/patbench 示例",
+      "command": "dnf install -y libpcap-devel",
+      "details": {
+        "packages": [
+          "libpcap-devel"
+        ],
+        "source": "openEuler 官方仓库 (dnf)"
+      },
+      "duration_seconds": 20,
+      "error": "",
+      "output": "libpcap-devel 安装成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T09:42:13"
+    },
+    {
+      "action": "首次构建（cmake + make -j51）",
+      "command": "cmake .. \u0026\u0026 make -j51",
+      "details": {
+        "concurrency": 51,
+        "error": "undefined reference to fat_hs_serialize_database/fat_hs_deserialize_database",
+        "target": "hscollider"
+      },
+      "duration_seconds": 53,
+      "error": "collect2: error: ld returned 1 exit status",
+      "output": "90% 目标编译成功；hscollider 链接失败：libdatabaseutil.a 引用 fat_hs_* 符号，但 libhs.a 在链接顺序中位于 libdatabaseutil.a 之前，静态库符号未解析",
+      "result": "失败（hscollider 链接错误）",
+      "returncode": 2,
+      "step": "build_attempt",
+      "success": false,
+      "timestamp": "2026-08-13T09:42:13"
+    },
+    {
+      "action": "定位 hscollider 链接失败原因：静态链接顺序问题（fat_database.c 位于 hs_exec 中，CMakeLists 链接顺序 libhs.a 在 libdatabaseutil.a 之前）",
+      "command": "手动链接验证 + 修改 build/tools/hscollider/.../link.txt 添加 --start-group",
+      "details": {
+        "root_cause": "仓库 tools/hscollider/CMakeLists.txt 链接顺序缺陷",
+        "solution": "在构建产物 link.txt 中为静态库添加 -Wl,--start-group/--end-group（仅修改构建树，不修改仓库源码），或手动链接验证"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "--start-group 验证链接成功，生成 bin/hscollider",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-08-13T09:42:13"
+    },
+    {
+      "action": "修复链接顺序后重新构建（make -j51）",
+      "command": "make -j51",
+      "details": {
+        "concurrency": 51,
+        "concurrency_ratio": "20%",
+        "targets": [
+          "hs",
+          "hs_runtime",
+          "unit-hyperscan",
+          "hsbench",
+          "hscheck",
+          "hscollider",
+          "simplegrep",
+          "pcapscan",
+          "patbench"
+        ]
+      },
+      "duration_seconds": 53,
+      "error": "",
+      "output": "100% Built target hscollider; make 成功退出（RC=0）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-08-13T09:42:13"
+    },
+    {
+      "action": "确认构建产物与 chimera 构建条件",
+      "command": "ls build/lib build/bin; grep -i pcre /tmp/cmake_out.txt",
+      "details": {
+        "artifacts": [
+          "lib/libhs.a (429MB)",
+          "lib/libhs_runtime.a",
+          "bin/unit-hyperscan",
+          "bin/hsbench",
+          "bin/hscheck",
+          "bin/hscollider",
+          "bin/simplegrep",
+          "bin/pcapscan",
+          "bin/patbench"
+        ],
+        "chimera": "未构建（安装指南要求将 pcre 源码拷贝到仓库，本次使用系统 pcre 包，BUILD_CHIMERA=FALSE）"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "PCRE 8.45 found；libhs.a 429MB；构建产物齐全",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-13T09:42:13"
+    },
+    {
+      "action": "执行单元测试 unit-hyperscan（release 构建）",
+      "command": "time ./bin/unit-hyperscan",
+      "details": {
+        "binary": "build/bin/unit-hyperscan",
+        "failed": 0,
+        "passed": 4133,
+        "total": 4133
+      },
+      "duration_seconds": 249,
+      "error": "",
+      "output": "[==========] 4133 tests from 34 test cases ran (248671 ms); [  PASSED  ] 4133 tests",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-13T10:28:33"
+    },
+    {
+      "action": "创建 DEBUG 构建（安装指南 debug 模式）以生成 hsdump 工具（release 默认 DUMP_SUPPORT=OFF）",
+      "command": "cmake .. -DCMAKE_BUILD_TYPE=DEBUG \u0026\u0026 make -j51",
+      "details": {
+        "build_dir": "build-debug",
+        "command": "cmake .. -DCMAKE_BUILD_TYPE=DEBUG \u0026\u0026 make -j51",
+        "note": "hscollider 同样存在链接顺序缺陷，采用相同 --start-group 方案修复"
+      },
+      "duration_seconds": 94,
+      "error": "",
+      "output": "build-debug/bin 生成 hsdump、unit-internal 等工具",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-08-13T10:28:33"
+    },
+    {
+      "action": "执行单元测试 unit-internal（debug 构建）",
+      "command": "time ./bin/unit-internal",
+      "details": {
+        "binary": "build-debug/bin/unit-internal",
+        "failed": 0,
+        "passed": 14232,
+        "total": 14232
+      },
+      "duration_seconds": 448,
+      "error": "",
+      "output": "[==========] 14232 tests from 79 test cases ran (447927 ms); [  PASSED  ] 14232 tests",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-13T10:28:33"
+    },
+    {
+      "action": "执行样例 simplegrep（正则匹配文件）",
+      "command": "./bin/simplegrep hatstand /tmp/sample_input.txt",
+      "details": {
+        "command": "./bin/simplegrep hatstand /tmp/sample_input.txt",
+        "sample": "simplegrep"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "Match for pattern \"hatstand\" at offset 38",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-13T10:28:33"
+    },
+    {
+      "action": "执行样例 pcapscan（PCAP 数据包扫描）",
+      "command": "./bin/pcapscan -n 2 /tmp/patterns.txt /tmp/sample.pcap",
+      "details": {
+        "matches": 8,
+        "modes": [
+          "streaming",
+          "block"
+        ],
+        "sample": "pcapscan"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "Streaming mode: Total matches 8; Block mode: Total matches 8, Throughput 82.24 Mbit/s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-13T10:28:33"
+    },
+    {
+      "action": "执行样例 patbench（模式匹配性能基准）",
+      "command": "./bin/patbench -N -n 2 /tmp/patterns.txt /tmp/sample.pcap",
+      "details": {
+        "matches": 8,
+        "sample": "patbench",
+        "throughput": "192.9 Mbit/s base"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "Scan 136 bytes, Throughput 39.264 Mbps, Matches 8; Base performance 192.908 Mbit/s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-13T10:28:33"
+    },
+    {
+      "action": "执行快速入门样例 hsdump 生成通用字节码",
+      "command": "./bin/hsdump -e /tmp/patterns.txt -o /tmp/dump_output -U -X -N",
+      "details": {
+        "command": "./bin/hsdump -e /tmp/patterns.txt -o /tmp/dump_output -U -X -N",
+        "sample": "hsdump"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "生成通用字节码 db.raw（16KB）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-13T10:28:33"
+    },
+    {
+      "action": "执行快速入门样例 hsbench（含通用字节码模式）",
+      "command": "./bin/hsbench -e /tmp/patterns.txt -c /tmp/corpus.db -N -n1; ./bin/hsbench -U db.raw -c /tmp/corpus.db -N -n1",
+      "details": {
+        "bytecode_mode": "36.09 Mbit/s",
+        "normal_mode": "31.92 Mbit/s",
+        "sample": "hsbench"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "正常模式 Mean throughput 31.92 Mbit/s；通用字节码模式 36.09 Mbit/s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-13T10:28:33"
+    },
+    {
+      "action": "执行 hscheck 语法检查样例",
+      "command": "./bin/hscheck -s /workspace/tools/hscollider/test_cases/signatures/collider_tests.txt",
+      "details": {
+        "failed": 0,
+        "tool": "hscheck",
+        "total_patterns": 2135
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "SUMMARY: 0 of 2135 failed",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-13T10:28:33"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "libhs.a",
+          "path": "build/lib/libhs.a",
+          "size": "429 MB",
+          "type": "static library"
+        },
+        {
+          "name": "libhs_runtime.a",
+          "path": "build/lib/libhs_runtime.a",
+          "size": "21 MB",
+          "type": "static library"
+        },
+        {
+          "name": "unit-hyperscan",
+          "path": "build/bin/unit-hyperscan",
+          "size": "190 MB",
+          "type": "binary"
+        },
+        {
+          "name": "hsbench",
+          "path": "build/bin/hsbench",
+          "size": "4.4 MB",
+          "type": "binary"
+        },
+        {
+          "name": "hscheck",
+          "path": "build/bin/hscheck",
+          "size": "3.3 MB",
+          "type": "binary"
+        },
+        {
+          "name": "hscollider",
+          "path": "build/bin/hscollider",
+          "size": "4.5 MB",
+          "type": "binary"
+        },
+        {
+          "name": "simplegrep",
+          "path": "build/bin/simplegrep",
+          "size": "4.3 MB",
+          "type": "binary"
+        },
+        {
+          "name": "pcapscan",
+          "path": "build/bin/pcapscan",
+          "size": "4.3 MB",
+          "type": "binary"
+        },
+        {
+          "name": "patbench",
+          "path": "build/bin/patbench",
+          "size": "4.3 MB",
+          "type": "binary"
+        }
+      ],
+      "cmake": "cmake 3.27.9",
+      "compiler": "gcc 12.3.1 (openEuler 12.3.1-38.oe2403)",
+      "concurrency": 51,
+      "concurrency_ratio": "20%",
+      "duration_seconds": 106,
+      "notes": "构建命令：cmake .. \u0026\u0026 make -j51（并发=256核×20%）。默认 release 模式静态库。hscollider 存在静态链接顺序缺陷（libhs.a 在 libdatabaseutil.a 之前），通过为构建产物 link.txt 添加 -Wl,--start-group/--end-group 解决（不改仓库源码）。chimera/unit-chimera 未构建：安装指南要求将 pcre 源码目录拷贝至仓库（PCRE_BUILD_SOURCE），本次使用 openEuler 系统 pcre 包，BUILD_CHIMERA=FALSE。",
+      "status": "成功"
+    },
+    "devcontainer": {
+      "config_dir": null,
+      "config_files": [],
+      "enabled": false,
+      "original_base_image": "N/A（仓库无 .devcontainer/Dockerfile）",
+      "summary": "仓库未配置 devcontainer 能力（无 .devcontainer 目录），依据安装指南选择 openEuler 24.03 LTS 从零构建",
+      "used_image": "openEuler 24.03 LTS"
+    },
+    "sample": {
+      "duration_seconds": 7,
+      "results": [
+        {
+          "execution_status": "成功",
+          "execution_time": "1秒",
+          "output_summary": "正则模式 'hatstand' 在输入文件中命中 offset 38",
+          "sample_name": "simplegrep"
+        },
+        {
+          "execution_status": "成功",
+          "execution_time": "1秒",
+          "output_summary": "流模式与块模式各匹配 8 次，块模式吞吐 82.24 Mbit/s",
+          "sample_name": "pcapscan"
+        },
+        {
+          "execution_status": "成功",
+          "execution_time": "1秒",
+          "output_summary": "扫描 136 字节匹配 8 次，基准性能 192.9 Mbit/s",
+          "sample_name": "patbench"
+        },
+        {
+          "execution_status": "成功",
+          "execution_time": "2秒",
+          "output_summary": "生成通用字节码 db.raw（16KB），实现跨平台部署字节码编译",
+          "sample_name": "hsdump (quick_start)"
+        },
+        {
+          "execution_status": "成功",
+          "execution_time": "2秒",
+          "output_summary": "正常模式平均吞吐 31.92 Mbit/s；通用字节码模式 36.09 Mbit/s",
+          "sample_name": "hsbench (quick_start)"
+        }
+      ],
+      "status": "成功"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 300,
+        "executed_in_verification": true,
+        "failed": 3,
+        "failures": [
+          {
+            "error": "在 master 分支上运行 pre-commit 触发，属预期行为（防止直接提交到主分支）",
+            "file": "-",
+            "hook_name": "no-commit-to-branch"
+          },
+          {
+            "error": "Base64/Hex 高熵字符串被识别为潜在密钥，实为测试语料数据",
+            "file": "src/util/dump_charclass.cpp:110; tools/hscollider/test_cases/corpora/anchors.txt:612-623",
+            "hook_name": "detect-secrets"
+          },
+          {
+            "error": "源码格式未符合 clang-format v18.1.8 规范，hook 修改了文件",
+            "file": "chimera/、src/、examples/ 等大量源文件",
+            "hook_name": "clang-format"
+          }
+        ],
+        "passed": 4,
+        "skipped": 3,
+        "status": "部分通过",
+        "total_hooks": 10
+      },
+      "summary": "检测到 pre-commit 配置（.pre-commit-config.yaml，10 个 hook），未检测到 lint-runner 配置。执行 pre-commit run --all-files：4 通过、3 失败（no-commit-to-branch 因在 master 分支运行触发、detect-secrets 发现测试语料高熵字符串、clang-format 需格式化多文件）、3 跳过（check-json/check-xml 无文件、golangci-lint-full 无 Go 源文件）"
+    },
+    "ut": {
+      "duration_seconds": 697,
+      "failed": 0,
+      "failures": [],
+      "passed": 4133,
+      "skipped": 0,
+      "status": "成功",
+      "total": 4133
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "Ultrascan-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti (无限制)",
+      "os": "openEuler 24.03 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "69G (4.7G available)",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "CMakeLists.txt 依赖 ragel、pcre(可选)、boost 头文件",
+        "from_dockerfile": "仓库无 Dockerfile，无 FROM 指令，依赖以安装指南和 .travis.yml 为准",
+        "from_readme": "安装指南要求 GCC\u003e=10.3, CMake\u003e=2.8.11, Ragel\u003e=6.9, Boost\u003e=1.57, PCRE\u003e=8.41(可选), SQLite3(可选)",
+        "mappings": [
+          {
+            "original": "gcc\u003e=10.3",
+            "source": "docs/zh/installation_guide.md 软件要求表",
+            "target": "gcc gcc-c++ (dnf)"
+          },
+          {
+            "original": "cmake\u003e=2.8.11",
+            "source": "docs/zh/installation_guide.md 软件要求表",
+            "target": "cmake (dnf)"
+          },
+          {
+            "original": "ragel\u003e=6.9",
+            "source": "docs/zh/installation_guide.md 安装Ragel章节",
+            "target": "ragel (dnf，openEuler 24.03 原生包)"
+          },
+          {
+            "original": "boost\u003e=1.57",
+            "source": "docs/zh/installation_guide.md 配置Boost章节",
+            "target": "boost-devel (dnf)"
+          },
+          {
+            "original": "pcre\u003e=8.41(可选)",
+            "source": "docs/zh/installation_guide.md 下载PCRE章节",
+            "target": "pcre pcre-devel (dnf)"
+          },
+          {
+            "original": "sqlite3(可选)",
+            "source": "docs/zh/installation_guide.md 安装SQLite章节",
+            "target": "sqlite sqlite-devel (dnf)"
+          }
+        ]
+      },
+      "image_name": "hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+      "selection_reason": "仓库无 Dockerfile；README/安装指南（docs/zh/installation_guide.md）明确要求 openEuler 22.03 LTS SP4 / 24.03 LTS SP3 环境（鲲鹏920），选择 openEuler 24.03 LTS 基础镜像从零构建",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "b4fe0f101e2fdd5053097518650a9d18627f0e09",
+    "duration_seconds": 4927,
+    "end_time": "2026-08-13T10:28:42",
+    "repo_url": "https://gitcode.com/boostkit/Ultrascan.git",
+    "start_time": "2026-08-13T09:06:35",
+    "total_steps": 27
+  },
+  "problems_encountered": [
+    {
+      "problem": "hscollider 编译链接失败：undefined reference to fat_hs_serialize_database/fat_hs_deserialize_database",
+      "solution": "根因为静态链接顺序问题（libhs.a 在 libdatabaseutil.a 之前）。在构建产物 link.txt 中为静态库添加 -Wl,--start-group/--end-group（仅修改构建树，不改仓库源码），手动链接验证成功后重新 make 通过。",
+      "source": "tools/hscollider/CMakeLists.txt target_link_libraries 顺序",
+      "timestamp": "2026-08-13T10:28:33"
+    },
+    {
+      "problem": "golangci-lint pre-commit hook 因 Go 模块代理 proxy.golang.org 网络超时无法编译",
+      "solution": "dnf install golang 安装 Go 工具链后，设置 GOPROXY=https://goproxy.cn,direct 使用国内镜像重新安装 hook，执行成功（仓库无 Go 源文件，跳过）。",
+      "source": ".pre-commit-config.yaml golangci-lint hook + 远程网络环境",
+      "timestamp": "2026-08-13T10:28:33"
+    },
+    {
+      "problem": "release 构建不生成 hsdump，快速入门样例无法直接运行",
+      "solution": "按安装指南 debug 模式创建 build-debug 构建（cmake .. -DCMAKE_BUILD_TYPE=DEBUG）生成 hsdump，完成通用字节码样例。",
+      "source": "CMakeLists.txt:181 CMAKE_DEPENDENT_OPTION(DUMP_SUPPORT)",
+      "timestamp": "2026-08-13T10:28:33"
+    }
+  ],
+  "session_export_file": "",
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "deepseek/deepseek-v4-flash",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

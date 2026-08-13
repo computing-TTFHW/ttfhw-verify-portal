@@ -46,6 +46,11 @@ const REPO_COMMUNITY_MAP: Record<string, string> = {
   'vllm-ascend': 'MindIE', 'pymotor': 'MindIE',
   'triton-ascend': 'triton',
   'polymind': 'openEuler', 'witty-service': 'openEuler',
+  'kpex': 'HPCKit',
+  'msdebug': 'MindStudio', 'msmemscope': 'MindStudio', 'msmodeling': 'MindStudio',
+  'msmodelslim': 'MindStudio', 'msopgen': 'MindStudio', 'msopprof': 'MindStudio',
+  'msprobe': 'MindStudio', 'msprof': 'MindStudio', 'msprof-analyze': 'MindStudio',
+  'mssanitizer': 'MindStudio', 'msserviceprofiler': 'MindStudio',
 }
 
 const REPO_NAME_NORMALIZE: Record<string, string> = {

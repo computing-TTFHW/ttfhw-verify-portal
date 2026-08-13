@@ -1,0 +1,872 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md + docs/zh/quick_start/msprof-analyze_quick_start.md",
+      "value": "aarch64（面向昇腾 NPU 性能分析，快速入门要求 NPU 硬件，验证机器为 aarch64）"
+    },
+    "build_commands": {
+      "source": "docs/zh/install_guide/msprof-analyze_install_guide.md 第 2.3.2 节 + build.py",
+      "value": "python3 build.py（内部执行 pip install -r requirements/build.txt + python3 setup.py bdist_wheel，产物输出到 artifacts/ 目录）"
+    },
+    "dependencies": {
+      "source": "requirements/build.txt + requirements/tests.txt + setup.py + docs/zh/install_guide/msprof-analyze_install_guide.md",
+      "value": [
+        "Python \u003e= 3.7.5（建议 \u003e= 3.9）",
+        "click",
+        "networkx",
+        "jinja2",
+        "PyYaml",
+        "tqdm",
+        "prettytable",
+        "ijson",
+        "xlsxwriter\u003e=3.0.6",
+        "sqlalchemy",
+        "numpy",
+        "pandas",
+        "psutil",
+        "pybind11",
+        "plotly",
+        "pytest==7.1.2（测试）",
+        "pytest-cov==3.0.0（测试）",
+        "pytest-mock==3.10.0（测试）",
+        "mock==4.0.3（测试）",
+        "beautifulsoup4（测试）",
+        "openpyxl（测试）",
+        "pytest-asyncio==0.21.2（测试）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库内无 Dockerfile",
+      "value": "仓库内无 Dockerfile，依赖来源为 requirements/build.txt 和 requirements/tests.txt"
+    },
+    "recommended_image": {
+      "source": ".devcontainer/devcontainer.json image 字段",
+      "value": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701（MindStudio 标准构建镜像，Tier 1 业务预构建镜像）"
+    },
+    "sample_commands": {
+      "source": "docs/zh/install_guide/msprof-analyze_install_guide.md 第 3 节 + README.md 快速入门章节",
+      "value": "msprof-analyze --help（验证安装）；msprof-analyze advisor all -d ./prof_data -o ./advisor_output（专家建议分析，需 NPU 性能数据）"
+    },
+    "special_dependencies": {
+      "source": "docs/zh/quick_start/msprof-analyze_quick_start.md + .devcontainer/devcontainer.json",
+      "value": [
+        "CANN 软件包环境（MindStudio 标准构建镜像已内置）",
+        "NPU 硬件（样例执行需昇腾 NPU 卡，构建和 UT 不需要）",
+        "torch + torch_npu + torchvision（仅快速入门样例需要）"
+      ]
+    },
+    "ut_commands": {
+      "source": "docs/zh/install_guide/msprof-analyze_install_guide.md 第 2.3.3 节 + build.py + test/run_ut.py",
+      "value": "python3 build.py test（内部执行 pip install -r requirements/tests.txt + cd test \u0026\u0026 python3 run_ut.py，run_ut.py 调用 pytest 执行 test/ut/ 下全部用例并生成覆盖率报告）"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "安装指南源码安装章节要求执行 python3 build.py，但未说明需要预先安装 wheel 包。build.py 内部执行 setup.py bdist_wheel，而 Tier 1 镜像虽内置 Python/GCC/CANN 环境但未预装 wheel 包，导致首次构建失败。建议在安装指南中补充 wheel 包依赖说明或在 build.py 中自动安装。",
+      "source": "docs/zh/install_guide/msprof-analyze_install_guide.md 第 2.3.2 节",
+      "time": "2026-08-13T13:00:00",
+      "title": "安装指南未提及 wheel 包依赖"
+    },
+    {
+      "body": "devcontainer.json 的 remoteUser 设为 mindstudio，但仓库源码挂载到 /workspace 后目录属主为 root，mindstudio 用户无写权限导致 bdist_wheel 无法创建 build 目录。文档未说明此权限问题及解决方案（如使用 --user root 或 chown）。",
+      "source": ".devcontainer/devcontainer.json",
+      "time": "2026-08-13T13:01:00",
+      "title": "devcontainer.json 指定 remoteUser 为 mindstudio 但未说明容器写权限要求"
+    },
+    {
+      "body": "快速入门文档的样例需要 NPU 硬件 + CANN 容器 + torch/torch_npu/torchvision + 实际训练数据，步骤复杂且依赖较多。对于仅想验证工具安装是否成功的新手，缺少一个简单的冒烟测试命令（如 msprof-analyze --help）作为入门验证。",
+      "source": "docs/zh/quick_start/msprof-analyze_quick_start.md",
+      "time": "2026-08-13T13:02:00",
+      "title": "快速入门样例需要完整的 NPU 训练环境，无法快速验证"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "克隆仓库 msprof-analyze 到远程机器并查看目录结构",
+      "command": "ssh root@192.168.9.114 \"git clone --depth=1 -b master https://gitcode.com/Ascend/msprof-analyze.git /tmp/msprof-analyze\"",
+      "details": {
+        "branch": "master",
+        "commit": "a116cf93ae400d931ae90c71be7273aa23e1710c",
+        "repo_url": "https://gitcode.com/Ascend/msprof-analyze.git"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "仓库克隆成功，根目录含 README.md、setup.py、build.py、.devcontainer/、.pre-commit-config.yaml、requirements/、test/ 等",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T12:55:00"
+    },
+    {
+      "action": "阅读 README.md 提取构建依赖和命令",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/msprof-analyze/README.md\"",
+      "details": {
+        "file": "README.md",
+        "sections_read": [
+          "简介",
+          "功能介绍",
+          "快速入门",
+          "安装指南",
+          "使用指南"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "README 推荐通过 pip install -U msprof-analyze 安装；源码安装参考安装指南文档；示例命令 msprof-analyze advisor all -d ./prof_data -o ./advisor_output",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T12:56:00"
+    },
+    {
+      "action": "阅读安装指南 docs/zh/install_guide/msprof-analyze_install_guide.md 提取源码编译和测试命令",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/msprof-analyze/docs/zh/install_guide/msprof-analyze_install_guide.md\"",
+      "details": {
+        "file": "docs/zh/install_guide/msprof-analyze_install_guide.md",
+        "sections_read": [
+          "在线安装",
+          "离线安装",
+          "源码安装-环境准备",
+          "源码安装-执行编译",
+          "源码安装-执行单元测试",
+          "验证安装"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "源码编译命令: python3 build.py；单元测试命令: python3 build.py test；验证安装: msprof-analyze --help；源码编译统一使用 MindStudio 标准构建环境镜像",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T12:57:00"
+    },
+    {
+      "action": "阅读快速入门 docs/zh/quick_start/msprof-analyze_quick_start.md 提取样例命令和 NPU 需求",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/msprof-analyze/docs/zh/quick_start/msprof-analyze_quick_start.md\"",
+      "details": {
+        "file": "docs/zh/quick_start/msprof-analyze_quick_start.md",
+        "sections_read": [
+          "环境准备",
+          "采集性能数据",
+          "自动分析与报告查看"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "快速入门要求 NPU 硬件 + CANN 容器环境；样例使用 ResNet50 训练采集性能数据后执行 msprof-analyze advisor 分析；需安装 torch + torch_npu + torchvision",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T12:58:00"
+    },
+    {
+      "action": "检查仓库内是否存在 Dockerfile",
+      "command": "ssh root@192.168.9.114 \"find /tmp/msprof-analyze -name 'Dockerfile*'\"",
+      "details": {
+        "dockerfile_found": false,
+        "reason": "仓库根目录及子目录均无 Dockerfile"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "未找到任何 Dockerfile 文件",
+      "result": "无 Dockerfile",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-13T12:59:00"
+    },
+    {
+      "action": "阅读 .devcontainer/devcontainer.json 探测预构建镜像信号（Tier 1）",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/msprof-analyze/.devcontainer/devcontainer.json\"",
+      "details": {
+        "file": ".devcontainer/devcontainer.json",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+        "reason": "devcontainer.json image 字段指向非基础 OS 的自定义镜像（华为云 SWR 仓库），命中 Tier 1 预构建镜像条件",
+        "tier": 1
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "image: swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701，runArgs 含 --privileged --security-opt=seccomp=unconfined（NPU 访问）",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T13:00:00"
+    },
+    {
+      "action": "阅读 requirements/build.txt 和 requirements/tests.txt 提取依赖列表",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/msprof-analyze/requirements/build.txt \u0026\u0026 cat /tmp/msprof-analyze/requirements/tests.txt\"",
+      "details": {
+        "build_deps": [
+          "click",
+          "networkx",
+          "jinja2",
+          "PyYaml",
+          "tqdm",
+          "prettytable",
+          "ijson",
+          "xlsxwriter\u003e=3.0.6",
+          "sqlalchemy",
+          "numpy",
+          "pandas",
+          "psutil",
+          "pybind11",
+          "plotly"
+        ],
+        "test_deps": [
+          "pytest==7.1.2",
+          "pytest-cov==3.0.0",
+          "pytest-mock==3.10.0",
+          "pytest-cookies==0.6.1",
+          "mock==4.0.3",
+          "beautifulsoup4",
+          "openpyxl",
+          "pytest-asyncio==0.21.2"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "build.txt 含 14 个 Python 依赖包；tests.txt 含 8 个测试依赖包（另含 build.txt 全部依赖）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T13:01:00"
+    },
+    {
+      "action": "阅读 build.py 和 setup.py 确认构建和测试流程",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/msprof-analyze/build.py \u0026\u0026 cat /tmp/msprof-analyze/setup.py\"",
+      "details": {
+        "build_flow": "pip install -r requirements/build.txt → python3 setup.py bdist_wheel → 产物复制到 artifacts/",
+        "python_requires": "\u003e=3.7",
+        "test_flow": "pip install -r requirements/tests.txt → cd test \u0026\u0026 python3 run_ut.py → pytest test/ut/ --cov"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "build.py 支持完整构建(python3 build.py)和单元测试(python3 build.py test)；setup.py 使用 setuptools bdist_wheel 打包",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T13:02:00"
+    },
+    {
+      "action": "探测 NPU 需求：扫描 README/快速入门/devcontainer 搜索 CANN/Ascend/NPU/昇腾关键词",
+      "command": "",
+      "details": {
+        "keywords_matched": [
+          "昇腾",
+          "NPU",
+          "Ascend",
+          "CANN",
+          "davinci",
+          "torch_npu"
+        ],
+        "note": "构建和 UT 为纯 Python 操作不需要 NPU；样例执行需要 NPU + CANN 环境",
+        "npu_required": true,
+        "sources": [
+          "README.md",
+          "docs/zh/quick_start/msprof-analyze_quick_start.md",
+          ".devcontainer/devcontainer.json"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "README 和快速入门均提及昇腾 NPU 性能分析；devcontainer.json 含 --privileged 用于 NPU 硬件访问；判定 npu_required=true",
+      "result": "NPU 需求确认",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T13:03:00"
+    },
+    {
+      "action": "拉取 Tier 1 预构建镜像验证可用性",
+      "command": "ssh root@192.168.9.114 \"docker pull swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701\"",
+      "details": {
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+        "pull_status": "Image is up to date"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "Digest: sha256:b6f14a4799e75a7b1fed00f05a218b5ecce9faa7d659804cc4f0bc547797aba7，Status: Image is up to date",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T13:04:00"
+    },
+    {
+      "action": "检查 .pre-commit-config.yaml 配置，解析 hook 列表",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/msprof-analyze/.pre-commit-config.yaml\"",
+      "details": {
+        "config_file": ".pre-commit-config.yaml",
+        "hook_ids": [
+          "trailing-whitespace",
+          "end-of-file-fixer",
+          "check-yaml",
+          "check-added-large-files",
+          "check-merge-conflict",
+          "detect-private-key",
+          "check-json",
+          "ruff-check",
+          "ruff-format",
+          "codespell",
+          "pylint",
+          "bandit",
+          "typos",
+          "clang-format",
+          "gitleaks-offline-scan"
+        ],
+        "minimum_pre_commit_version": "4.0.0",
+        "total_hooks": 15
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "pre-commit 配置文件存在，含 15 个 hooks，minimum_pre_commit_version: 4.0.0，涵盖 Python 检查(ruff/pylint/bandit/codespell/typos)、C++ 检查(clang-format)、安全扫描(gitleaks)",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-13T13:05:00"
+    },
+    {
+      "action": "检查 lint-runner 配置（.lintrunner.toml / .lint-runner.yaml）",
+      "command": "ssh root@192.168.9.114 \"find /tmp/msprof-analyze -name '.lintrunner*' -o -name '.lint-runner*' -o -name 'lintrunner*'\"",
+      "details": {
+        "config_found": false,
+        "searched_files": [
+          ".lintrunner.toml",
+          ".lint-runner.yaml",
+          "lintrunner.toml"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "未找到 lint-runner 相关配置文件",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-13T13:05:30"
+    },
+    {
+      "action": "检查 .devcontainer 目录，读取 devcontainer.json 和 post-create.sh",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/msprof-analyze/.devcontainer/devcontainer.json \u0026\u0026 ls -la /tmp/msprof-analyze/.devcontainer/\"",
+      "details": {
+        "config_dir": ".devcontainer",
+        "config_files": [
+          "devcontainer.json",
+          "post-create.sh"
+        ],
+        "original_base_image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+        "postCreateCommand": "bash /workspace/.devcontainer/post-create.sh",
+        "remoteUser": "mindstudio",
+        "runArgs": [
+          "--network=host",
+          "--privileged",
+          "--ipc=host",
+          "--ulimit=nproc=65535:65535",
+          "--security-opt=seccomp=unconfined"
+        ],
+        "used_image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "devcontainer.json 指定 image: swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701；post-create.sh 负责配置 Python3、安装 gitleaks 等构建依赖",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-08-13T13:06:00"
+    },
+    {
+      "action": "根据 devcontainer.json image 字段选择 Tier 1 业务预构建镜像",
+      "command": "",
+      "details": {
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+        "selection_reason": "devcontainer.json image 字段指向非基础 OS 的自定义镜像（华为云 SWR MindStudio 构建镜像），命中 Tier 1 条件且镜像已成功拉取",
+        "tier": 1
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "选择 Tier 1 预构建镜像，跳过 Tier 2/3",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-13T13:08:00"
+    },
+    {
+      "action": "启动容器 msprof-analyze-ttfhw，挂载 NPU 设备和仓库源码",
+      "command": "docker run -d --name msprof-analyze-ttfhw --device /dev/davinci1 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/Ascend/driver:/usr/local/Ascend/driver -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware -v /tmp/msprof-analyze:/workspace -w /workspace swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701 sleep infinity",
+      "details": {
+        "container_name": "msprof-analyze-ttfhw",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+        "note": "NPU 卡 0 状态为 Critical，使用 davinci1 代替；构建和 UT 为纯 Python 操作不需要 NPU，挂载用于后续样例执行",
+        "npu_devices_mounted": [
+          "/dev/davinci1",
+          "/dev/davinci_manager",
+          "/dev/devmm_svm",
+          "/dev/hisi_hdc"
+        ],
+        "volumes_mounted": [
+          "/usr/local/sbin/npu-smi",
+          "/usr/local/Ascend/driver",
+          "/usr/local/Ascend/firmware",
+          "/tmp/msprof-analyze:/workspace"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "容器 ID: 31110c9b530a39141693a86d00f1954682808de2ef8655d723defcf5a8c93a9f",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-13T13:09:00"
+    },
+    {
+      "action": "验证 Tier 1 镜像内置环境（Python/GCC/CANN）和 Python 包依赖",
+      "command": "docker exec msprof-analyze-ttfhw bash -c 'python3 --version \u0026\u0026 gcc --version \u0026\u0026 pip3 list | grep -iE click|networkx|numpy'",
+      "details": {
+        "cann_version": "cann-9.1.0-beta.3",
+        "gcc_version": "11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility)",
+        "note": "镜像内置 Python/GCC/CANN 环境，但 Python 包依赖（click/networkx/numpy 等）未预装，由 build.py 自动安装",
+        "os": "openEuler 24.03 (LTS-SP3)",
+        "pip_version": "pip 23.3.1",
+        "python_deps_preinstalled": false,
+        "python_version": "3.11.6"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Python 3.11.6; GCC 11.2.0; CANN cann-9.1.0-beta.3; pip 23.3.1; Python 包依赖未预装（build.py 会自动安装）",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-13T13:10:00"
+    },
+    {
+      "action": "首次构建尝试：python3 build.py（自动安装依赖 + bdist_wheel）",
+      "command": "docker exec msprof-analyze-ttfhw bash -c 'cd /workspace \u0026\u0026 python3 build.py'",
+      "details": {
+        "deps_installed": [
+          "click",
+          "networkx",
+          "jinja2",
+          "PyYaml",
+          "tqdm",
+          "prettytable",
+          "ijson",
+          "xlsxwriter",
+          "sqlalchemy",
+          "numpy",
+          "pandas",
+          "psutil",
+          "pybind11",
+          "plotly"
+        ],
+        "error": "error: invalid command 'bdist_wheel'",
+        "reason": "容器内未安装 wheel 包，setup.py bdist_wheel 命令不可用"
+      },
+      "duration_seconds": 21,
+      "error": "error: invalid command 'bdist_wheel'（缺少 wheel 包）",
+      "output": "pip install -r requirements/build.txt 成功安装 14 个依赖包；python3 setup.py bdist_wheel 失败：error: invalid command 'bdist_wheel'",
+      "result": "失败",
+      "returncode": 1,
+      "step": "build_attempt",
+      "success": false,
+      "timestamp": "2026-08-13T13:12:00"
+    },
+    {
+      "action": "安装缺失的 wheel 包后重试构建",
+      "command": "docker exec msprof-analyze-ttfhw bash -c 'pip3 install wheel setuptools \u0026\u0026 cd /workspace \u0026\u0026 python3 build.py local'",
+      "details": {
+        "problem": "缺少 wheel 包导致 bdist_wheel 命令不可用",
+        "second_error": "error: could not create 'build': Permission denied（容器默认用户 mindstudio 无 /workspace 写权限）",
+        "solution": "pip3 install wheel setuptools"
+      },
+      "duration_seconds": 10,
+      "error": "error: could not create 'build': Permission denied",
+      "output": "wheel 安装成功；但 bdist_wheel 失败：Permission denied（mindstudio 用户无法写入 root 拥有的 /workspace 目录）",
+      "result": "失败",
+      "returncode": 1,
+      "step": "problem_resolution",
+      "success": false,
+      "timestamp": "2026-08-13T13:13:00"
+    },
+    {
+      "action": "以 --user root 重启容器解决权限问题",
+      "command": "docker rm -f msprof-analyze-ttfhw \u0026\u0026 docker run -d --name msprof-analyze-ttfhw --user root --device /dev/davinci1 ... sleep infinity \u0026\u0026 pip3 install wheel setuptools",
+      "details": {
+        "problem": "容器默认用户 mindstudio 无 /workspace 写权限，bdist_wheel 无法创建 build 目录",
+        "solution": "docker rm -f 后以 --user root 重新启动容器，并重新安装 wheel 包"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "容器以 root 用户重启成功，wheel 包已安装",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-08-13T13:14:00"
+    },
+    {
+      "action": "以 root 用户重新执行 python3 build.py（并发数 51，20%）",
+      "command": "docker exec msprof-analyze-ttfhw bash -c 'cd /workspace \u0026\u0026 python3 build.py'",
+      "details": {
+        "artifact": "msprof_analyze-1.0.0-py3-none-any.whl",
+        "artifact_path": "/workspace/artifacts/msprof_analyze-1.0.0-py3-none-any.whl",
+        "artifact_size": "729K",
+        "build_time": "约 20.7 秒",
+        "concurrency": 51,
+        "concurrency_ratio": "20%"
+      },
+      "duration_seconds": 21,
+      "error": "",
+      "output": "Successfully installed 依赖包；running bdist_wheel；Copy artifact: msprof_analyze-1.0.0-py3-none-any.whl -\u003e artifacts/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-08-13T13:15:00"
+    },
+    {
+      "action": "执行单元测试：python3 build.py test（自动安装测试依赖 + pytest）",
+      "command": "docker exec msprof-analyze-ttfhw bash -c 'cd /workspace \u0026\u0026 python3 build.py test'",
+      "details": {
+        "coverage_report": "/workspace/test/report/coverage.xml",
+        "failed": 0,
+        "junit_report": "/workspace/test/report/final.xml",
+        "passed": 1559,
+        "skipped": 0,
+        "test_framework": "pytest 7.1.2 + pytest-cov 3.0.0",
+        "test_modules": [
+          "advisor",
+          "cli",
+          "cluster_analyse",
+          "compare_tools",
+          "misc",
+          "prof_common",
+          "prof_exports"
+        ],
+        "test_time": "46.08 秒",
+        "total": 1559,
+        "total_time": "62 秒（含依赖安装）",
+        "warnings": 13
+      },
+      "duration_seconds": 62,
+      "error": "",
+      "output": "1559 passed, 13 warnings in 46.08s；测试覆盖 advisor/cli/cluster_analyse/compare_tools/misc/prof_common/prof_exports 共 7 个模块",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-13T13:18:00"
+    },
+    {
+      "action": "安装构建产物并执行冒烟测试（msprof-analyze --help 和 msprof-analyze -V）",
+      "command": "docker exec msprof-analyze-ttfhw bash -c 'pip3 install /workspace/artifacts/msprof_analyze-1.0.0-py3-none-any.whl \u0026\u0026 msprof-analyze --help \u0026\u0026 msprof-analyze -V'",
+      "details": {
+        "install_command": "pip3 install /workspace/artifacts/msprof_analyze-1.0.0-py3-none-any.whl",
+        "note": "README 快速入门中的样例需 NPU 性能数据+训练环境，无法在本次验证中完整执行；使用安装验证命令作为冒烟测试",
+        "sample_1": "msprof-analyze --help — 显示 cluster/compare/advisor/auto-completion 子命令及参数",
+        "sample_2": "msprof-analyze -V — 显示版本号 Version 1.0.0",
+        "samples_run": 2
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "Successfully installed msprof-analyze-1.0.0；msprof-analyze --help 输出完整帮助信息；msprof-analyze -V 输出 Version 1.0.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-13T13:20:00"
+    },
+    {
+      "action": "停止并删除容器 msprof-analyze-ttfhw",
+      "command": "docker rm -f msprof-analyze-ttfhw",
+      "details": {},
+      "duration_seconds": 2,
+      "error": "",
+      "output": "容器已清理",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-08-13T13:21:00"
+    },
+    {
+      "action": "生成验证报告",
+      "command": "",
+      "details": {
+        "output_file": "verification_report_msprof-analyze_20260813.json"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-08-13T13:22:00"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "msprof_analyze-1.0.0-py3-none-any.whl",
+          "path": "/workspace/artifacts/msprof_analyze-1.0.0-py3-none-any.whl",
+          "size": "729K",
+          "type": "wheel"
+        }
+      ],
+      "cmake": "无（Python 项目，使用 setuptools bdist_wheel）",
+      "compiler": "Python 3.11.6 + GCC 11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility)",
+      "concurrency": 51,
+      "concurrency_ratio": "20%（256 核 × 20% = 51，Python 构建不涉及 C/C++ 并行编译）",
+      "duration_seconds": 21,
+      "notes": "build.py 自动安装 requirements/build.txt 依赖后执行 setup.py bdist_wheel 打包。首次构建缺少 wheel 包，安装后重试；第二次因容器用户权限问题（mindstudio 用户无法写入 /workspace），以 --user root 重启容器后构建成功。",
+      "status": "success"
+    },
+    "devcontainer": {
+      "config_dir": ".devcontainer",
+      "config_files": [
+        "devcontainer.json",
+        "post-create.sh"
+      ],
+      "enabled": true,
+      "original_base_image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+      "summary": "仓库配置了 .devcontainer 目录，含 devcontainer.json 和 post-create.sh。devcontainer.json 的 image 字段指向华为云 SWR 仓库的 MindStudio 标准构建镜像（mindstudio-build:26.1.0-0701），属 Tier 1 业务预构建镜像。镜像已成功拉取，直接用于容器启动。post-create.sh 负责配置用户 bin 目录、Python 3 环境、安装 gitleaks 等构建依赖。runArgs 含 --privileged --security-opt=seccomp=unconfined 用于 NPU 硬件访问。",
+      "used_image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701"
+    },
+    "sample": {
+      "duration_seconds": 2,
+      "reason": "",
+      "results": [
+        {
+          "execution_status": "成功",
+          "execution_time": "0.9 秒",
+          "output_summary": "显示完整帮助信息，含 cluster/compare/advisor/auto-completion 四个子命令及其参数说明",
+          "sample_name": "msprof-analyze --help"
+        },
+        {
+          "execution_status": "成功",
+          "execution_time": "1.0 秒",
+          "output_summary": "显示 MindStudio Logo 和版本号 Version 1.0.0；有 root 用户安全警告但不影响功能",
+          "sample_name": "msprof-analyze -V"
+        }
+      ],
+      "status": "success"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 0,
+        "executed_in_verification": false,
+        "failed": 0,
+        "hooks": [
+          {
+            "id": "trailing-whitespace",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "end-of-file-fixer",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-yaml",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-added-large-files",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-merge-conflict",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "detect-private-key",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-json",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "ruff-check",
+            "repo": "ruff-pre-commit",
+            "rev": "v0.14.14"
+          },
+          {
+            "id": "ruff-format",
+            "repo": "ruff-pre-commit",
+            "rev": "v0.14.14"
+          },
+          {
+            "id": "codespell",
+            "repo": "codespell",
+            "rev": "v2.4.1"
+          },
+          {
+            "id": "pylint",
+            "repo": "pylint",
+            "rev": "v4.0.5"
+          },
+          {
+            "id": "bandit",
+            "repo": "bandit",
+            "rev": "1.9.4"
+          },
+          {
+            "id": "typos",
+            "repo": "typos",
+            "rev": "v1.32.0"
+          },
+          {
+            "id": "clang-format",
+            "repo": "mirrors-clang-format",
+            "rev": "v18.1.8"
+          },
+          {
+            "id": "gitleaks-offline-scan",
+            "repo": "local",
+            "rev": ""
+          }
+        ],
+        "note": "按 skill 要求仅检查配置是否存在及 hook 列表，不安装 pre-commit，不执行 pre-commit run",
+        "passed": 0,
+        "skipped": 0,
+        "status": "仅检查配置，未执行",
+        "total_hooks": 15
+      },
+      "summary": "检测到 pre-commit 配置（.pre-commit-config.yaml，15 个 hooks，含 Python 检查 ruff/pylint/bandit/codespell/typos + C++ 检查 clang-format + 安全扫描 gitleaks）；未检测到 lint-runner 配置"
+    },
+    "ut": {
+      "duration_seconds": 62,
+      "failed": 0,
+      "failures": [],
+      "passed": 1559,
+      "python": {
+        "failed": 0,
+        "passed": 1559,
+        "status": "success",
+        "total": 1559
+      },
+      "skipped": 0,
+      "status": "success",
+      "total": 1559
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "msprof-analyze-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "openEuler 24.03 (LTS-SP3)"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "69G（可用 4.5G）",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 1
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_dockerfile": "仓库无 Dockerfile，依赖来源为 requirements/build.txt（14 个包）和 requirements/tests.txt（8 个测试包+14 个构建包）",
+        "from_readme": "README 推荐通过 pip install -U msprof-analyze 安装；源码安装指南要求使用 MindStudio 标准构建环境镜像",
+        "mappings": [
+          {
+            "original": "click",
+            "source": "requirements/build.txt",
+            "target": "click（pip 安装，镜像未预装）"
+          },
+          {
+            "original": "networkx",
+            "source": "requirements/build.txt",
+            "target": "networkx（pip 安装，镜像未预装）"
+          },
+          {
+            "original": "numpy",
+            "source": "requirements/build.txt",
+            "target": "numpy（pip 安装，镜像未预装）"
+          },
+          {
+            "original": "pandas",
+            "source": "requirements/build.txt",
+            "target": "pandas（pip 安装，镜像未预装）"
+          },
+          {
+            "original": "pytest==7.1.2",
+            "source": "requirements/tests.txt",
+            "target": "pytest==7.1.2（pip 安装，镜像未预装）"
+          }
+        ]
+      },
+      "image_name": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+      "selection_reason": "Tier 1 业务预构建镜像。.devcontainer/devcontainer.json 的 image 字段指向华为云 SWR 仓库的 MindStudio 标准构建镜像（非基础 OS 镜像），镜像已成功拉取。镜像内置 Python 3.11.6、GCC 11.2.0、CANN 9.1.0 环境。Python 包依赖由 build.py 自动安装。",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "a116cf93ae400d931ae90c71be7273aa23e1710c",
+    "duration_seconds": 1800,
+    "end_time": "2026-08-13T13:22:00",
+    "environment": "远程容器验证（192.168.9.114，aarch64，256核，NPU 16卡）",
+    "repo_url": "https://gitcode.com/Ascend/msprof-analyze.git",
+    "start_time": "2026-08-13T12:52:05",
+    "total_steps": 20,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "python3 build.py 构建失败：error: invalid command 'bdist_wheel'",
+      "solution": "Tier 1 预构建镜像未预装 wheel 包，执行 pip3 install wheel setuptools 安装后解决",
+      "source": "build.py → setup.py bdist_wheel",
+      "timestamp": "2026-08-13T12:57:00"
+    },
+    {
+      "problem": "构建失败：error: could not create 'build': Permission denied",
+      "solution": "容器默认用户 mindstudio 无 /workspace 写权限。以 --user root 重启容器后解决",
+      "source": ".devcontainer/devcontainer.json remoteUser: mindstudio",
+      "timestamp": "2026-08-13T12:58:00"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

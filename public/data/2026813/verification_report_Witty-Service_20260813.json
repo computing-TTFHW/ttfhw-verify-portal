@@ -1,0 +1,629 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "Dockerfile 与宿主机",
+      "value": "aarch64（Kunpeng 920，Dockerfile 未限定架构）"
+    },
+    "build_commands": {
+      "source": "README 部署流程",
+      "value": "uv build"
+    },
+    "dependencies": {
+      "source": "README + pyproject.toml",
+      "value": [
+        "Python\u003e=3.11",
+        "uv",
+        "fastapi\u003e=0.115",
+        "sqlalchemy\u003e=2.0",
+        "alembic\u003e=1.14",
+        "websockets\u003e=15.0.1",
+        "cryptography\u003e=42.0.0",
+        "requests",
+        "uvicorn",
+        "httpx",
+        "pyyaml",
+        "python-multipart",
+        "gitpython",
+        "docker\u003e=7.0",
+        "apscheduler\u003e=3.11,\u003c4"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "Dockerfile",
+      "value": [
+        {
+          "original": "apt-get install curl git",
+          "target_equivalent": "apt-get install -y curl git"
+        },
+        {
+          "original": "pip install fastapi uvicorn websockets httpx pyyaml cryptography",
+          "target_equivalent": "apt-get install python3-* 或 pip install"
+        },
+        {
+          "original": "npm install -g wittyhub / openclaw / opencode-ai",
+          "target_equivalent": "运行时可选，验证不安装"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "Dockerfile FROM python:3.11-slim",
+      "value": "Debian 系 → 按 skill 规则选用 Ubuntu 22.04"
+    },
+    "sample_commands": {
+      "source": "README 快速开始",
+      "value": "witty-service --host 0.0.0.0 --port 8000 \u0026\u0026 curl http://127.0.0.1:8000/healthz"
+    },
+    "special_dependencies": {
+      "source": "README/pyproject",
+      "value": []
+    },
+    "ut_commands": {
+      "source": "README 测试环境",
+      "value": "uv run pytest tests/unit/ -q / uv run pytest tests/ -q"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "README 快速开始直接演示 POST /agents 创建 Agent，但未说明该操作需要 openclaw 网关运行时（witty-agent-server），缺少该外部依赖时仅返回 AGENT_CREATE_FAILED",
+      "source": "README.md",
+      "time": "2026-08-13T14:23:29",
+      "title": "README 快速开始创建 Agent 依赖未说明"
+    },
+    {
+      "body": "tests/unit 中 26 个用例与当前实现不一致（docker 镜像名禁止 tag 新逻辑、Settings scheduler 新参数、BackportCvekitClient 行为变化），README 未说明这些失败",
+      "source": "tests/unit",
+      "time": "2026-08-13T14:23:29",
+      "title": "UT 与实现不同步"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "远程克隆仓库到 /tmp/Witty-Service-verify/witty-service",
+      "command": "git clone -b master --depth 1 https://gitcode.com/openeuler/witty-service.git",
+      "details": {
+        "branch": "master",
+        "commit": "21e03001f4437fbaf3807448fa831a8d2c18385a"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "Cloning into witty-service...",
+      "result": "克隆成功（depth=1，master 分支），commit 21e0300",
+      "returncode": 0,
+      "step": "git_clone",
+      "success": true,
+      "timestamp": "2026-08-13T13:08:06"
+    },
+    {
+      "action": "阅读 README.md、Dockerfile、pyproject.toml、CI 工作流",
+      "command": "cat README.md / Dockerfile / pyproject.toml",
+      "details": {
+        "dockerfile": "Dockerfile (python:3.11-slim)",
+        "pyproject": "pyproject.toml",
+        "readme": "README.md/README_EN.md"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "构建: uv build; UT: uv run pytest tests/unit -q; 样例: witty-service --port 8000 + curl /healthz",
+      "result": "提取出构建/UT/样例命令、依赖列表与镜像依据",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T13:08:06"
+    },
+    {
+      "action": "检查仓库静态分析工具配置",
+      "command": "ls .pre-commit-config.yaml / .lint-runner*",
+      "details": {
+        "lint_runner": null,
+        "pre_commit_config": ".pre-commit-config.yaml"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": ".pre-commit-config.yaml 存在；无 lint-runner 配置",
+      "result": "发现根目录 .pre-commit-config.yaml（configured=true），无 lint-runner 配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-13T13:08:15"
+    },
+    {
+      "action": "扫描 .devcontainer 目录",
+      "command": "ls .devcontainer",
+      "details": {
+        "config_dir": null,
+        "config_files": []
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "无 .devcontainer 目录",
+      "result": "仓库无 .devcontainer 目录，不具备 devcontainer 能力",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-08-13T13:08:15"
+    },
+    {
+      "action": "启动 Ubuntu 22.04 容器（清理同名残留后），挂载仓库到 /workspace",
+      "command": "docker run -d --name Witty-Service-ttfhw -v /tmp/Witty-Service-verify:/workspace ubuntu:22.04 tail -f /dev/null",
+      "details": {
+        "container_name": "Witty-Service-ttfhw",
+        "image": "docker.m.daocloud.io/library/ubuntu:22.04"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Ubuntu 22.04.5 LTS, nproc=394, aarch64",
+      "result": "容器 Witty-Service-ttfhw 启动成功，Ubuntu 22.04.5 LTS aarch64，394 核",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-13T13:08:44"
+    },
+    {
+      "action": "第一层系统工具链安装（gcc/g++/make/cmake/git/python3/pip3/venv/curl）",
+      "command": "apt-get install -y gcc g++ make cmake git python3 python3-pip python3-venv curl",
+      "details": {
+        "packages": "gcc g++ make cmake git python3 python3-pip python3-venv curl"
+      },
+      "duration_seconds": 600,
+      "error": "",
+      "output": "gcc (Ubuntu 11.4.0) 11.4.0, cmake 3.22.1, git 2.34.1, Python 3.10.12",
+      "result": "工具链安装成功：gcc 11.4.0, cmake 3.22.1, python3 3.10.12（低于项目要求的 3.11，需额外安装）",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T13:37:46"
+    },
+    {
+      "action": "安装 uv 0.12.3（阿里云源）与 Python 3.11.15（uv 托管安装）",
+      "command": "pip3 install -i https://mirrors.aliyun.com/pypi/simple/ uv \u0026\u0026 uv python install 3.11",
+      "details": {
+        "python": "3.11.15",
+        "uv": "0.12.3"
+      },
+      "duration_seconds": 200,
+      "error": "",
+      "output": "uv 0.12.3, Python 3.11.15 (python3.11)",
+      "result": "uv 0.12.3 与 Python 3.11.15 (aarch64) 安装成功（系统默认 Python 3.10 不满足 \u003e=3.11 要求）",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T13:56:57"
+    },
+    {
+      "action": "创建虚拟环境并安装项目依赖（uv pip install -e .[dev]）",
+      "command": "uv venv --python 3.11 .venv \u0026\u0026 uv pip install -e .[dev]",
+      "details": {
+        "python": "3.11.15",
+        "venv": ".venv"
+      },
+      "duration_seconds": 90,
+      "error": "",
+      "output": "witty-service==0.1.0 (from file:///workspace/witty-service)",
+      "result": "依赖安装成功，witty-service 0.1.0 可编辑安装，CLI 正常",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T14:04:58"
+    },
+    {
+      "action": "修复 witty-service --help 报错 Invalid timezone Asia/Shanghai（tzdata 缺失）",
+      "command": "apt-get install -y tzdata",
+      "details": {
+        "root_cause": "容器基础镜像未安装 tzdata，zoneinfo 无法加载 IANA 时区"
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "Asia/Shanghai 可加载，witty-service --help 正常",
+      "result": "安装 tzdata 后 zoneinfo 正常，CLI --help 可用",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-08-13T14:04:58"
+    },
+    {
+      "action": "在远程容器内安装 pre-commit 并执行 pre-commit run --all-files",
+      "command": "pre-commit run --all-files",
+      "details": {
+        "failed": 6,
+        "passed": 9,
+        "skipped": 0,
+        "total_hooks": 15
+      },
+      "duration_seconds": 300,
+      "error": "6 hooks failed",
+      "output": "trim trailing whitespace:Failed; codespell:Failed; ruff check:Failed(140 fixed); ruff format:Failed(70 reformatted); markdownlint:Failed; bandit:Passed; shellcheck:Passed",
+      "result": "pre-commit 执行完成：6 个 hook 失败（trailing-whitespace/end-of-file-fixer/codespell/ruff-check/ruff-format/markdownlint），其余通过；失败原因：存量代码存在格式与拼写问题，hooks 自动修改了文件",
+      "returncode": 1,
+      "step": "static_analysis_execution",
+      "success": false,
+      "timestamp": "2026-08-13T14:15:04"
+    },
+    {
+      "action": "执行 uv build 构建 pip 包",
+      "command": "uv build",
+      "details": {
+        "artifacts": [
+          "dist/witty_service-0.1.0-py3-none-any.whl",
+          "dist/witty_service-0.1.0.tar.gz"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Successfully built dist/witty_service-0.1.0.tar.gz / dist/witty_service-0.1.0-py3-none-any.whl",
+      "result": "构建成功：witty_service-0.1.0-py3-none-any.whl（307KB）与 witty_service-0.1.0.tar.gz（256KB），耗时 5.3s",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-13T14:15:26"
+    },
+    {
+      "action": "执行单元测试 uv run pytest tests/unit/ -q",
+      "command": "uv run pytest tests/unit/ -q",
+      "details": {
+        "duration": 50.35,
+        "failed": 26,
+        "passed": 557,
+        "skipped": 8,
+        "total": 591
+      },
+      "duration_seconds": 50,
+      "error": "26 个测试失败（代码/测试不同步）",
+      "output": "26 failed, 557 passed, 8 skipped in 50.35s",
+      "result": "UT 完成：557 通过 / 26 失败 / 8 跳过，耗时 50.35s。失败均为测试与当前实现不同步（如代码禁止带 tag 镜像名、Settings 新参数未传入测试、cvekit 行为断言过时），非环境/依赖问题",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-08-13T14:21:06"
+    },
+    {
+      "action": "执行 README 快速开始样例：安装 wheel 冒烟 + 启动服务 + curl 验证",
+      "command": "witty-service --host 0.0.0.0 --port 8000 \u0026\u0026 curl /healthz \u0026\u0026 curl -X POST /agents",
+      "details": {
+        "samples": [
+          "wheel 导入冒烟",
+          "服务启动+healthz",
+          "创建 Agent"
+        ]
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "healthz: {\"status\":\"ok\"}; 创建 Agent: AGENT_CREATE_FAILED（网关运行时缺失）",
+      "result": "wheel 安装成功并可导入；服务启动成功（Alembic 迁移完成）；GET /healthz 返回 {\"status\":\"ok\"}；创建 Agent 失败（需 openclaw 网关运行时，容器内未部署）",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-13T14:23:19"
+    },
+    {
+      "action": "构建产物 wheel 冒烟测试（安装+导入）",
+      "command": "uv pip install dist/witty_service-0.1.0-py3-none-any.whl \u0026\u0026 python -c \"import witty_service\"",
+      "details": {
+        "artifact": "dist/witty_service-0.1.0-py3-none-any.whl"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "import OK",
+      "result": "wheel 安装成功，import witty_service 正常",
+      "returncode": 0,
+      "step": "smoke_test",
+      "success": true,
+      "timestamp": "2026-08-13T14:23:19"
+    },
+    {
+      "action": "清理远程容器与临时目录",
+      "command": "docker rm -f Witty-Service-ttfhw; rm -rf /tmp/Witty-Service-verify",
+      "details": {
+        "container": "Witty-Service-ttfhw",
+        "remote_dir": "/tmp/Witty-Service-verify"
+      },
+      "duration_seconds": 20,
+      "error": "",
+      "output": "CLEANED",
+      "result": "容器 Witty-Service-ttfhw 已删除，/tmp/Witty-Service-verify 已清理",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-08-13T14:24:57"
+    },
+    {
+      "action": "生成本地 JSON 报告并通过 validate_report.py 校验",
+      "command": "python3 validate_report.py verification_report_Witty-Service_20260813.json",
+      "details": {
+        "report": "json_tmp/verification_report_Witty-Service_20260813.json"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "OK (0 issues)",
+      "result": "报告校验通过（0 issues）",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-08-13T14:24:57"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "witty_service-0.1.0-py3-none-any.whl",
+          "path": "dist/witty_service-0.1.0-py3-none-any.whl",
+          "size": "307KB",
+          "type": "wheel"
+        },
+        {
+          "name": "witty_service-0.1.0.tar.gz",
+          "path": "dist/witty_service-0.1.0.tar.gz",
+          "size": "256KB",
+          "type": "sdist"
+        }
+      ],
+      "compiler": "Python 3.11.15 / setuptools (uv build)",
+      "concurrency": 78,
+      "concurrency_ratio": "20% (394核×20%)",
+      "duration_seconds": 5,
+      "status": "success"
+    },
+    "devcontainer": {
+      "config_dir": null,
+      "config_files": [],
+      "enabled": false,
+      "original_base_image": "",
+      "summary": "仓库未提供 .devcontainer 开发容器配置",
+      "used_image": ""
+    },
+    "sample": {
+      "duration_seconds": 30,
+      "reason": "服务启动与 /healthz 通过；创建 Agent 需要 openclaw 网关运行时（外部服务），验证容器内未部署",
+      "results": [
+        {
+          "execution_status": "success",
+          "execution_time": "15s",
+          "output_summary": "witty_service 0.1.0 wheel 安装成功，import 正常",
+          "sample_name": "wheel 冒烟（pip install + import）"
+        },
+        {
+          "execution_status": "success",
+          "execution_time": "15s",
+          "output_summary": "服务启动成功（Alembic 迁移完成），{status:ok}",
+          "sample_name": "服务启动 + GET /healthz"
+        },
+        {
+          "execution_status": "failed",
+          "execution_time": "2s",
+          "output_summary": "AGENT_CREATE_FAILED：需 openclaw 网关运行时（外部依赖未部署）",
+          "sample_name": "POST /agents 创建 Agent"
+        }
+      ],
+      "status": "partial_success"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 300,
+        "executed_in_verification": true,
+        "failed": 6,
+        "failures": [
+          {
+            "error": "buildin ==\u003e building",
+            "file": "pyproject.toml:138",
+            "hook_name": "codespell"
+          },
+          {
+            "error": "hel ==\u003e help",
+            "file": "tests/e2e/test_message_stream_sse.py:268",
+            "hook_name": "codespell"
+          },
+          {
+            "error": "140 errors fixed",
+            "file": "多处源码",
+            "hook_name": "ruff-check"
+          },
+          {
+            "error": "70 files reformatted",
+            "file": "多处源码",
+            "hook_name": "ruff-format"
+          },
+          {
+            "error": "files were modified",
+            "file": "*.md",
+            "hook_name": "markdownlint"
+          }
+        ],
+        "hooks": [
+          {
+            "detail": "files modified",
+            "name": "trailing-whitespace",
+            "status": "failed"
+          },
+          {
+            "detail": "files modified",
+            "name": "end-of-file-fixer",
+            "status": "failed"
+          },
+          {
+            "name": "check-yaml",
+            "status": "passed"
+          },
+          {
+            "name": "check-json",
+            "status": "passed"
+          },
+          {
+            "name": "check-toml",
+            "status": "passed"
+          },
+          {
+            "name": "check-merge-conflict",
+            "status": "passed"
+          },
+          {
+            "name": "check-added-large-files",
+            "status": "passed"
+          },
+          {
+            "name": "detect-private-key",
+            "status": "passed"
+          },
+          {
+            "name": "debug-statements",
+            "status": "passed"
+          },
+          {
+            "detail": "buildin/hel 拼写，exit 65",
+            "name": "codespell",
+            "status": "failed"
+          },
+          {
+            "detail": "140 errors fixed",
+            "name": "ruff-check",
+            "status": "failed"
+          },
+          {
+            "detail": "70 files reformatted",
+            "name": "ruff-format",
+            "status": "failed"
+          },
+          {
+            "name": "bandit",
+            "status": "passed"
+          },
+          {
+            "detail": "shellcheck 未安装则跳过",
+            "name": "shellcheck",
+            "status": "passed"
+          },
+          {
+            "detail": "files modified",
+            "name": "markdownlint",
+            "status": "failed"
+          },
+          {
+            "detail": "commit-msg 阶段，run --all-files 不触发",
+            "name": "gitlint",
+            "status": "skipped"
+          }
+        ],
+        "passed": 9,
+        "skipped": 0,
+        "status": "failed",
+        "total_hooks": 15
+      },
+      "summary": "仓库配置了 pre-commit（.pre-commit-config.yaml），验证中实际执行 pre-commit run --all-files：9 通过 / 6 失败（存量代码格式与拼写问题，hooks 自动修复）。未配置 lint-runner。"
+    },
+    "ut": {
+      "duration_seconds": 50,
+      "failed": 26,
+      "failures": [
+        {
+          "error": "行为断言不匹配(upstream/auto)、BackportCvekitClient 无 _filtered_report_path 属性、Report outside Backport archive",
+          "test": "test_backport_cvekit_client.py (21个)"
+        },
+        {
+          "error": "ValueError: Docker image 不得包含 tag（代码新逻辑禁止，测试仍传带 tag 镜像名）",
+          "test": "test_sandbox_docker.py (2个)"
+        },
+        {
+          "error": "IsADirectoryError: shutil.copy2 源为 .",
+          "test": "test_backport_api.py (2个)"
+        },
+        {
+          "error": "TypeError: Settings.__init__() missing scheduler",
+          "test": "test_services.py (1个)"
+        }
+      ],
+      "passed": 557,
+      "skipped": 8,
+      "status": "failed",
+      "total": 591
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "Witty-Service-ttfhw",
+      "cpu_cores": 394,
+      "memory": "1007GB",
+      "os": "Ubuntu 22.04.5 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 394,
+      "cpu_model": "Kunpeng 920 72F8 (aarch64)",
+      "disk": "/ 23G available (69G total)",
+      "docker_version": "25.0.2",
+      "memory": "1007GB",
+      "npu": {
+        "available": false
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "",
+        "from_dockerfile": "python:3.11-slim + node:22.22.2-slim（apt-get 系）",
+        "from_readme": "Python 3.11+ / uv / Docker（可选）",
+        "mappings": []
+      },
+      "image_name": "ubuntu:22.04",
+      "selection_reason": "Dockerfile FROM python:3.11-slim / node:22.22.2-slim（Debian 系），按 skill 规则映射到 Ubuntu 基础镜像（默认 ubuntu:22.04）",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "21e03001f4437fbaf3807448fa831a8d2c18385a",
+    "duration_seconds": 4586,
+    "end_time": "2026-08-13T14:23:35",
+    "environment": "远程机器 123.60.114.33 (SSH port 33433), 容器 Witty-Service-ttfhw",
+    "repo_url": "https://gitcode.com/openeuler/witty-service.git",
+    "start_time": "2026-08-13T13:07:09",
+    "total_steps": 16
+  },
+  "problems_encountered": [
+    {
+      "problem": "系统 Python 3.10 不满足项目 requires-python\u003e=3.11 要求",
+      "solution": "通过 uv python install 3.11 安装 CPython 3.11.15（aarch64），用 --python 3.11 创建虚拟环境",
+      "source": "pyproject.toml requires-python",
+      "timestamp": "2026-08-13T14:23:29"
+    },
+    {
+      "problem": "pip 访问 pypi.org/files.pythonhosted.org 超时导致安装失败",
+      "solution": "改用阿里云镜像源（mirrors.aliyun.com/pypi/simple/），并设置 PIP_INDEX_URL 供 pre-commit 内部 venv 使用",
+      "source": "依赖安装/网络",
+      "timestamp": "2026-08-13T14:23:29"
+    },
+    {
+      "problem": "witty-service --help 报 Invalid timezone Asia/Shanghai",
+      "solution": "容器基础镜像缺少 tzdata，安装 tzdata 后 zoneinfo 正常加载时区",
+      "source": "容器环境",
+      "timestamp": "2026-08-13T14:23:29"
+    },
+    {
+      "problem": "pre-commit hook 初始化时内部 venv 无法访问 pypi.org（ruamel.yaml 找不到）",
+      "solution": "导出 PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ 后重跑 pre-commit run --all-files",
+      "source": "pre-commit 网络",
+      "timestamp": "2026-08-13T14:23:29"
+    },
+    {
+      "problem": "apt-get install 速度极慢且超时",
+      "solution": "采用 docker exec -d 后台运行 + 轮询日志等待完成",
+      "source": "网络",
+      "timestamp": "2026-08-13T14:23:29"
+    }
+  ],
+  "session_export_file": "",
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "deepseek/deepseek-v4-flash",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

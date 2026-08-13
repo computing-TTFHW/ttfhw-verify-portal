@@ -1,0 +1,1124 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md + 安装指南 + devcontainer.json",
+      "value": "aarch64（昇腾 NPU 服务器，msPTI 面向 Ascend 设备的 Profiling API）"
+    },
+    "build_commands": {
+      "source": "安装指南 2.3.2 + build.py + scripts/build.sh",
+      "value": "cd ~/mspti \u0026\u0026 python3 build.py（内部执行 bash scripts/build.sh：download_thirdparty.sh → cmake -S . -B build -DCMAKE_BUILD_TYPE=Release → make -j$(nproc) → make install → make_run.sh）"
+    },
+    "dependencies": {
+      "source": "README.md + 安装指南 + CMakeLists.txt + build.sh + download_thirdparty.sh",
+      "value": [
+        "cmake \u003e= 3.14.1（CMakeLists.txt cmake_minimum_required）",
+        "gcc/g++ 支持 C++14（CMakeLists.txt -std=c++14）",
+        "python3（build.py 构建入口）",
+        "CANN 软件（msPTI 依赖 CANN 运行时库，安装指南要求已安装 CANN）",
+        "makeself v2.5.0.x（download_thirdparty.sh 下载，用于打 run 包）",
+        "boost 1.81.0（download_thirdparty.sh 下载，UT 依赖）",
+        "googletest release-1.10.0（download_thirdparty.sh 下载，UT 依赖）",
+        "mockcpp（download_thirdparty.sh 下载，UT 依赖）",
+        "securec/libboundscheck（download_thirdparty.sh 下载，C 安全库）",
+        "pip 包：packaging, wheel, pre-commit, bandit（post-create.sh 安装）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库无根目录 Dockerfile，依赖来源为 devcontainer.json + scripts/download_thirdparty.sh + CMakeLists.txt",
+      "value": "无根目录 Dockerfile。第三方依赖通过 scripts/download_thirdparty.sh 下载：makeself v2.5.0.x、boost 1.81.0、googletest release-1.10.0、mockcpp、securec（libboundscheck）"
+    },
+    "recommended_image": {
+      "source": ".devcontainer/devcontainer.json image 字段",
+      "value": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701（Tier 1 业务预构建镜像）"
+    },
+    "sample_commands": {
+      "source": "samples/README.md + 快速入门 4.2 + scripts/smoke.sh",
+      "value": "安装后进入样例目录执行 bash sample_run.sh（需要 source CANN set_env.sh）；冒烟测试：bash scripts/smoke.sh --smoke-level=l0"
+    },
+    "special_dependencies": {
+      "source": "安装指南 + download_thirdparty.sh + devcontainer.json",
+      "value": [
+        "CANN 软件（含 Toolkit 和 ops 包，必须预先安装并配置环境变量）",
+        "NPU 驱动和固件（昇腾设备）",
+        "MindStudio 标准构建镜像（devcontainer.json 指定 swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701）",
+        "PyTorch + torch_npu（Python Monitor 样例依赖，可选）"
+      ]
+    },
+    "ut_commands": {
+      "source": "安装指南 2.3.3 + build.py + scripts/execute_test_case.sh",
+      "value": "cd ~/mspti \u0026\u0026 python3 build.py test（内部执行 bash scripts/execute_test_case.sh：download_thirdparty.sh → cmake ../ -DPACKAGE=ut -DBOOST_INCLUDE_DIRS=... -DPython_ROOT_DIR=... → make -j$(nproc)）"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "安装指南 2.3 节源码安装仅提到需要 CANN Toolkit 和 ops 包，但样例执行时发现所有 C/C++ 样例都依赖 aclnnop/aclnn_add.h 头文件和 libopapi.so 库（属于 CANN ops 包）。MindStudio 构建镜像中未包含 ops 包，导致样例无法编译。文档应明确说明样例执行需要完整安装 CANN（含 ops 包）或在样例目录中标注此依赖。",
+      "source": "安装指南 2.3 + samples/*/CMakeLists.txt + samples/mspti_activity/mspti_activity.cpp:27",
+      "time": "2026-08-13T11:04:35",
+      "title": "安装指南未明确说明 CANN ops 包是样例执行的必需依赖"
+    },
+    {
+      "body": "scripts/make_run.sh 中 MSPTI_TEMP_DIR=${TOP_DIR}/../output/mspti，即 /workspace 的上一级目录 /output。在容器环境中该目录通常不可写，导致 mindstudio 用户构建失败。应改为 ${TOP_DIR}/output 或使用可配置的临时目录。",
+      "source": "scripts/make_run.sh: MSPTI_TEMP_DIR=${TOP_DIR}/../output/mspti",
+      "time": "2026-08-13T11:04:35",
+      "title": "make_run.sh 使用 /workspace/../output 作为临时目录，路径设计不合理"
+    },
+    {
+      "body": "execute_test_case.sh 通过 which python3 获取系统 Python（3.11.6），其 libpython3.11.so 使用 glibc 2.38 符号，与 MindStudio 构建镜像的 GCC 11.2.0（glibc 2.17 兼容模式）不兼容，导致 mspti_adapter_utest 链接失败。应优先使用 pyenv Python（/opt/python/cp311-cp311/bin/python3），与 devcontainer post-create.sh 的配置保持一致。",
+      "source": "scripts/execute_test_case.sh: PYTHON_ROOT=$(python3 -c ...) + devcontainer post-create.sh",
+      "time": "2026-08-13T11:04:35",
+      "title": "execute_test_case.sh 使用系统 Python 而非 pyenv Python，导致 glibc 不兼容"
+    },
+    {
+      "body": "CMakeLists.txt 的 mspti/csrc/CMakeLists.txt 使用 find_package(Python) 需要 Python 开发头文件（Python_INCLUDE_DIRS），但安装指南和 README 均未提及需要安装 python3-devel。MindStudio 构建镜像默认未安装 python3-devel，导致 cmake 配置失败。post-create.sh 中有安装逻辑但仅在首次创建容器时执行。",
+      "source": "mspti/csrc/CMakeLists.txt:6 + .devcontainer/post-create.sh install_build_deps()",
+      "time": "2026-08-13T11:04:35",
+      "title": "README 未列出 python3-devel 为源码编译的前置依赖"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "SSH 远程克隆仓库 mspti 到 /tmp/mspti",
+      "command": "ssh root@192.168.9.114 \"git clone --depth 1 -b master https://gitcode.com/Ascend/mspti.git /tmp/mspti\"",
+      "details": {
+        "branch": "master",
+        "commit": "fde59eb",
+        "repo_url": "https://gitcode.com/Ascend/mspti.git"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "Cloning into '/tmp/mspti'... commit fde59eb msPTI API consistency part2",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T10:36:02"
+    },
+    {
+      "action": "读取 README.md 提取项目概要、功能模块、快速入门链接",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/mspti/README.md\"",
+      "details": {
+        "file": "README.md",
+        "sections_read": [
+          "简介",
+          "功能介绍",
+          "快速入门",
+          "安装指南",
+          "使用指南",
+          "API参考"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "msPTI（MindStudio Profiler Tools Interface）是面向 Ascend 设备的 Profiling API 集合，提供 Tracing 和 Profiling 能力。安装指南指向 docs/zh/install_guide/mspti_install_guide.md",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T10:36:02"
+    },
+    {
+      "action": "读取安装指南 docs/zh/install_guide/mspti_install_guide.md 提取构建和测试命令",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/mspti/docs/zh/install_guide/mspti_install_guide.md\"",
+      "details": {
+        "build_cmd": "python3 build.py",
+        "file": "docs/zh/install_guide/mspti_install_guide.md",
+        "ut_cmd": "python3 build.py test"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "源码编译统一使用 MindStudio 标准构建环境。构建命令：python3 build.py。单元测试：python3 build.py test。构建产物在 artifacts/ 目录",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T10:36:02"
+    },
+    {
+      "action": "检查仓库 Dockerfile — 仓库根目录无 Dockerfile，依赖来源为 devcontainer.json + download_thirdparty.sh",
+      "command": "ssh root@192.168.9.114 \"find /tmp/mspti -name 'Dockerfile*' -maxdepth 3\"",
+      "details": {
+        "dependency_source": "devcontainer.json + scripts/download_thirdparty.sh + CMakeLists.txt",
+        "has_dockerfile": false
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "未找到 Dockerfile。第三方依赖通过 scripts/download_thirdparty.sh 下载：makeself、boost、googletest、mockcpp、securec",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-13T10:36:02"
+    },
+    {
+      "action": "读取 CMakeLists.txt 提取构建依赖和编译选项",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/mspti/CMakeLists.txt\"",
+      "details": {
+        "cmake_min_version": "3.14.1",
+        "cpp_standard": "C++14",
+        "file": "CMakeLists.txt",
+        "targets": [
+          "c_sec",
+          "mspti_shared",
+          "mspti whl"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "cmake_minimum_required(3.14.1)，构建 c_sec 共享库和 mspti_shared 共享库，链接 dl/pthread/c_sec，编译选项 -std=c++14 -fPIC",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T10:36:02"
+    },
+    {
+      "action": "读取 devcontainer.json 探测预构建镜像信号",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/mspti/.devcontainer/devcontainer.json\"",
+      "details": {
+        "file": ".devcontainer/devcontainer.json",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+        "tier": "Tier 1 业务预构建镜像"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "devcontainer.json image 字段指向 swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701，非纯基础 OS 镜像，判定为 Tier 1",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T10:36:02"
+    },
+    {
+      "action": "读取 build.py 和 scripts/build.sh 确认构建流程",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/mspti/build.py \u0026\u0026 cat /tmp/mspti/scripts/build.sh\"",
+      "details": {
+        "build_entry": "python3 build.py",
+        "build_script": "scripts/build.sh",
+        "steps": [
+          "download_thirdparty.sh",
+          "cmake",
+          "make -j$(nproc)",
+          "make install",
+          "make_run.sh"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "build.py 调用 scripts/build.sh，build.sh 执行：download_thirdparty.sh → cmake -S . -B build -DCMAKE_BUILD_TYPE=Release → make -j$(nproc) → make install → make_run.sh",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T10:36:02"
+    },
+    {
+      "action": "读取 scripts/execute_test_case.sh 确认 UT 执行流程",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/mspti/scripts/execute_test_case.sh\"",
+      "details": {
+        "steps": [
+          "download_thirdparty.sh",
+          "cmake -DPACKAGE=ut",
+          "make -j$(nproc)"
+        ],
+        "ut_entry": "python3 build.py test",
+        "ut_script": "scripts/execute_test_case.sh"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "execute_test_case.sh 执行：download_thirdparty.sh → cmake ../ -DPACKAGE=ut -DBOOST_INCLUDE_DIRS=... -DPython_ROOT_DIR=... → make -j$(nproc)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T10:36:02"
+    },
+    {
+      "action": "读取 scripts/download_thirdparty.sh 确认第三方依赖下载",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/mspti/scripts/download_thirdparty.sh\"",
+      "details": {
+        "dependencies": [
+          "makeself v2.5.0.x",
+          "boost 1.81.0",
+          "googletest release-1.10.0",
+          "mockcpp",
+          "securec (libboundscheck)"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "下载 makeself（gitcode.com/cann-src-third-party/makeself）、boost 1.81.0（obs mirror）、googletest release-1.10.0、mockcpp、securec（libboundscheck）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T10:36:02"
+    },
+    {
+      "action": "读取 samples/README.md 和快速入门确认样例执行方式",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/mspti/samples/README.md \u0026\u0026 cat /tmp/mspti/docs/zh/quick_start/mspti_quick_start.md\"",
+      "details": {
+        "sample_count": 8,
+        "sample_dirs": [
+          "callback_domain",
+          "callback_mstx",
+          "mspti_activity",
+          "mspti_correlation",
+          "mspti_external_correlation",
+          "mspti_hccl_activity",
+          "mspti_mstx_activity_domain",
+          "python_monitor",
+          "python_mstx_monitor"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "样例通过 bash sample_run.sh 执行，需先 source CANN set_env.sh。冒烟测试脚本 scripts/smoke.sh --smoke-level=l0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T10:36:02"
+    },
+    {
+      "action": "NPU 需求判断：扫描 README/Dockerfile/devcontainer.json 搜索 CANN/Ascend/NPU/davinci/昇腾",
+      "command": "ssh root@192.168.9.114 \"grep -ri 'cann\\|ascend\\|npu\\|davinci\\|昇腾' /tmp/mspti/README.md /tmp/mspti/.devcontainer/devcontainer.json /tmp/mspti/docs/zh/install_guide/mspti_install_guide.md\"",
+      "details": {
+        "keywords_found": [
+          "Ascend",
+          "CANN",
+          "NPU",
+          "昇腾",
+          "davinci"
+        ],
+        "npu_required": true,
+        "source": "README.md + 安装指南 + devcontainer.json"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "命中 CANN/Ascend/NPU/昇腾关键词，判定 npu_required=true",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T10:36:02"
+    },
+    {
+      "action": "检查仓库 pre-commit 配置（.pre-commit-config.yaml）",
+      "command": "ssh root@192.168.9.114 \"cat /tmp/mspti/.pre-commit-config.yaml\"",
+      "details": {
+        "config_file": ".pre-commit-config.yaml",
+        "executed": false,
+        "hooks_count": 14
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "检测到 .pre-commit-config.yaml，minimum_pre_commit_version: 4.0.0，14 个 hooks（trailing-whitespace, end-of-file-fixer, check-yaml, check-added-large-files, check-merge-conflict, detect-private-key, check-json, ruff-check, ruff-format, codespell, pylint, bandit, typos, clang-format, clang-tidy, gitleaks）",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-13T10:36:45"
+    },
+    {
+      "action": "检查仓库 lint-runner 配置（.lint-runner.yaml / .lintrunner.toml）",
+      "command": "ssh root@192.168.9.114 \"find /tmp/mspti -name '.lint-runner*' -o -name '.lintrunner*' 2\u003e/dev/null\"",
+      "details": {
+        "config_file": null
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "未找到 .lint-runner.yaml 或 .lintrunner.toml",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-13T10:36:45"
+    },
+    {
+      "action": "检查 .devcontainer 目录及配置文件",
+      "command": "ssh root@192.168.9.114 \"ls /tmp/mspti/.devcontainer/ \u0026\u0026 cat /tmp/mspti/.devcontainer/devcontainer.json \u0026\u0026 cat /tmp/mspti/.devcontainer/post-create.sh\"",
+      "details": {
+        "config_dir": ".devcontainer",
+        "files": [
+          "devcontainer.json",
+          "post-create.sh"
+        ],
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "devcontainer.json image 字段指向 mindstudio-build:26.1.0-0701（非基础 OS 镜像，Tier 1 信号）。post-create.sh 负责安装编译和测试依赖、配置 pyenv Python、预下载第三方依赖",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-08-13T10:36:45"
+    },
+    {
+      "action": "根据 devcontainer.json image 字段选择 Tier 1 业务预构建镜像",
+      "command": "docker pull swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+      "details": {
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+        "pull_result": "成功",
+        "signal_source": "devcontainer.json image 字段指向非纯基础 OS 镜像",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "Digest: sha256:b6f14a4799e75a7b1fed00f05a218b5ecce9faa7d659804cc4f0bc547797aba7, Status: Image is up to date",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-13T10:43:02"
+    },
+    {
+      "action": "启动容器 mspti-ttfhw，挂载 NPU 设备（davinci1，跳过 Critical 状态的 davinci0）",
+      "command": "docker run -d --name mspti-ttfhw --network=host --privileged --ipc=host --device /dev/davinci1 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/Ascend/driver:/usr/local/Ascend/driver -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware -v /tmp/mspti:/workspace -w /workspace swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701 sleep infinity",
+      "details": {
+        "container_name": "mspti-ttfhw",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+        "mounts": [
+          "/usr/local/sbin/npu-smi",
+          "/usr/local/Ascend/driver",
+          "/usr/local/Ascend/firmware",
+          "/tmp/mspti:/workspace"
+        ],
+        "note": "NPU 0 状态为 Critical，按 skill 规则跳过，使用 davinci1",
+        "npu_devices": [
+          "/dev/davinci1",
+          "/dev/davinci_manager",
+          "/dev/devmm_svm",
+          "/dev/hisi_hdc"
+        ],
+        "run_args": [
+          "--network=host",
+          "--privileged",
+          "--ipc=host"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Container ID: 331e9df1d149400196cbf9d26d64960a0597b992c9fa10af05d3525d7ba35cbe",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-13T10:43:02"
+    },
+    {
+      "action": "收集容器规格信息（OS、架构、CPU、内存）并验证预装依赖",
+      "command": "docker exec mspti-ttfhw bash -c 'cat /etc/os-release \u0026\u0026 uname -m \u0026\u0026 nproc \u0026\u0026 free -h \u0026\u0026 cmake --version \u0026\u0026 gcc --version \u0026\u0026 python3 --version'",
+      "details": {
+        "architecture": "aarch64",
+        "cann": "/usr/local/Ascend/cann (9.1.0-beta.3)",
+        "cmake": "3.31.10",
+        "cpu_cores": 256,
+        "gcc": "11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility)",
+        "git": "2.54.0",
+        "make": "4.4.1",
+        "memory": "2.0Ti",
+        "os": "openEuler 24.03 (LTS-SP3)",
+        "python3": "3.11.6 (/usr/bin/python3)"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "openEuler 24.03 LTS-SP3, aarch64, 256 cores, 2.0Ti mem, cmake 3.31.10, gcc 11.2.0, python 3.11.6, CANN 9.1.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-13T10:43:02"
+    },
+    {
+      "action": "安装 pip 包 wheel 和 setuptools（构建 Python whl 包需要）",
+      "command": "docker exec mspti-ttfhw pip3 install --upgrade pip setuptools wheel",
+      "details": {
+        "packages": [
+          "pip (26.2.1)",
+          "setuptools (84.0.0)",
+          "wheel (0.48.0)",
+          "packaging (26.3)"
+        ]
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "Successfully installed packaging-26.3 pip-26.2.1 setuptools-84.0.0 wheel-0.48.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T10:43:02"
+    },
+    {
+      "action": "验证容器内构建依赖完整性（cmake/gcc/python3/make/git/CANN）",
+      "command": "docker exec mspti-ttfhw bash -lc 'cmake --version \u0026\u0026 gcc --version \u0026\u0026 python3 --version \u0026\u0026 make --version \u0026\u0026 git --version \u0026\u0026 ls /usr/local/Ascend/cann/set_env.sh'",
+      "details": {
+        "cann": "/usr/local/Ascend/cann/set_env.sh 存在",
+        "cmake": "3.31.10 (\u003e= 3.14.1)",
+        "gcc": "11.2.0 (支持 C++14)",
+        "git": "2.54.0",
+        "make": "4.4.1",
+        "npu": "davinci1 已挂载（davinci0 Critical 跳过）",
+        "python3": "3.11.6"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "所有构建依赖验证通过：cmake 3.31.10, gcc 11.2.0, python3 3.11.6, make 4.4.1, git 2.54.0, CANN set_env.sh 存在",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-13T10:43:02"
+    },
+    {
+      "action": "执行第三方依赖下载（download_thirdparty.sh：makeself/boost/googletest/mockcpp/securec）",
+      "command": "docker exec mspti-ttfhw bash -lc 'cd /workspace \u0026\u0026 bash scripts/download_thirdparty.sh'",
+      "details": {
+        "dependencies": [
+          "makeself v2.5.0.x",
+          "boost 1.81.0",
+          "googletest release-1.10.0",
+          "mockcpp",
+          "securec (libboundscheck)"
+        ]
+      },
+      "duration_seconds": 32,
+      "error": "",
+      "output": "Cloning makeself... boost_1_81_0.tar.bz2: OK... Cloning googletest... Cloning mockcpp... Cloning securec...",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-13T10:50:19"
+    },
+    {
+      "action": "首次 cmake 配置（cmake -S . -B build -DCMAKE_BUILD_TYPE=Release）",
+      "command": "docker exec mspti-ttfhw bash -lc 'cd /workspace \u0026\u0026 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/workspace/prefix -DSECUREC_LIB_DIR=/workspace/prefix/securec_shared'",
+      "details": {
+        "error": "Could NOT find Python (missing: Python_INCLUDE_DIRS Python_LIBRARIES Development)"
+      },
+      "duration_seconds": 1,
+      "error": "缺少 python3-devel 包，Python 开发头文件未安装",
+      "output": "CMake Error: Could NOT find Python (missing: Python_INCLUDE_DIRS Python_LIBRARIES Development Development.Module Development.Embed)",
+      "result": "失败",
+      "returncode": 1,
+      "step": "build_attempt",
+      "success": false,
+      "timestamp": "2026-08-13T10:50:19"
+    },
+    {
+      "action": "安装 python3-devel 解决 cmake 找不到 Python 开发头文件问题",
+      "command": "docker exec mspti-ttfhw bash -lc 'sudo dnf install -y python3-devel'",
+      "details": {
+        "package": "python3-devel-3.11.6-40.oe2403sp3.aarch64",
+        "solution": "sudo dnf install -y python3-devel"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "Installed: python3-devel-3.11.6-40.oe2403sp3.aarch64",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-08-13T10:50:19"
+    },
+    {
+      "action": "重新执行 cmake 配置（安装 python3-devel 后）",
+      "command": "docker exec mspti-ttfhw bash -lc 'cd /workspace \u0026\u0026 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/workspace/prefix -DSECUREC_LIB_DIR=/workspace/prefix/securec_shared'",
+      "details": {
+        "cmake_version": "3.31.10",
+        "python_found": "3.11.6 at /usr/include/python3.11"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "-- Found Python: /usr/include/python3.11 (found version 3.11.6) -- Configuring done -- Build files have been written to: /workspace/build",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-08-13T10:50:19"
+    },
+    {
+      "action": "执行 make -j51 编译（并发 51 = 256核 × 20%）",
+      "command": "docker exec mspti-ttfhw bash -lc 'cd /workspace/build \u0026\u0026 make -j51'",
+      "details": {
+        "concurrency": 51,
+        "targets": [
+          "c_sec",
+          "mspti_shared (libmspti.so)",
+          "mspti_wrapper (mspti_C.so)",
+          "mspti_stub"
+        ],
+        "warnings": "packed-not-aligned, inline variables c++17, unused parameters（均为非致命警告）"
+      },
+      "duration_seconds": 8,
+      "error": "",
+      "output": "[100%] Built target mspti_shared — 编译成功，生成 libmspti.so 和 mspti_C.so",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-08-13T10:50:19"
+    },
+    {
+      "action": "执行 make install 安装构建产物",
+      "command": "docker exec mspti-ttfhw bash -lc 'cd /workspace/build \u0026\u0026 make install'",
+      "details": {
+        "installed": [
+          "/workspace/prefix/mspti/libmspti.so",
+          "/workspace/mspti/lib64/mspti_C.so"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "Installing: /workspace/prefix/mspti/libmspti.so, /workspace/mspti/lib64/mspti_C.so",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-08-13T10:50:19"
+    },
+    {
+      "action": "执行 make_run.sh 生成 Python whl 包和 run 安装包",
+      "command": "docker exec mspti-ttfhw bash -lc 'cd /workspace \u0026\u0026 BUILD_VERSION=26.0.0 bash scripts/make_run.sh 26.0.0'",
+      "details": {
+        "note": "需创建 /output 目录解决权限问题",
+        "run": "mindstudio-profiler-tools-interface_26.0.0_aarch64.run (1.1M)",
+        "whl": "mspti-26.0.0-py3-none-any.whl (352K)"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "Self-extractable archive /workspace/output/mindstudio-profiler-tools-interface_26.0.0_aarch64.run successfully created",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-08-13T10:50:19"
+    },
+    {
+      "action": "执行 UT cmake 配置（使用 pyenv Python 避免 glibc 不兼容）",
+      "command": "docker exec mspti-ttfhw bash -lc 'cd /workspace/test/build_llt \u0026\u0026 cmake ../ -DPACKAGE=ut -DPython_ROOT_DIR=/opt/_internal/cpython-3.11.15 -DPython_EXECUTABLE=/opt/python/cp311-cp311/bin/python3'",
+      "details": {
+        "cmake": "test/CMakeLists.txt superbuild",
+        "package": "ut",
+        "python": "/opt/python/cp311-cp311/bin/python3 (3.11.15)"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "Configuring done, Build files written to /workspace/test/build_llt",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-13T10:56:39"
+    },
+    {
+      "action": "执行 UT 编译（make -j51，11 个测试可执行文件）",
+      "command": "docker exec mspti-ttfhw bash -lc 'cd /workspace/test/build_llt \u0026\u0026 make -j51'",
+      "details": {
+        "concurrency": 51,
+        "note": "首次使用系统 Python 链接 mspti_adapter_utest 失败（glibc 不兼容），改用 pyenv Python 后成功",
+        "test_executables": 11
+      },
+      "duration_seconds": 23,
+      "error": "",
+      "output": "11 个测试可执行文件全部编译链接成功：activity_utest, mspti_channel_utest, dev_task_utest, mspti_activity_flush_all_utest, mspti_parser_utest, mspti_reporter_utest, callback_utest, context_manager_utest, function_loader_utest, mspti_utils_utest, mspti_adapter_utest",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-13T10:56:39"
+    },
+    {
+      "action": "执行全部 11 个测试可执行文件，收集测试结果",
+      "command": "docker exec mspti-ttfhw bash -lc 'cd /workspace/test/build_llt/mspti_llt-prefix/src/mspti_llt-build \u0026\u0026 for test_bin in activity/activity_manager_test/activity_utest ... whl/mspti_adapter_utest; do ./$test_bin; done'",
+      "details": {
+        "failed": 33,
+        "passed": 214,
+        "success_rate": "86.6%",
+        "total": 247
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "247 个测试用例：214 通过，33 失败。callback_utest (21/21)、function_loader_utest (7/7)、mspti_activity_flush_all_utest (1/1) 全部通过。失败用例主要涉及 NPU 驱动交互、芯片 V6 编码、内存报告等硬件相关功能。",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-13T10:56:39"
+    },
+    {
+      "action": "安装 mspti run 包到 CANN 目录",
+      "command": "docker exec -u root mspti-ttfhw bash -lc './mindstudio-profiler-tools-interface_26.0.0_aarch64.run --install --install-path=/usr/local/Ascend/cann'",
+      "details": {
+        "install_path": "/usr/local/Ascend/cann",
+        "run_package": "mindstudio-profiler-tools-interface_26.0.0_aarch64.run"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "MindStudio-Profiler-Tools-Interface package install success. 头文件、libmspti.so、samples、whl 包安装到 /usr/local/Ascend/cann-9.1.0-beta.3/tools/mspti/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-13T11:04:35"
+    },
+    {
+      "action": "执行 mspti_activity 样例",
+      "command": "docker exec -u root mspti-ttfhw bash -lc 'cd /workspace/samples/mspti_activity \u0026\u0026 bash sample_run.sh'",
+      "details": {
+        "error": "aclnnop/aclnn_add.h: No such file or directory, libopapi.so: No rule to make target"
+      },
+      "duration_seconds": 5,
+      "error": "CANN ops 包（含 aclnnop 头文件和 libopapi.so 库）在容器镜像中缺失",
+      "output": "fatal error: aclnnop/aclnn_add.h: No such file or directory. CANN ops 包未安装。",
+      "result": "失败",
+      "returncode": 1,
+      "step": "sample_execution",
+      "success": false,
+      "timestamp": "2026-08-13T11:04:35"
+    },
+    {
+      "action": "执行 callback_domain 样例",
+      "command": "docker exec -u root mspti-ttfhw bash -lc 'cd /workspace/samples/callback_domain \u0026\u0026 bash sample_run.sh'",
+      "details": {
+        "error": "aclnnop/aclnn_add.h: No such file or directory, libopapi.so: No rule to make target"
+      },
+      "duration_seconds": 3,
+      "error": "CANN ops 包在容器镜像中缺失",
+      "output": "fatal error: aclnnop/aclnn_add.h: No such file or directory. 与 mspti_activity 相同的 ops 包缺失问题。",
+      "result": "失败",
+      "returncode": 1,
+      "step": "sample_execution",
+      "success": false,
+      "timestamp": "2026-08-13T11:04:35"
+    },
+    {
+      "action": "执行 smoke.sh l0 冒烟测试",
+      "command": "docker exec -u root mspti-ttfhw bash -lc 'cd /workspace \u0026\u0026 bash scripts/smoke.sh --smoke-level=l0'",
+      "details": {
+        "error": "bdist_wheel 命令失败，root 用户 Python 缺少 wheel 包"
+      },
+      "duration_seconds": 10,
+      "error": "smoke.sh 以 root 用户重建时，root 的 Python 环境缺少 wheel 包",
+      "output": "error: invalid command 'bdist_wheel'，cp: cannot stat '/workspace/build/dist/mspti-*-py3-none-any.whl'",
+      "result": "失败",
+      "returncode": 1,
+      "step": "sample_execution",
+      "success": false,
+      "timestamp": "2026-08-13T11:04:35"
+    },
+    {
+      "action": "停止并删除容器 mspti-ttfhw",
+      "command": "ssh root@192.168.9.114 \"docker rm -f mspti-ttfhw\"",
+      "details": {},
+      "duration_seconds": 5,
+      "error": "",
+      "output": "mspti-ttfhw",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-08-13T11:04:35"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "libmspti.so",
+          "path": "/workspace/prefix/mspti/libmspti.so",
+          "size": "1.8M",
+          "type": "library"
+        },
+        {
+          "name": "mspti_C.so",
+          "path": "/workspace/mspti/lib64/mspti_C.so",
+          "size": "1.1M",
+          "type": "library"
+        },
+        {
+          "name": "mspti-26.0.0-py3-none-any.whl",
+          "path": "/workspace/build/dist/mspti-26.0.0-py3-none-any.whl",
+          "size": "352K",
+          "type": "wheel"
+        },
+        {
+          "name": "mindstudio-profiler-tools-interface_26.0.0_aarch64.run",
+          "path": "/workspace/output/mindstudio-profiler-tools-interface_26.0.0_aarch64.run",
+          "size": "1.1M",
+          "type": "binary"
+        }
+      ],
+      "cmake": "cmake 3.31.10 (\u003e= 3.14.1)",
+      "compiler": "gcc 11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility), C++14",
+      "concurrency": 51,
+      "concurrency_ratio": "20%（256核 × 20% = 51）",
+      "duration_seconds": 42,
+      "notes": "构建流程：download_thirdparty.sh（下载 makeself/boost/googletest/mockcpp/securec，32s）→ cmake 配置（0.8s）→ make -j51 编译（7.8s，有警告但无错误）→ make install → make_run.sh（生成 Python whl 包和 run 安装包）。cmake 首次失败缺少 python3-devel，安装后重试成功。",
+      "status": "success"
+    },
+    "devcontainer": {
+      "config_dir": ".devcontainer",
+      "config_files": [
+        "devcontainer.json",
+        "post-create.sh"
+      ],
+      "enabled": true,
+      "original_base_image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+      "summary": "仓库配置了 .devcontainer 目录，包含 devcontainer.json 和 post-create.sh。devcontainer.json 的 image 字段指向业务预构建镜像 mindstudio-build:26.1.0-0701（Tier 1 信号），remoteUser 为 mindstudio，运行参数包括 --network=host --privileged --ipc=host。post-create.sh 负责安装编译依赖（python3-devel、gitleaks、pip 包 packaging/wheel/pre-commit/bandit）、配置 pyenv Python、预下载第三方依赖。",
+      "used_image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701"
+    },
+    "sample": {
+      "duration_seconds": 60,
+      "reason": "样例无法执行。原因：1）所有 C/C++ 样例依赖 CANN ops 包（aclnnop/aclnn_add.h 头文件和 libopapi.so 库），容器镜像中仅安装了 CANN Toolkit 未安装 ops 包；2）NPU DCMI 初始化失败（ret=-8005），驱动版本与 CANN 版本可能不匹配，导致 NPU 设备不可用；3）smoke.sh 重建时 root 用户 Python 缺少 wheel 包导致 bdist_wheel 失败。Python 样例还需 PyTorch + torch_npu，镜像中未安装。",
+      "results": [
+        {
+          "execution_status": "失败",
+          "execution_time": "5s",
+          "output_summary": "编译失败：fatal error: aclnnop/aclnn_add.h: No such file or directory；链接失败：libopapi.so 不存在。CANN ops 包未安装在容器镜像中。",
+          "sample_name": "mspti_activity"
+        },
+        {
+          "execution_status": "失败",
+          "execution_time": "3s",
+          "output_summary": "编译失败：fatal error: aclnnop/aclnn_add.h: No such file or directory；链接失败：libopapi.so 不存在。与 mspti_activity 样例相同的 CANN ops 包缺失问题。",
+          "sample_name": "callback_domain"
+        },
+        {
+          "execution_status": "失败",
+          "execution_time": "10s",
+          "output_summary": "smoke.sh 重建 mspti 失败：root 用户 Python 缺少 wheel 包，bdist_wheel 命令执行失败，无法生成 whl 包和 run 包。",
+          "sample_name": "smoke.sh l0"
+        }
+      ],
+      "status": "failed"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 2,
+        "executed_in_verification": false,
+        "failed": 0,
+        "hooks": [
+          {
+            "name": "trailing-whitespace",
+            "repo": "pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "name": "end-of-file-fixer",
+            "repo": "pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "name": "check-yaml",
+            "repo": "pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "name": "check-added-large-files",
+            "repo": "pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "name": "check-merge-conflict",
+            "repo": "pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "name": "detect-private-key",
+            "repo": "pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "name": "check-json",
+            "repo": "pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "name": "ruff-check",
+            "repo": "ruff-pre-commit",
+            "rev": "v0.14.14"
+          },
+          {
+            "name": "ruff-format",
+            "repo": "ruff-pre-commit",
+            "rev": "v0.14.14"
+          },
+          {
+            "name": "codespell",
+            "repo": "codespell",
+            "rev": "v2.4.1"
+          },
+          {
+            "name": "pylint",
+            "repo": "pylint",
+            "rev": "v4.0.5"
+          },
+          {
+            "name": "bandit",
+            "repo": "bandit",
+            "rev": "1.9.4"
+          },
+          {
+            "name": "typos",
+            "repo": "typos",
+            "rev": "v1.32.0"
+          },
+          {
+            "name": "clang-format",
+            "repo": "mirrors-clang-format",
+            "rev": "v18.1.8"
+          },
+          {
+            "name": "clang-tidy",
+            "repo": "local",
+            "rev": "system"
+          },
+          {
+            "name": "gitleaks-offline-scan",
+            "repo": "local",
+            "rev": "system"
+          }
+        ],
+        "note": "仅检查配置，不执行 pre-commit run。minimum_pre_commit_version: 4.0.0",
+        "passed": 0,
+        "skipped": 0,
+        "status": "已配置（未执行）",
+        "total_hooks": 14
+      },
+      "summary": "检测到 pre-commit 配置（.pre-commit-config.yaml），共 14 个 hooks，涵盖 Python 检查（ruff-check、ruff-format、pylint、bandit、codespell、typos）、C++ 检查（clang-format、clang-tidy）、基础检查（trailing-whitespace、end-of-file-fixer、check-yaml、check-added-large-files、check-merge-conflict、detect-private-key、check-json）和安全扫描（gitleaks）。未检测到 lint-runner 配置。本次验证仅检查配置，不执行 pre-commit。"
+    },
+    "ut": {
+      "cpp": {
+        "failed": 33,
+        "note": "11 个测试可执行文件，247 个测试用例，214 通过，33 失败。失败用例主要涉及 NPU 驱动交互（ChannelPoolManager、DevTaskManager、DevProfTask）、芯片 V6 编码（ContextManager）、内存报告（MemoryReporter）、MSTX 解析器、工具函数（RealPath/Clock）和 Python 适配器回调。这些失败与容器内 NPU DCMI 初始化失败（ret=-8005）相关，非硬件依赖的测试全部通过。",
+        "passed": 214,
+        "status": "partial_success",
+        "total": 247
+      },
+      "duration_seconds": 30,
+      "failed": 33,
+      "failures": [
+        {
+          "error": "NPU 驱动交互相关，DCMI 初始化失败导致",
+          "test_name": "ActivityUtest.ShouldRetSuccessWhenSetAllKindWithCorrectApiInvocationSequence"
+        },
+        {
+          "error": "模块版本获取失败，可能与 CANN 版本不匹配",
+          "test_name": "ActivityUtest.MsptiGetVersionReturnsVersionWhenModuleVersionAvailable"
+        },
+        {
+          "error": "NPU 驱动设备数获取相关",
+          "test_name": "ChannelPoolManagerUtest.InitWillNotReturnSuccWhenDrvGetDevNumReturnError"
+        },
+        {
+          "error": "NPU 驱动设备数为零",
+          "test_name": "ChannelPoolManagerUtest.InitWillNotReturnSuccWhenGetZeroDevNum"
+        },
+        {
+          "error": "NPU 驱动通道获取相关",
+          "test_name": "ChannelPoolManagerUtest.GetAllChannelsWillReturnSuccWhenGetValidChannels"
+        },
+        {
+          "error": "NPU 驱动通道校验相关",
+          "test_name": "ChannelPoolManagerUtest.CheckChannelValidWillReturnFalseWhenInputInvalidChannel"
+        },
+        {
+          "error": "NPU 驱动通道校验相关",
+          "test_name": "ChannelPoolManagerUtest.CheckChannelValidWillReturnTrueWhenInputValidChannel"
+        },
+        {
+          "error": "NPU 驱动缓冲区刷新相关",
+          "test_name": "ChannelPoolManagerUtest.FlushDrvBuffWillReturnSuccWhenChannelPoolFlushSucc"
+        },
+        {
+          "error": "芯片 V6 日志解析相关",
+          "test_name": "ConvertUtest.ParseStarsSocLogV6Success"
+        },
+        {
+          "error": "芯片类型检测失败",
+          "test_name": "DevProfTaskUtest.CreateTasksShouldGetZeroProfTaskNumsWhenChipTypeIsInvalid"
+        },
+        {
+          "error": "NPU 驱动通道启动失败",
+          "test_name": "DevProfTaskUtest.DevProfTaskStarsShouldReturnInnerErrorWhenDrvStartChannelFail"
+        },
+        {
+          "error": "NPU 驱动通道启动失败",
+          "test_name": "DevProfTaskUtest.DevProfTaskTsFwShouldReturnInnerErrorWhenDrvStartChannelFail"
+        },
+        {
+          "error": "NPU 设备任务管理器运行失败",
+          "test_name": "DevTaskManager.DevProfTaskShouldRunSuccessfullyWhenUseDevTaskManagerNormal"
+        },
+        {
+          "error": "NPU 设备离线检测相关",
+          "test_name": "DevTaskManager.DevProfTaskShouldRetErrorWhenDeviceOffline"
+        },
+        {
+          "error": "CANN Profiling 任务启停失败",
+          "test_name": "DevTaskManager.DevProfTaskShouldRetErrorWhenStartOrStopCannProfTaskFailed"
+        },
+        {
+          "error": "MSTX ProfTrace 相关",
+          "test_name": "MstxParserUtest.MstxApisWillReturnErrorWhenProfTraceFailWithValidInputStream"
+        },
+        {
+          "error": "MSTX RangeEnd ProfTrace 相关",
+          "test_name": "MstxParserUtest.MstxRangeEndWillReturnErrorWhenProfTraceFailWhithValidInputMarkId"
+        },
+        {
+          "error": "MSTX 标记消息缓存相关",
+          "test_name": "MstxParserUtest.MstxApisShouldRetErrorWhenTryCacheMarkmsgFailed"
+        },
+        {
+          "error": "MSTX Range 标记相关",
+          "test_name": "MstxParserUtest.MstxRangeApisShouldRetErrorWhenRangeMarkFail"
+        },
+        {
+          "error": "MSTX RangeEnd ProfTrace 相关",
+          "test_name": "MstxParserUtest.MstxRangeEndShouldRetErrorWhenProfTraceForRangeEndRunsFail"
+        },
+        {
+          "error": "NPU 内存活动报告相关",
+          "test_name": "MemoryReporterUtest.ShouldRetSuccessWhenReportMemoryActivity"
+        },
+        {
+          "error": "NPU 内存设置报告相关",
+          "test_name": "MemoryReporterUtest.ShouldRetSuccessWhenReportMemsetActivity"
+        },
+        {
+          "error": "NPU 内存拷贝报告相关",
+          "test_name": "MemoryReporterUtest.ShouldRetSuccessWhenReportMemcpyActivity"
+        },
+        {
+          "error": "NPU 驱动频率初始化相关",
+          "test_name": "ContextManagerUtest.ShouldInitDeviceFreqWithDefaultValueWhenDrvFailed"
+        },
+        {
+          "error": "芯片 V6 编码相关",
+          "test_name": "ContextManagerUtest.EncodeDstKeyClearsStreamIdOnChipV6"
+        },
+        {
+          "error": "芯片 V6 编码相关",
+          "test_name": "ContextManagerUtest.EncodeDstKeyOnChipV6WithMaxValuesProducesZeroStreamBits"
+        },
+        {
+          "error": "芯片 V6 编码相关",
+          "test_name": "ContextManagerUtest.EncodeDstKeyOnChipV6DifferentStreamIdsProduceSameKey"
+        },
+        {
+          "error": "芯片 V6 编码相关",
+          "test_name": "ContextManagerUtest.EncodeThenDecodeDstKeyRoundTripClearsStreamIdOnChipV6"
+        },
+        {
+          "error": "路径解析相关",
+          "test_name": "UtilsUtest.RealPathShouldReturnRealPathWhenInputRelativePath"
+        },
+        {
+          "error": "路径解析相关",
+          "test_name": "UtilsUtest.RealPathShouldReturnRealPathWhenInputAbsolutePath"
+        },
+        {
+          "error": "时钟获取相关",
+          "test_name": "UtilsUtest.GetClockRealTimeNsMemsetFail"
+        },
+        {
+          "error": "系统计数器相关",
+          "test_name": "UtilsUtest.GetHostSysCntTestMemsetFail"
+        },
+        {
+          "error": "Python 内核回调相关",
+          "test_name": "MsptiAdapterUtest.PythonKernelCallbackWillRunSuccess"
+        }
+      ],
+      "passed": 214,
+      "skipped": 0,
+      "status": "partial_success",
+      "total": 247
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "mspti-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "openEuler 24.03 (LTS-SP3)"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "69G (4.5G available)",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 1
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "CMakeLists.txt 需要 cmake \u003e= 3.14.1、C++14 编译器、dl/pthread 系统库",
+        "from_dockerfile": "仓库无根目录 Dockerfile，依赖来源为 devcontainer.json image 字段指向的业务预构建镜像",
+        "from_readme": "安装指南要求 CANN 软件、MindStudio 标准构建环境",
+        "mappings": []
+      },
+      "image_name": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+      "selection_reason": "Tier 1 业务预构建镜像。devcontainer.json 的 image 字段指向 swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701（非纯基础 OS 镜像），docker pull 成功。镜像内已预装 CANN 9.1.0、GCC 11.2.0、CMake 3.31.10、Python 3.11.6、Make 4.4.1、Git 2.54.0 等构建依赖，跳过依赖安装直接进入构建。",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "fde59eb",
+    "duration_seconds": 1713,
+    "end_time": "2026-08-13T11:04:35",
+    "environment": "远程容器验证 (192.168.9.114, aarch64, 256核, 2044GB内存, 16张NPU)",
+    "repo_url": "https://gitcode.com/Ascend/mspti.git",
+    "start_time": "2026-08-13T10:36:02",
+    "total_steps": 34,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "cmake 配置阶段找不到 Python 开发头文件（Python_INCLUDE_DIRS 缺失）",
+      "solution": "通过 sudo dnf install -y python3-devel 安装 Python 开发头文件包",
+      "source": "mspti/csrc/CMakeLists.txt:6 find_package(Python)",
+      "timestamp": "2026-08-13T10:50:19"
+    },
+    {
+      "problem": "make_run.sh 尝试在 /workspace/../output（即 /output）创建目录，mindstudio 用户无权限",
+      "solution": "以 root 用户创建 /output 目录并 chown 给 mindstudio 用户",
+      "source": "scripts/make_run.sh: MSPTI_TEMP_DIR=${TOP_DIR}/../output/mspti",
+      "timestamp": "2026-08-13T10:50:19"
+    },
+    {
+      "problem": "首次 UT 编译时 mspti_adapter_utest 链接失败，系统 Python 3.11.6 的 libpython3.11.so 使用 glibc 2.38 符号，与 MindStudio 构建镜像的 GCC 11.2.0（glibc 2.17 兼容模式）不兼容",
+      "solution": "改用 pyenv Python 3.11.15（/opt/python/cp311-cp311/bin/python3），其 libpython 与 GCC 工具链兼容，重新配置 cmake 并编译成功",
+      "source": "execute_test_case.sh 使用系统 python3，mspti/csrc/CMakeLists.txt find_package(Python) 解析到系统 Python",
+      "timestamp": "2026-08-13T10:56:39"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}
