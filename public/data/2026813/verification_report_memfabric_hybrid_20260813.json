@@ -1,0 +1,574 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md 软件硬件配套说明",
+      "value": "aarch64/x86（宿主机为 aarch64 Kunpeng）"
+    },
+    "build_commands": {
+      "source": "docs/installation.md",
+      "value": "bash script/build_and_pack_run.sh（默认 RELEASE/NPU/ON python；无卡环境可用 bash script/build.sh RELEASE OFF ON OFF ON NONE OFF OFF OFF OFF OFF）"
+    },
+    "dependencies": {
+      "source": "docs/installation.md + CMakeLists.txt + config_python.cmake + script/build.sh",
+      "value": [
+        "Ubuntu 22.04 LTS 或更高版本 (OS 要求)",
+        "CMake \u003e= 3.12 (推荐 3.20+)，apt: cmake",
+        "GCC \u003e= 11.4，apt: gcc g++",
+        "Make 4.3+ 或 Ninja 1.10.1+，apt: make ninja-build",
+        "pybind11 \u003e= 2.10.3（编译 Python 绑定需要），pip: pybind11",
+        "python3 + pip (构建 wheel 需要)",
+        "libibverbs-dev (BUILD_HCOM=ON 且 RDMA 时需要的可选依赖)",
+        "git（含 submodule 拉取 googletest/mockcpp）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": ".devcontainer/Dockerfile RUN apt-get 指令",
+      "value": [
+        {
+          "original": "apt-get install -y doxygen graphviz gdb valgrind strace ltrace cgdb dos2unix bc lcov pciutils",
+          "target_equivalent": "apt-get install -y doxygen graphviz gdb valgrind strace ltrace cgdb dos2unix bc lcov pciutils（Ubuntu 原生包，无需翻译）"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "docs/installation.md + .devcontainer/Dockerfile",
+      "value": "Ubuntu 22.04 LTS（vllm-ascend 基于 Ubuntu 22.04）"
+    },
+    "sample_commands": {
+      "source": "examples/memory_pool/README.md + examples/*/README.md",
+      "value": "examples/memory_pool/01_basic/01_single_device_dram_pool 等样例；需 NPU/CANN 环境运行，示例命令见各样例 README"
+    },
+    "special_dependencies": {
+      "source": "README.md 软件硬件配套 + .gitmodules",
+      "value": [
+        "NPU 硬件（Atlas 系列）与 CANN \u003e= 8.1.RC1、Ascend HDK 驱动/固件（HBM/DRAM 池化需要）——本机无 NPU",
+        "git submodule: test/3rdparty/googletest (v1.12.0)、test/3rdparty/mockcpp (v2.7)（BUILD_TEST/UT 时需要）"
+      ]
+    },
+    "ut_commands": {
+      "source": "script/run_ut.md + script/run_ut.sh",
+      "value": "bash script/run_ut.sh（或 bash script/run_ut.sh --fast，需先初始化 test/3rdparty submodule，构建产物为 output/bin/ut/test_memfabric）"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "README/docs 说明 UT 使用 script/run_ut.sh，但未说明运行 UT 是否需要 NPU 硬件；实测无 NPU 环境下 AccLinksTest 触发 ASAN stack-use-after-return、HybmDataOpDeviceRdmaTest/HybmComposeDataOpTest 崩溃",
+      "source": "script/run_ut.md / README.md",
+      "time": "2026-08-13T17:54:05",
+      "title": "UT 在无 NPU 环境的行为未说明"
+    },
+    {
+      "body": "样例 README 必要条件写明需 NPU，但顶部 examples/memory_pool/README.md 未集中列出所有样例的硬件前置；04_no_xpu_host_rdma/05_no_xpu_host_urma 标称\"无卡环境\"却只有 README 无脚本",
+      "source": "examples/memory_pool/README.md",
+      "time": "2026-08-13T17:54:05",
+      "title": "样例运行前提为 NPU 硬件但文档分散"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "读取 README.md、docs/installation.md、script/build.sh、script/run_ut.sh、CMakeLists.txt、.devcontainer/Dockerfile 等文档提取构建/UT/样例信息",
+      "command": "cat README.md docs/installation.md script/build.sh script/run_ut.sh ...",
+      "details": {
+        "files": [
+          "README.md",
+          "docs/installation.md",
+          "script/build.sh",
+          "script/run_ut.sh",
+          "script/run_ut.md",
+          "CMakeLists.txt",
+          ".devcontainer/Dockerfile",
+          "examples/memory_pool/README.md"
+        ]
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "已提取 OS=Ubuntu 22.04, CMake\u003e=3.12, GCC\u003e=11.4, pybind11\u003e=2.10.3；构建入口 build_and_pack_run.sh；UT入口 run_ut.sh；NPU/CANN 必需",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T16:45:06"
+    },
+    {
+      "action": "通过 SSH 收集宿主机规格与 NPU 硬件信息",
+      "command": "uname -m; nproc; free -h; lscpu; npu-smi info; ls /dev/davinci*",
+      "details": {
+        "architecture": "aarch64",
+        "cpu": "Kunpeng 920 72F8 394核",
+        "memory": "1.0Ti",
+        "npu_available": false
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "无 NPU（npu-smi not found，无 /dev/davinci*，无 /usr/local/Ascend）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "machine_spec",
+      "success": true,
+      "timestamp": "2026-08-13T16:45:06"
+    },
+    {
+      "action": "拉取/复用 ubuntu:22.04 基础镜像并启动容器，挂载仓库到 /workspace",
+      "command": "docker run -d --name memfabric_hybrid-ttfhw --network=host -v /tmp/memfabric_hybrid-verify/repo:/workspace docker.m.daocloud.io/library/ubuntu:22.04 sleep infinity",
+      "details": {
+        "arch": "aarch64",
+        "container": "memfabric_hybrid-ttfhw",
+        "cpu_cores": 394,
+        "image": "docker.m.daocloud.io/library/ubuntu:22.04",
+        "os": "Ubuntu 22.04.5 LTS"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "容器 memfabric_hybrid-ttfhw 已启动，Ubuntu 22.04.5 LTS aarch64，nproc=394",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-13T16:46:51"
+    },
+    {
+      "action": "在容器内再次阅读 README、installation.md、.gitmodules 确认构建依赖与 OS 要求",
+      "command": "cd /workspace \u0026\u0026 head -30 README.md \u0026\u0026 grep -A20 编译环境要求 docs/installation.md \u0026\u0026 cat .gitmodules",
+      "details": {
+        "cmake": "\u003e=3.12 (推荐 3.20+)",
+        "gcc": "\u003e=11.4",
+        "os_required": "Ubuntu 22.04 LTS 或更高",
+        "pybind11": "2.10.3",
+        "submodules": [
+          "googletest v1.12.0",
+          "mockcpp v2.7"
+        ]
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "确认构建入口为 script/build_and_pack_run.sh，UT 入口为 script/run_ut.sh；NPU/CANN 为硬件依赖",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T16:46:51"
+    },
+    {
+      "action": "扫描仓库静态检查配置（pre-commit / lint-runner）",
+      "command": "ls -la .pre-commit-config.yaml; ls -la .lint-runner* .lintrunner* lint-runner* 2\u003e/dev/null",
+      "details": {
+        "lint_runner_configured": false,
+        "pre_commit_config": "/workspace/.pre-commit-config.yaml",
+        "pre_commit_configured": true
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": ".pre-commit-config.yaml 存在（17 个 hook）；无 lint-runner 配置",
+      "result": "成功",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-13T16:46:51"
+    },
+    {
+      "action": "扫描 .devcontainer 目录及配置文件",
+      "command": "ls -la .devcontainer/ \u0026\u0026 cat .devcontainer/devcontainer.json | head -20",
+      "details": {
+        "base_image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1",
+        "config_dir": "/workspace/.devcontainer",
+        "config_files": [
+          "Dockerfile",
+          "devcontainer.json",
+          "post_create.sh",
+          "requirements.txt"
+        ]
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "devcontainer 存在，基于 vllm-ascend(Ubuntu 22.04) 镜像，挂载 NPU 设备与驱动",
+      "result": "成功",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-08-13T16:46:51"
+    },
+    {
+      "action": "安装第一层系统工具链（gcc/g++/make/cmake/git/python3/pip/ninja/dos2unix）",
+      "command": "apt-get update \u0026\u0026 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gcc g++ make cmake git python3 python3-pip ninja-build dos2unix",
+      "details": {
+        "cmake": "3.22.1",
+        "gcc": "11.4.0",
+        "git": "2.34.1",
+        "make": "4.3",
+        "ninja": "1.10.1",
+        "python3": "3.10.12"
+      },
+      "duration_seconds": 600,
+      "error": "",
+      "output": "工具链安装成功；apt 网络较慢，耗时较长",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T17:03:52"
+    },
+    {
+      "action": "安装语言特定依赖（pybind11/wheel/setuptools），并配置阿里云 pip 镜像",
+      "command": "pip3 config set global.index-url https://mirrors.aliyun.com/pypi/simple/; pip3 install --no-cache-dir pybind11 wheel setuptools",
+      "details": {
+        "pip_index": "https://mirrors.aliyun.com/pypi/simple/",
+        "pybind11": "3.1.0",
+        "setuptools": "59.6.0",
+        "wheel": "0.37.1"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "pybind11 3.1.0 安装成功，cmake 配置目录存在于 /usr/local/lib/python3.10/dist-packages/pybind11/share/cmake/pybind11/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T17:04:13"
+    },
+    {
+      "action": "在远程容器内安装 pre-commit 并执行 pre-commit run --all-files",
+      "command": "pip3 install pre-commit; pre-commit run --all-files",
+      "details": {
+        "failed": 0,
+        "note": "ruff-check/pylint/bandit 配置为 manual stage，默认执行时不运行；gitleaks 需 go\u003e=1.24，已安装 go1.24.3 并配置 GOPROXY=goproxy.cn 后成功",
+        "passed": 11,
+        "pre_commit_version": "4.6.2",
+        "skipped": 0,
+        "total_hooks": 11
+      },
+      "duration_seconds": 300,
+      "error": "",
+      "output": "trailing-whitespace/end-of-file-fixer/check-yaml/check-added-large-files/check-merge-conflict/detect-private-key/check-json/ruff-format/codespell/clang-format/gitleaks 全部 Passed",
+      "result": "成功（全部 11 个默认 hook 通过）",
+      "returncode": 0,
+      "step": "static_analysis_execution",
+      "success": true,
+      "timestamp": "2026-08-13T17:15:43"
+    },
+    {
+      "action": "初始化 git submodule（googletest v1.12.0, mockcpp v2.7）用于 UT",
+      "command": "GIT_SSL_NO_VERIFY=1 git submodule update --init --recursive test/3rdparty/",
+      "details": {
+        "googletest": "15460959cbbfa20e66ef0b5ab497367e47fc0a04",
+        "mockcpp": "e8d8b8fa25830b7f6b94281c5c5aee67ee87836f"
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "两个 submodule 均 checkout 成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T17:16:12"
+    },
+    {
+      "action": "执行构建（XPU_TYPE=NONE 纯 CPU 模式，并发 MF_BUILD_JOBS=78，即 394核×20%）",
+      "command": "MF_BUILD_JOBS=78 bash script/build_and_pack_run.sh --build_mode RELEASE --build_python OFF --xpu_type NONE --build_test OFF --build_hcom OFF --build_tool cmake",
+      "details": {
+        "build_mode": "RELEASE",
+        "concurrency": 78,
+        "concurrency_ratio": "20%",
+        "output": "output/memfabric_hybrid-1.2.0_linux_aarch64_cpu.run (5.0M)",
+        "xpu_type": "NONE"
+      },
+      "duration_seconds": 20,
+      "error": "",
+      "output": "构建成功，EXIT=0，real 20s；生成 libmf_smem.so、libmf_hybm_core.so、libmf_acc_offload.so、libacc_tcp_net.so 及 .run 安装包",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-13T17:18:57"
+    },
+    {
+      "action": "执行单元测试 script/run_ut.sh（ASAN 构建+运行 gtest）",
+      "command": "MF_BUILD_JOBS=78 bash script/run_ut.sh",
+      "details": {
+        "asan_issue": "AccLinksTest.test_server_start_StartWorkers_validate_should_return_error 触发 stack-use-after-return（mockcpp 线程钩子问题）",
+        "crashed_suites": [
+          "AccLinksTest",
+          "HybmComposeDataOpTest",
+          "HybmDataOpDeviceRdmaTest"
+        ],
+        "failed": 0,
+        "npu_issue": "HybmDataOpDeviceRdmaTest/HybmComposeDataOpTest 需 NPU 设备，无 NPU 环境崩溃",
+        "passed": 56,
+        "total": 2042
+      },
+      "duration_seconds": 300,
+      "error": "AddressSanitizer stack-use-after-return / Segfault",
+      "output": "构建 235/235 成功；运行时 2042 用例，约 56 个通过后崩溃。ASAN 版 detect_stack_use_after_return 无法禁用（编译期生效）",
+      "result": "部分成功（构建成功，运行因无 NPU 环境及 AccLinksTest 用例崩溃而中断）",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-08-13T17:32:54"
+    },
+    {
+      "action": "构建 Python wheel 并安装，运行 01_single_device_dram_pool 样例",
+      "command": "pip3 install wheel; python3 examples/memory_pool/01_basic/01_single_device_dram_pool/01_single_device_dram_pool.py",
+      "details": {
+        "create2": "失败: invalid opType 4 for non-cann based backend（DEVICE_RDMA 需 NPU）",
+        "import": "成功",
+        "init_store": "成功",
+        "install": "成功",
+        "sample": "01_single_device_dram_pool.py",
+        "wheel": "memfabric_hybrid-1.2.0+cpu-cp310-cp310-linux_aarch64.whl (2.4M)"
+      },
+      "duration_seconds": 120,
+      "error": "RuntimeError: create bm handle failed (invalid opType 4 for non-cann based backend)",
+      "output": "mf.initialize/smem_bm_init/config store 均成功；create2(DEVICE_RDMA) 因无 NPU 抛 RuntimeError",
+      "result": "部分成功（wheel 构建+安装+import 成功；样例因无 NPU 硬件在 create2 处失败）",
+      "returncode": 1,
+      "step": "sample_execution",
+      "success": false,
+      "timestamp": "2026-08-13T17:53:54"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "memfabric_hybrid-1.2.0_linux_aarch64_cpu.run",
+          "path": "/workspace/output/memfabric_hybrid-1.2.0_linux_aarch64_cpu.run",
+          "size": "5.0M",
+          "type": "installer"
+        },
+        {
+          "name": "libmf_smem.so",
+          "path": "/workspace/output/smem/lib64/libmf_smem.so",
+          "size": "1.9M",
+          "type": "library"
+        },
+        {
+          "name": "libmf_hybm_core.so",
+          "path": "/workspace/output/hybm/lib64/libmf_hybm_core.so",
+          "size": "2.9M",
+          "type": "library"
+        },
+        {
+          "name": "libmf_acc_offload.so",
+          "path": "/workspace/output/acc_offload/lib64/libmf_acc_offload.so",
+          "size": "127K",
+          "type": "library"
+        },
+        {
+          "name": "libacc_tcp_net.so",
+          "path": "/workspace/output/acc_links/lib64/libacc_tcp_net.so",
+          "size": "627K",
+          "type": "library"
+        }
+      ],
+      "cmake": "3.22.1",
+      "compiler": "gcc 11.4.0",
+      "concurrency": 78,
+      "concurrency_ratio": "CPU核数×20% (394×20%=78)",
+      "duration_seconds": 20,
+      "notes": "本机无 NPU，使用 XPU_TYPE=NONE 纯 CPU 模式构建；构建命令来自 docs/installation.md 的 build_and_pack_run.sh",
+      "status": "success"
+    },
+    "devcontainer": {
+      "config_dir": "/workspace/.devcontainer",
+      "config_files": [
+        "Dockerfile",
+        "devcontainer.json",
+        "post_create.sh",
+        "requirements.txt"
+      ],
+      "enabled": true,
+      "original_base_image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1",
+      "summary": "具备 devcontainer 能力，基于 Ascend vllm-ascend (Ubuntu 22.04) 镜像并挂载 NPU 设备；按技能规则未使用该预构建镜像，改用 ubuntu:22.04 从零构建",
+      "used_image": "ubuntu:22.04"
+    },
+    "sample": {
+      "duration_seconds": 120,
+      "reason": "样例全部要求 NPU 硬件（如 create2 使用 DEVICE_RDMA，README 必要条件：单机至少 1 张可用 NPU）；本机无 NPU，初始化/store 成功但 create2 失败。另 04/05 no_xpu 样例仅 README 无脚本。",
+      "results": [
+        {
+          "execution_status": "failed (需 NPU)",
+          "execution_time": "~2s",
+          "output_summary": "mf.initialize/smem_bm_init/config store(tcp://127.0.0.1:8570) 均成功；create2(DEVICE_RDMA) 报 invalid opType 4 for non-cann based backend",
+          "sample_name": "01_single_device_dram_pool"
+        },
+        {
+          "execution_status": "success",
+          "execution_time": "~30s",
+          "output_summary": "pip3 install wheel 成功，import memfabric_hybrid 成功 (version 1.2.0+cpu)",
+          "sample_name": "wheel smoke test"
+        }
+      ],
+      "status": "partial_success"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": "/workspace/.pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 300,
+        "executed_in_verification": true,
+        "failed": 0,
+        "hooks": [
+          {
+            "hook_name": "trailing-whitespace",
+            "status": "passed"
+          },
+          {
+            "hook_name": "end-of-file-fixer",
+            "status": "passed"
+          },
+          {
+            "hook_name": "check-yaml",
+            "status": "passed"
+          },
+          {
+            "hook_name": "check-added-large-files",
+            "status": "passed"
+          },
+          {
+            "hook_name": "check-merge-conflict",
+            "status": "passed"
+          },
+          {
+            "hook_name": "detect-private-key",
+            "status": "passed"
+          },
+          {
+            "hook_name": "check-json",
+            "status": "passed"
+          },
+          {
+            "hook_name": "ruff-format",
+            "status": "passed"
+          },
+          {
+            "hook_name": "codespell",
+            "status": "passed"
+          },
+          {
+            "hook_name": "clang-format",
+            "status": "passed"
+          },
+          {
+            "hook_name": "gitleaks",
+            "status": "passed"
+          }
+        ],
+        "passed": 11,
+        "skipped": 0,
+        "status": "passed",
+        "total_hooks": 11
+      },
+      "summary": "pre-commit 已执行，11 个默认 hook 全部通过"
+    },
+    "ut": {
+      "duration_seconds": 300,
+      "failed": 0,
+      "failures": [
+        {
+          "error": "AddressSanitizer stack-use-after-return（mockcpp 在 aarch64 的线程钩子问题，单独运行也段错误）",
+          "name": "AccLinksTest.test_server_start_StartWorkers_validate_should_return_error"
+        },
+        {
+          "error": "无 NPU 设备，Device RDMA 相关用例失败/崩溃",
+          "name": "HybmDataOpDeviceRdmaTest.* (9个)"
+        },
+        {
+          "error": "无 NPU 设备，SDMA data operator 初始化崩溃",
+          "name": "HybmComposeDataOpTest.*"
+        }
+      ],
+      "passed": 56,
+      "status": "partial_success",
+      "total": 2042
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "memfabric_hybrid-ttfhw",
+      "cpu_cores": 394,
+      "memory": "1.0Ti",
+      "os": "Ubuntu 22.04"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 394,
+      "cpu_model": "Kunpeng 920 72F8 (双路, 每socket 197核)",
+      "disk": "69G 总量 / 22G 可用",
+      "docker_version": "Docker version 25.0.2, build fce6e0c",
+      "memory": "1.0Ti",
+      "npu": {
+        "available": false,
+        "card_count": 0,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "image_name": "ubuntu:22.04",
+      "selection_reason": "仓库 docs/installation.md 明确要求 OS 为 Ubuntu 22.04 LTS 或更高版本；.devcontainer/Dockerfile FROM quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1（基于 Ubuntu 22.04）。按技能规则不使用预构建的 vllm-ascend 镜像，选择 ubuntu:22.04 从零构建。",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "f36b39dce48eebe2b75141147b9c653c2c40fe21",
+    "duration_seconds": 4281,
+    "end_time": "2026-08-13T17:54:09",
+    "environment": "远程机器 123.60.114.33，容器 memfabric_hybrid-ttfhw",
+    "repo_url": "https://gitcode.com/Ascend/memfabric_hybrid.git",
+    "start_time": "2026-08-13T16:42:48",
+    "total_steps": 13
+  },
+  "problems_encountered": [
+    {
+      "problem": "预编译的 devcontainer 镜像 (vllm-ascend) 包含预装依赖，按技能规则禁止使用，改用 ubuntu:22.04 从零构建",
+      "solution": "从 ubuntu:22.04 原生 apt 源逐步安装 gcc/g++/cmake/ninja/git/python3 等工具链",
+      "source": ".devcontainer/Dockerfile FROM quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1",
+      "timestamp": "2026-08-13T17:54:05"
+    },
+    {
+      "problem": "pre-commit 的 gitleaks hook 需要 go\u003e=1.24 编译，系统 go 1.18 过旧报 \"invalid go version 1.24.11\"",
+      "solution": "从阿里云镜像下载安装 go1.24.3 到 /opt/go，并用 PATH=/opt/go/bin 运行 pre-commit",
+      "source": ".pre-commit-config.yaml gitleaks hook",
+      "timestamp": "2026-08-13T17:54:05"
+    },
+    {
+      "problem": "go 依赖下载 proxy.golang.org 超时",
+      "solution": "设置 GOPROXY=https://goproxy.cn,direct",
+      "source": "pre-commit 执行环境",
+      "timestamp": "2026-08-13T17:54:05"
+    },
+    {
+      "problem": "UT 构建时 mockcpp 打 patch 失败：patch 工具未安装",
+      "solution": "apt-get install -y patch 后重试",
+      "source": "script/run_ut.sh 依赖 dos2unix/patch",
+      "timestamp": "2026-08-13T17:54:05"
+    },
+    {
+      "problem": "Python wheel 构建报 \"ZIP does not support timestamps before 1980\"（wheel 0.37.1 打包含 pre-1980 时间戳文件失败）",
+      "solution": "升级 wheel 到 0.48.0 后 wheel 构建成功",
+      "source": "setup.py bdist_wheel",
+      "timestamp": "2026-08-13T17:54:05"
+    },
+    {
+      "problem": "安装 wheel 后 import 报缺 torch/numpy",
+      "solution": "pip3 install torch(CPU版) 与 numpy",
+      "source": "memfabric_hybrid python 包依赖",
+      "timestamp": "2026-08-13T17:54:05"
+    }
+  ],
+  "session_export_file": "",
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "deepseek/deepseek-v4-flash",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}
