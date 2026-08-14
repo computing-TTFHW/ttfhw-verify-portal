@@ -2999,6 +2999,88 @@
     ]
   },
   {
+    "name": "pytorch",
+    "displayName": "pytorch",
+    "result": "partial_success",
+    "buildStatus": "success",
+    "utStatus": "partial_success",
+    "sampleStatus": "success",
+    "totalDuration": 4929,
+    "environmentDuration": 3014,
+    "buildDuration": 1800,
+    "utDuration": 100,
+    "sampleDuration": 15,
+    "testPassed": 52,
+    "testFailed": 2,
+    "testTotal": 55,
+    "testSkipped": 1,
+    "generatedAt": "2026-08-14T11:10:56",
+    "environment": "unknown",
+    "url": "https://gitcode.com/Ascend/pytorch.git",
+    "category": "PyTorch",
+    "hasStaticAnalysis": true,
+    "hasDevcontainer": true,
+    "file": "verification_report_pytorch_20260814.json",
+    "issues": [
+      {
+        "problem": "pip install -r requirements.txt 将 PyTorch 从 2.13.0 升级到 2.14.0.dev20260719，导致 torch_npu 版本不匹配，import 时报 ModuleNotFoundError: No module named 'torch_npu._C'",
+        "solution": "重新安装 torch==2.13.0+cpu（pip3 install torch==2.13.0 --index-url https://download.pytorch.org/whl/cpu），并从非源码目录（/root）运行 Python 避免加载源码目录的 torch_npu 包",
+        "source": "requirements.txt 中 torch==2.14.0.dev20260719 与构建使用的 2.13.0 版本不匹配",
+        "timestamp": "2026-08-14T12:18:39"
+      },
+      {
+        "problem": "Tier 2 Docker 构建超时: 构建 docker/devel/Dockerfile (target=builder) 耗时过长，SSH 超时",
+        "solution": "降级为使用 Tier 1 CANN 预构建镜像（宿主机已有），手动安装缺失编译依赖（PyTorch CPU/ninja/mold/pyyaml）",
+        "source": "docker/devel/Dockerfile 构建过程需下载 gcc-toolset-13/PyTorch 等大包",
+        "timestamp": "2026-08-14T12:18:39"
+      },
+      {
+        "problem": "NPU 卡0 状态为 Critical，无法使用",
+        "solution": "跳过卡0，使用卡1（davinci1）挂载到容器",
+        "source": "npu-smi info 显示卡0 Health=Critical",
+        "timestamp": "2026-08-14T12:18:39"
+      },
+      {
+        "problem": "scipy 版本与 numpy 1.26.2 不兼容: CANN 镜像内置的 scipy 使用 np.long（numpy 1.24 已移除），导致 import scipy.signal 时 AttributeError",
+        "solution": "升级 scipy 到 1.12.0（兼容 numpy 1.26.2），同时保持 numpy 1.26.2",
+        "source": "CANN 镜像预装 scipy 版本过旧",
+        "timestamp": "2026-08-14T12:31:52"
+      },
+      {
+        "problem": "源码目录 /workspace/torch_npu/ 覆盖安装的 wheel 包: 从 /workspace 目录运行 Python 时，源码目录的 torch_npu 被优先加载，缺少编译产物 torch_npu._C",
+        "solution": "从 /workspace/test 目录运行测试（不包含 torch_npu/ 子目录），确保加载 site-packages 中的安装版本",
+        "source": "Python sys.path 当前目录优先于 site-packages",
+        "timestamp": "2026-08-14T12:31:52"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "body": "requirements.txt 指定 torch==2.14.0.dev20260719 (nightly dev 版本)，而 version.txt 声明 master 分支支持 2.13.0/2.14.0/2.15.0。building_from_source.md 以 PyTorch 2.13.0 为例，但 requirements.txt 却指向 2.14.0.dev。安装 requirements.txt 会升级 PyTorch 导致与编译的 torch_npu 版本不匹配。",
+        "source": "requirements.txt + version.txt + building_from_source.md",
+        "time": "2026-08-14T12:33:05",
+        "title": "requirements.txt 中 torch 版本与 master 分支不匹配"
+      },
+      {
+        "body": "building_from_source.md 要求 aarch64 使用 cmake 4.3.2，但 docker/devel/Dockerfile 仅在 amd64 架构下安装 cmake 3.18.4，aarch64 下不安装 cmake。manylinux_2_28 基础镜像的 cmake 版本可能不满足要求。",
+        "source": "docker/devel/Dockerfile 第75-78行 + building_from_source.md gcc/cmake 版本表",
+        "time": "2026-08-14T12:33:05",
+        "title": "aarch64 架构下 cmake 版本要求未在 Dockerfile 中处理"
+      },
+      {
+        "body": "Tier 1 CANN 预构建镜像 (swr.cn-south-1.myhuaweicloud.com/ascendhub/cann) 包含 CANN 运行时但不包含 gcc-toolset-13、PyTorch CPU、ninja、mold 等编译依赖。文档未说明 CANN 镜像仅适用于运行而非编译。",
+        "source": "docker/OVERVIEW.md + CANN 镜像实际检查",
+        "time": "2026-08-14T12:33:05",
+        "title": "CANN 镜像缺少编译工具链"
+      },
+      {
+        "body": "从仓库根目录运行 Python 时，源码目录 torch_npu/ 会覆盖 site-packages 中安装的 wheel 包，导致 ModuleNotFoundError: No module named 'torch_npu._C'。文档未说明需从非源码目录运行 Python。",
+        "source": "building_from_source.md 安装后验证章节",
+        "time": "2026-08-14T12:33:05",
+        "title": "源码目录覆盖安装包问题未文档化"
+      }
+    ]
+  },
+  {
     "name": "RAGSDK",
     "displayName": "RAGSDK",
     "result": "partial_success",
