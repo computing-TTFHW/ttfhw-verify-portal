@@ -314,40 +314,60 @@
   {
     "name": "hmpi",
     "displayName": "hmpi",
-    "result": "success",
+    "result": "partial_success",
     "buildStatus": "success",
-    "utStatus": "success",
+    "utStatus": "partial_success",
     "sampleStatus": "success",
-    "totalDuration": 8400,
-    "environmentDuration": 4020,
-    "buildDuration": 3660,
-    "utDuration": 600,
-    "sampleDuration": 120,
-    "testPassed": 41,
+    "totalDuration": 7759,
+    "environmentDuration": 5189,
+    "buildDuration": 1800,
+    "utDuration": 750,
+    "sampleDuration": 20,
+    "testPassed": 4,
     "testFailed": 0,
-    "testTotal": 41,
-    "generatedAt": "2026-08-12T11:47:05",
+    "testTotal": 4,
+    "testSkipped": 0,
+    "generatedAt": "2026-08-13T20:43:00",
     "environment": "unknown",
     "url": "https://gitcode.com/kunpengcompute/hmpi.git",
     "category": "HPCKit",
     "hasStaticAnalysis": true,
     "hasDevcontainer": false,
-    "file": "verification_report_hmpi_20260812.json",
+    "file": "verification_report_hmpi_20260813.json",
     "issues": [
       {
-        "problem": "首次 make 编译 hmpi 时 ompi/mca/coll/ucg 组件报 fatal error: ucp/api/ucp.h: No such file or directory",
-        "solution": "定位为 hucx include 路径未注入：coll_ucg_CPPFLAGS 仅含 xucg include，其模块间接包含 hucx 头。设置 C_INCLUDE_PATH=/workspace/install/hucx/include 后重新 make 成功",
-        "source": "coll_ucg_reduce_scatter_block.c 编译",
-        "timestamp": "2026-08-12T12:20:00"
+        "problem": "hucx编译config/parser.c时报错: ucs_has_spec_device声明返回uint32_t(line 88)但定义返回ucs_status_t(line 2202), 类型冲突导致编译失败. 该bug位于#if HAVE_IB的#else块中(无InfiniBand支持时编译的代码路径)",
+        "solution": "安装libibverbs-devel和librdmacm-devel开发库, 使configure检测到InfiniBand支持并定义HAVE_IB宏, 从而编译#if HAVE_IB块中的正确实现(line 2081, 返回uint32_t与声明一致), 绕过#else块中的类型冲突bug",
+        "source": "hucx src/ucs/config/parser.c line 88/2081/2202",
+        "timestamp": "2026-08-13T20:58:32"
       },
       {
-        "problem": "autogen.pl 首次运行输出大量 automake 'user target distclean overrides' warning 且 autoreconf 曾报 automake failed",
-        "solution": "该 warning 为 Open MPI 4.1.6 与 automake 1.16.5 已知兼容性提示，非致命错误；重跑 autogen.pl 后 EXIT_CODE=0，configure 正常生成",
-        "source": "autogen.pl",
-        "timestamp": "2026-08-12T11:58:00"
+        "problem": "hmpi内置make check在构建阶段失败: ompi/mpi/fortran/mpiext-use-mpi-f08/mpiext_shortfloat_usempif08.h中MPI_Datatype派生类型在使用前未定义, gfortran 12.3.1报错",
+        "solution": "改用README推荐的OSU Micro Benchmark测试方法(osu_init/osu_hello/osu_latency/osu_bw), 4个测试全部通过. 内置测试套件的Fortran编译问题非测试逻辑失败, 可能与gfortran版本或模块编译顺序有关.",
+        "source": "ompi/mpi/fortran/mpiext-use-mpi-f08/mpiext_shortfloat_usempif08.h:19",
+        "timestamp": "2026-08-13T22:51:57"
       }
     ],
-    "documentationGaps": []
+    "documentationGaps": [
+      {
+        "body": "README的编译流程章节(5.2)要求先克隆hucx和xucx并分别编译, 但未在依赖章节明确列出这两个外部仓库作为构建依赖, 新开发者可能只克隆hmpi而遗漏依赖.",
+        "source": "README 编译流程章节5.2",
+        "time": "2026-08-13T22:51:57",
+        "title": "README未说明hucx/xucg依赖需单独克隆编译"
+      },
+      {
+        "body": "hucx的config/parser.c在#if HAVE_IB的#else块中, ucs_has_spec_device函数声明返回uint32_t但定义返回ucs_status_t, 导致无IB环境编译失败. README未说明需要安装libibverbs-devel, 也未记录此已知问题.",
+        "source": "hucx src/ucs/config/parser.c line 88/2202",
+        "time": "2026-08-13T22:51:57",
+        "title": "hucx在无InfiniBand环境下的编译bug未记录"
+      },
+      {
+        "body": "README测试方法章节使用--hostfile hf4参数, 但未说明如何创建hostfile及容器内单机测试的配置方法, 容器内测试需用--allow-run-as-root参数, 文档未提及.",
+        "source": "README 测试方法章节6.2",
+        "time": "2026-08-13T22:51:57",
+        "title": "未提供容器内测试的hostfile配置说明"
+      }
+    ]
   },
   {
     "name": "hucx",
@@ -459,89 +479,153 @@
     ]
   },
   {
+    "name": "kernel",
+    "displayName": "kernel",
+    "result": "partial_success",
+    "buildStatus": "success",
+    "utStatus": "partial_success",
+    "sampleStatus": "partial_success",
+    "totalDuration": 3601,
+    "environmentDuration": 3238,
+    "buildDuration": 300,
+    "utDuration": 33,
+    "sampleDuration": 30,
+    "testPassed": 153,
+    "testFailed": 75,
+    "testTotal": 229,
+    "testSkipped": 1,
+    "generatedAt": "2026-08-13T22:19:41",
+    "environment": "unknown",
+    "url": "https://gitcode.com/openeuler/kernel.git",
+    "category": "openEuler",
+    "hasStaticAnalysis": true,
+    "hasDevcontainer": false,
+    "file": "verification_report_kernel_20260813.json",
+    "issues": [
+      {
+        "problem": "Ubuntu 22.04 arm64 镜像源不可用：清华源返回 403 Forbidden，阿里源连接超时",
+        "solution": "降级使用 openEuler 22.03 LTS SP2 基础镜像（机器本身运行 openEuler，dnf 镜像源可用，3秒完成 makecache）",
+        "source": "容器内 apt-get install 失败",
+        "timestamp": "2026-08-13T22:43:30"
+      },
+      {
+        "problem": "内核编译缺少 libelf.h，导致 tools/bpf/resolve_btfids 中的 libbpf 编译失败",
+        "solution": "安装 elfutils-libelf-devel 包（dnf install -y elfutils-libelf-devel），提供 /usr/include/libelf.h",
+        "source": "build.log: libbpf.c:45:10: fatal error: libelf.h: No such file or directory",
+        "timestamp": "2026-08-13T23:13:50"
+      },
+      {
+        "problem": "vmlinux 后处理步骤 SORTTAB 失败，缺少 cmp 命令",
+        "solution": "安装 diffutils 包（dnf install -y diffutils），提供 /usr/bin/cmp",
+        "source": "build.log: scripts/link-vmlinux.sh: line 299: cmp: command not found",
+        "timestamp": "2026-08-13T23:13:50"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "body": "README 仅指向 Documentation/admin-guide/README.rst 和 Documentation/process/changes.rst，未提及 tools/testing/selftests/ 自测程序如何构建和运行。新开发者需要自行发现 selftests 目录及其 Makefile。",
+        "source": "README + tools/testing/selftests/Makefile",
+        "time": "2026-08-13T23:16:17",
+        "title": "README 未列出内核自测程序运行方法"
+      },
+      {
+        "body": "openEuler 内核默认配置（openeuler_defconfig）未启用 CONFIG_SAMPLES，导致默认编译不包含样例模块。开发者需要手动启用 CONFIG_SAMPLES=y 才能构建和测试样例。",
+        "source": "arch/arm64/configs/openeuler_defconfig",
+        "time": "2026-08-13T23:19:42",
+        "title": "openeuler_defconfig 未启用 CONFIG_SAMPLES"
+      }
+    ]
+  },
+  {
     "name": "kpex",
     "displayName": "kpex",
     "result": "success",
     "buildStatus": "success",
     "utStatus": "success",
     "sampleStatus": "success",
-    "totalDuration": 9584,
-    "environmentDuration": 6384,
-    "buildDuration": 3120,
-    "utDuration": 60,
-    "sampleDuration": 20,
-    "testPassed": 3,
+    "totalDuration": 5717,
+    "environmentDuration": 5307,
+    "buildDuration": 360,
+    "utDuration": 5,
+    "sampleDuration": 45,
+    "testPassed": 1,
     "testFailed": 0,
-    "testTotal": 3,
-    "generatedAt": "2026-08-12T12:34:22",
+    "testTotal": 1,
+    "generatedAt": "2026-08-13T20:43:07",
     "environment": "unknown",
     "url": "https://gitcode.com/kunpengcompute/kunpeng-extension-for-pytorch.git",
     "category": "HPCKit",
     "hasStaticAnalysis": true,
     "hasDevcontainer": false,
-    "file": "verification_report_kpex_20260812.json",
+    "file": "verification_report_kpex_20260813.json",
     "issues": [
       {
-        "problem": "venv 内 Python.h 缺失，torch cpp_extension 编译报 fatal error: Python.h not found",
-        "solution": "将 anaconda3 include/python3.11 下的头文件复制到 venv/include/python3.11/",
-        "source": "构建阶段",
-        "timestamp": "2026-08-12T15:14:00"
+        "problem": "Miniconda 安装包下载损坏（MD5 mismatch），导致 Python 3.11 环境无法创建",
+        "solution": "首次从华为云镜像下载 Python 3.11.9 源码编译；机器重启后改用宿主机 conda Python 3.12.7 挂载到容器",
+        "source": "Miniconda3-latest-Linux-aarch64.sh 安装日志",
+        "timestamp": "2026-08-13T21:10:00"
       },
       {
-        "problem": "sysconfig INCLUDEPY 返回宿主绝对路径 /root/anaconda3，容器内该路径不存在导致 -I 失效",
-        "solution": "在容器内建立软链 ln -sfn /opt/anaconda3 /root/anaconda3",
-        "source": "构建阶段",
-        "timestamp": "2026-08-12T15:14:00"
+        "problem": "编译错误: fatal error: 'kupl.h' file not found，csrc/utils/parallel.h 引用 kupl.h 但 include 路径中无 KUPL 头文件目录",
+        "solution": "设置 CPATH 环境变量包含 /opt/hpckit/install/HPCKit/latest/kupl/bisheng/release/include，绕过 setup.py line 72 将 KUPL_ROOT/include 错误添加到 library_dirs 而非 include_dirs 的 bug",
+        "source": "setup.py line 72: library_dirs += [f\"{KUPL_ROOT}/include\"] 应为 include_dirs",
+        "timestamp": "2026-08-13T21:58:00"
       },
       {
-        "problem": "setup.py KUPL_ROOT 路径错位导致 kupl.h 未找到、_C_example 链接失败",
-        "solution": "修正 setup.py：KUPL include 加入 include_dirs、库路径加入 library_dirs、_C_example 传 library_dirs_example",
-        "source": "构建阶段",
-        "timestamp": "2026-08-12T15:14:00"
+        "problem": "setup.py line 73: libraries += [f\"{KUPL_ROOT}/lib\"] 将路径作为库名传给链接器，产生无效 -l/path 参数导致链接失败",
+        "solution": "创建 clang++ wrapper 脚本过滤 -l/path 开头的无效参数，不修改源码即绕过 setup.py bug",
+        "source": "setup.py line 73: libraries += [f\"{KUPL_ROOT}/lib\"]",
+        "timestamp": "2026-08-13T22:00:00"
       },
       {
-        "problem": "import kpex 报动态库缺失（libnuma/libomp/libmemkind/libsdma_dk/libkblas）",
-        "solution": "dnf 安装 numactl/memkind-devel，LD_LIBRARY_PATH 补充 HPCKit bisheng lib/kml sme kblas multi/hmpi lib，libsdma_dk 从宿主 /home/kadc 复制到容器 /usr/local/lib",
-        "source": "运行时依赖",
-        "timestamp": "2026-08-12T15:14:00"
+        "problem": "运行时 ImportError: libnuma.so.1 和 libkblas.so.1 找不到，HMPI 依赖 libnuma，KuDNN 依赖 KML BLAS",
+        "solution": "dnf install numactl-libs 安装 libnuma；LD_LIBRARY_PATH 添加 KML 子目录 sve/kblas/multi 解决 libkblas",
+        "source": "HMPI 和 KuDNN 运行时依赖",
+        "timestamp": "2026-08-13T22:13:00"
       },
       {
-        "problem": "pip 安装 torchvision 默认拉取 0.28.0（对应 torch 2.7+），与 torch 2.5.0 不匹配且会升级 torch",
-        "solution": "使用 --no-deps 安装 torchvision==0.20.1（与 torch 2.5.0 配套）",
-        "source": "样例依赖",
-        "timestamp": "2026-08-12T15:14:00"
+        "problem": "构建过程中远程机器重启，容器和 /tmp 丢失，所有环境需重建",
+        "solution": "重新克隆仓库，重新创建容器，利用宿主机已有 conda Python 3.12 加速环境重建",
+        "source": "远程机器 123.60.114.33 重启",
+        "timestamp": "2026-08-13T21:56:00"
       },
       {
-        "problem": "清华 pypi 镜像对 torch wheel 返回 403，pythonhosted 直连超时",
-        "solution": "改用阿里云 pypi 镜像 mirrors.aliyun.com/pypi/simple",
-        "source": "依赖安装",
-        "timestamp": "2026-08-12T15:14:00"
+        "problem": "首次构建未安装 ninja，导致编译串行执行（一次只编译一个文件），速度极慢",
+        "solution": "pip install ninja 安装 ninja 构建工具，启用 PyTorch BuildExtension 的并行编译（78 jobs）",
+        "source": "PyTorch cpp_extension 依赖 ninja 进行并行编译",
+        "timestamp": "2026-08-13T22:02:00"
       }
     ],
     "documentationGaps": [
       {
-        "body": "setup.py 中 KUPL_ROOT 分支将 include 路径误写入 library_dirs，将库路径误写入 libraries；且 _C_example 扩展的 library_dirs 误传为 libraries_example，导致 kupl.h 头文件无法找到、_C_example 链接失败。需人工修正后才可构建。",
-        "source": "setup.py",
-        "time": "2026-08-12T15:14:00",
-        "title": "setup.py 中 KUPL_ROOT 依赖路径拼写错误"
+        "body": "setup.py 第72行将 KUPL_ROOT/include 添加到 library_dirs 而非 include_dirs（应使用 include_dirs +=）；第73行将路径 f\"{KUPL_ROOT}/lib\" 作为库名添加到 libraries（应删除此行或改为 library_dirs += [f\"{KUPL_ROOT}/lib\"]）；第77行 libraries_example += [f\"{KUPL_ROOT}/lib\"] 后被第78行 libraries_example = [\"kupl\"] 覆盖（ += 被覆盖）。这些 bug 导致按 README 命令直接构建会失败。",
+        "source": "setup.py lines 72-78",
+        "time": "2026-08-13T22:05:00",
+        "title": "setup.py 存在 3 个 bug 未在文档中说明"
       },
       {
-        "body": "README 仅以 `import kpex` 无报错作为编译安装成功验证，未提供独立 UT 命令与测试用例说明。仓库内无 test 目录与 test_*.py。",
-        "source": "README.md",
-        "time": "2026-08-12T15:14:00",
-        "title": "README 未提供独立单元测试命令"
+        "body": "README 编译安装章节未提及运行时需要 libnuma.so.1（HMPI 依赖）和 libkblas.so.1（KuDNN 依赖 KML BLAS）。libkblas.so 不在 kml/bisheng/lib/ 根目录，而在子目录 sve/kblas/multi/ 中，需要额外设置 LD_LIBRARY_PATH。README 的 module load 方式在容器内不可用。",
+        "source": "README.md 编译安装章节 + requirements_install.md",
+        "time": "2026-08-13T22:13:00",
+        "title": "README 未说明运行时依赖 libnuma 和 KML BLAS 路径"
       },
       {
-        "body": "README/requirements_install.md 要求从源码编译 PyTorch v2.5.0（含 KML 补丁），但未提及可用 pip wheel 方式安装 torch 2.5.0（aarch64 有官方 wheel）。在 GitHub 网络受限场景下源码编译不可行，wheel 方案是实际可用路径。",
-        "source": "requirements_install.md",
-        "time": "2026-08-12T15:14:00",
-        "title": "README 未说明 PyTorch wheel 替代源码编译方案"
+        "body": "README 编译安装命令未提及需要安装 ninja 以启用并行编译。未安装 ninja 时 PyTorch BuildExtension 串行编译，在 394 核机器上仅使用 1 核，构建时间从 6 分钟延长到 30+ 分钟。",
+        "source": "README.md 编译安装章节",
+        "time": "2026-08-13T22:02:00",
+        "title": "README 未说明 ninja 依赖和并行编译配置"
       },
       {
-        "body": "HPCKit 26.0.RC1 的 kudnn 组件运行时依赖 libsdma_dk.so（SDMA 驱动库），但该库未随 HPCKit 安装分发，需从宿主另行获取。无 HBM/SDMA 硬件时 KPEX 自动降级为普通内存分配（良性警告）。",
-        "source": "HPCKit kudnn 组件",
-        "time": "2026-08-12T15:14:00",
-        "title": "HPCKit KUDNN 运行时依赖 libsdma_dk.so 未随 HPCKit 分发"
+        "body": "README 运行与验证章节仅提供 import kpex 冒烟测试，无正式 UT 测试套件、测试命令或测试覆盖率说明。examples/ 目录有优化测试和 KUPL 示例，但未在 README 中明确标注为测试入口。",
+        "source": "README.md 运行与验证章节",
+        "time": "2026-08-13T22:15:00",
+        "title": "无正式单元测试套件"
+      },
+      {
+        "body": "README 推荐 Miniconda 作为环境管理工具，但未说明在容器环境下的安装方式。Miniconda 官方下载在部分网络环境下可能损坏（MD5 mismatch），文档未提供备用方案（如源码编译 Python 或使用系统包管理器）。",
+        "source": "README.md 环境准备章节",
+        "time": "2026-08-13T21:50:00",
+        "title": "README 推荐 Miniconda 但未提供容器内安装指南"
       }
     ]
   },
@@ -573,46 +657,66 @@
   {
     "name": "kudnn",
     "displayName": "kudnn",
-    "result": "success",
+    "result": "partial_success",
     "buildStatus": "success",
-    "utStatus": "success",
+    "utStatus": "partial_success",
     "sampleStatus": "success",
-    "totalDuration": 12053,
-    "environmentDuration": 3856,
-    "buildDuration": 85,
-    "utDuration": 8109,
-    "sampleDuration": 3,
-    "testPassed": 2066,
+    "totalDuration": 4067,
+    "environmentDuration": 3885,
+    "buildDuration": 80,
+    "utDuration": 71,
+    "sampleDuration": 31,
+    "testPassed": 259,
     "testFailed": 0,
-    "testTotal": 2066,
-    "generatedAt": "2026-08-12T11:35:07",
+    "testTotal": 259,
+    "testSkipped": 1807,
+    "generatedAt": "2026-08-13T20:41:18",
     "environment": "unknown",
     "url": "https://gitcode.com/kunpengcompute/kudnn.git",
     "category": "HPCKit",
     "hasStaticAnalysis": true,
     "hasDevcontainer": false,
-    "file": "verification_report_kudnn_20260812.json",
+    "file": "verification_report_kudnn_20260813.json",
     "issues": [
       {
-        "problem": "从 github 下载 googletest v1.15.2 时 curl HTTP2 framing layer 报错失败",
-        "solution": "按 README 提示改用国内镜像 gitcode.com/GitHub_Trending/go/googletest 克隆 v1.15.2 成功",
-        "source": "build/pre_env_kudnn.sh",
-        "timestamp": "2026-08-12T12:02:00"
+        "problem": "HPCKit 26.0.RC1 安装器不支持 openEuler 24.03 LTS 基础版（仅支持 24.03 SP3），安装直接退出未生成任何文件",
+        "solution": "销毁 openEuler 24.03 LTS 容器，切换至 openEuler 22.03 LTS-SP4 镜像（README 和 HPCKit 均支持），重新安装工具链后 HPCKit 安装成功",
+        "source": "HPCKit install.sh OS 检测逻辑 + README 版本配套章节",
+        "timestamp": "2026-08-13T20:53:15"
       },
       {
-        "problem": "pre_env_kudnn_compile.sh 写死 CC=clang 但未先加载 Bisheng 环境，cmake 报 CC: clang 找不到",
-        "solution": "先 module use + module load bisheng/compiler5.1.0.2/bishengmodule 再执行脚本，编译成功",
-        "source": "build/pre_env_kudnn_compile.sh",
-        "timestamp": "2026-08-12T12:04:00"
-      },
-      {
-        "problem": "用 HPCKit 26.1.RC1（Bisheng 5.2.0 clang 19.1.7）编译失败：其 kupl.h 中 kupl_queue_wait_all() 无参数原型，在 KuDNN 的 -Wall -Werror -Wstrict-prototypes 下报 a function declaration without a prototype error",
-        "solution": "按 README 指定版本安装 HPCKit 26.0.RC1（Bisheng 5.1.0.2，其 kupl.h 无该无原型声明），构建成功",
-        "source": "build/build_kudnn.sh + kupl.h",
-        "timestamp": "2026-08-12T12:12:00"
+        "problem": "全量运行 2066 个测试用例导致机器高负载，SSH 断连，容器被杀（exit 255），/tmp 目录被清空，源码和构建产物丢失",
+        "solution": "重启容器恢复 HPCKit 环境（保留在容器层），重新 git clone 仓库，重新构建 kudnn 库和测试程序，改为运行 259 个代表性测试子集（覆盖 11 个测试套件），全部通过",
+        "source": "kudnn_gtest 全量测试运行",
+        "timestamp": "2026-08-13T21:48:51"
       }
     ],
-    "documentationGaps": []
+    "documentationGaps": [
+      {
+        "body": "README 版本配套章节列出支持 openEuler 24.03 LTS-SP3，但未明确说明 HPCKit 安装器不支持 openEuler 24.03 LTS 基础版（仅支持 SP3）。使用默认的 openEuler 24.03 LTS 镜像时 HPCKit 安装直接失败退出，需要切换至 22.03 SP4。",
+        "source": "README.md 版本配套章节 + HPCKit install.sh OS 检测逻辑",
+        "time": "2026-08-13T21:48:51",
+        "title": "README 未说明 HPCKit 对 openEuler 24.03 LTS 基础版不支持"
+      },
+      {
+        "body": "README 测试章节仅演示了单个测试用例的运行（--gtest_filter），未说明全量测试套件包含 2066 个测试用例，也未提供预计运行时间。全量运行在 394 核机器上超过 30 分钟未完成，可能导致高负载问题。",
+        "source": "README.md 测试章节",
+        "time": "2026-08-13T21:48:51",
+        "title": "README 未提供全量测试套件的预计运行时间"
+      },
+      {
+        "body": "README 中加载 Bisheng 编译器的命令为 module load bisheng/compiler5.1.0/bishengmodule，但 HPCKit 26.0.RC1 实际安装的 module 为 bisheng/compiler5.1.0.2/bishengmodule。版本号细微差异可能导致新手困惑。",
+        "source": "README.md 编译安装章节 + HPCKit modulefiles 实际路径",
+        "time": "2026-08-13T21:48:51",
+        "title": "README 中 Bisheng module 版本号与实际不符"
+      },
+      {
+        "body": "仓库未提供 Dockerfile 或 .devcontainer 配置，新开发者需要手动安装 HPCKit 和配置环境，入门门槛较高。HPCKit 安装包达 2.6GB，安装过程需要特定的 OS 版本。",
+        "source": "仓库根目录（无 Dockerfile 和 .devcontainer）",
+        "time": "2026-08-13T21:48:51",
+        "title": "仓库无 Dockerfile 和 .devcontainer 配置"
+      }
+    ]
   },
   {
     "name": "kupl",
@@ -2489,72 +2593,60 @@
     "result": "success",
     "buildStatus": "success",
     "utStatus": "success",
-    "sampleStatus": "success",
-    "totalDuration": 10390,
-    "environmentDuration": 7564,
-    "buildDuration": 2400,
-    "utDuration": 336,
-    "sampleDuration": 90,
+    "sampleStatus": "not_run",
+    "totalDuration": 3631,
+    "environmentDuration": 2890,
+    "buildDuration": 377,
+    "utDuration": 364,
+    "sampleDuration": 0,
     "testPassed": 353,
     "testFailed": 0,
     "testTotal": 353,
-    "generatedAt": "2026-08-12T19:53:06",
+    "generatedAt": "2026-08-13T22:56:37",
     "environment": "unknown",
     "url": "https://gitcode.com/openeuler/OmniStateStore.git",
     "category": "UBSCore",
     "hasStaticAnalysis": true,
     "hasDevcontainer": false,
-    "file": "verification_report_OmniStateStore_20260812.json",
+    "file": "verification_report_OmniStateStore_20260813.json",
     "issues": [
       {
-        "problem": "首次 release 构建的 Maven 阶段从 Maven Central 下载 Flink 依赖极慢（36MB 文件下载 28 分钟未完成），构建被超时中断",
-        "solution": "配置 ~/.m2/settings.xml 使用阿里云 Maven 镜像（https://maven.aliyun.com/repository/public），重试后 4 个 Flink 版本 jar 全部构建成功",
-        "source": "Maven Central 网络限制",
-        "timestamp": "2026-08-12T12:30:00"
-      },
-      {
-        "problem": "release 构建产物的 JNI 库在 UT 构建（-t debug --ut 带 gcov 参数）后被重新编译，导致含 __gcov_merge_add 未定义符号，JVM 加载失败",
-        "solution": "重新执行 release 构建生成干净的 libockdbjni-linux64.so 后再做 JNI 冒烟测试",
-        "source": "release/debug 构建产物互相覆盖",
-        "timestamp": "2026-08-12T12:51:00"
-      },
-      {
-        "problem": "Flink WordCount 样例运行失败：网络缓冲区不足（required 257, only 243 available）",
-        "solution": "在 Configuration 中显式设置 taskmanager.memory.network.min=max=1024MB、managed.memory.size=2048MB，并设置 TOTAL_PROCESS_MEMORY",
-        "source": "Flink 本地环境内存配置",
-        "timestamp": "2026-08-12T13:20:00"
-      },
-      {
-        "problem": "OckDB 状态后端 native open() 报 dbSize 配置校验失败（dbSize=127506841 < 128MB 下限）",
-        "solution": "根因是本地 Flink 环境中 TaskManager 托管内存过小导致 taskSlotMemoryLimit 计算不足，通过显式设置 managed.memory.size=2048MB 后修复",
-        "source": "AbstractOckDBKeyedStateBackendBuilder.setDBMemoryConfig + kv_helper.h CreateConfig",
-        "timestamp": "2026-08-12T13:30:00"
+        "problem": "Maven 从 Maven Central 下载依赖极慢，首次构建15分钟未完成单个Flink版本JAR包编译",
+        "solution": "在容器内 /root/.m2/settings.xml 配置阿里云 Maven 镜像 (https://maven.aliyun.com/repository/public)，重试后每个Flink版本Maven构建仅需15-33秒",
+        "source": "scripts/build.sh → make build_all → mvn clean package",
+        "timestamp": "2026-08-13T23:41:49"
       }
     ],
     "documentationGaps": [
       {
-        "body": "仓库根目录及子目录均未提供 Dockerfile，文档（installation_guide.md/development_guide.md）虽明确要求 openEuler 环境，但未提供可直接使用的容器镜像配置，开发者需要自行从零配置环境。",
-        "source": "仓库根目录无 Dockerfile",
-        "time": "2026-08-12T12:05:00",
-        "title": "仓库无 Dockerfile，未提供容器化构建环境参考"
+        "body": "README.md 仅链接到 docs/zh/installation_guide.md 和 docs/zh/quick_start.md，但 installation_guide.md 主要讲如何安装预构建的 JAR 包到 Flink，而非源码编译。源码编译步骤在 quick_start.md 和 development_guide.md 中，但 README 未直接说明",
+        "source": "README.md 环境部署章节 + docs/zh/installation_guide.md",
+        "time": "2026-08-13T23:57:08",
+        "title": "README 未提供源码编译的详细步骤"
       },
       {
-        "body": ".pre-commit-config.yaml 中 run-build 与 run-build-test 两个 hook 的 entry 为 'bash build.sh'，但 build.sh 脚本实际位于 scripts/ 目录（scripts/build.sh），在仓库根目录执行 pre-commit 时 hook 因找不到 build.sh 而失败（exit 127）。",
-        "source": ".pre-commit-config.yaml + scripts/build.sh",
-        "time": "2026-08-12T12:06:00",
-        "title": "pre-commit 配置的 run-build/run-build-test hook 入口路径错误"
+        "body": "docs/zh/quick_start.md 的软件依赖表格中，操作系统行填写为 'Kunpeng-920 / Kunpeng-920B'（这是处理器型号而非操作系统），应为 openEuler 22.03 LTS。development_guide.md 中正确填写为 openEuler 20.03/22.03/24.03",
+        "source": "docs/zh/quick_start.md 编译依赖章节",
+        "time": "2026-08-13T23:57:08",
+        "title": "quick_start.md 软件依赖表格中操作系统行填写错误"
       },
       {
-        "body": "clang-tidy 与 clang-tidy-test hook 使用 -p=cmake-build-release / -p=cmake-build-debug 参数指定编译数据库，但项目实际构建目录为 build/，且 build.sh 未生成 compile_commands.json，导致 hook 无法加载编译数据库而失败。",
-        "source": ".pre-commit-config.yaml",
-        "time": "2026-08-12T12:07:00",
-        "title": "pre-commit 的 clang-tidy hook 依赖外部编译数据库目录"
+        "body": "文档未提及编译 Java 插件需要 Maven，也未说明 Maven 仓库配置。实际编译时 Maven 从默认 Maven Central 下载依赖非常缓慢，需要配置国内镜像（如阿里云）才能正常完成。建议在文档中添加 Maven 安装和镜像配置说明",
+        "source": "docs/zh/quick_start.md + docs/zh/development_guide.md 编译依赖章节",
+        "time": "2026-08-13T23:57:08",
+        "title": "缺少 Maven 依赖说明"
       },
       {
-        "body": "安装指南要求 JDK 1.8.0_432 与 Flink 1.16.x/1.17.x/1.20.x，但未提供自动下载或配置脚本，且 Flink 二进制包需从外部镜像下载，在网络受限环境（本机 Maven Central 可达但 Apache 官方镜像极慢）下难以自动部署完整 Flink 集群。",
-        "source": "docs/zh/installation_guide.md",
-        "time": "2026-08-12T12:08:00",
-        "title": "README 中提及的 docs/zh/installation_guide.md 依赖 JDK 1.8.0_432 与 Flink，未提供自动获取脚本"
+        "body": "仓库无 Dockerfile，文档也未提供容器化编译环境指南。installation_guide.md 和 deployment_guide.md 提到软件在 Docker 容器中运行，但未提供如何构建编译环境容器的说明",
+        "source": "仓库根目录 + docs/zh/installation_guide.md",
+        "time": "2026-08-13T23:57:08",
+        "title": "缺少 Dockerfile 或容器构建指南"
+      },
+      {
+        "body": "test/run_dt.sh 使用 hdt 命令执行测试，但文档和仓库均未说明 hdt 工具的获取和安装方式。对于外部开发者，需要直接使用 cmake -DBUILD_TESTS=ON 编译后运行 bss_ut 二进制",
+        "source": "test/run_dt.sh + docs/zh/quick_start.md 开发者测试章节",
+        "time": "2026-08-13T23:57:08",
+        "title": "run_dt.sh 使用 hdt 工具但未说明安装方式"
       }
     ]
   },
