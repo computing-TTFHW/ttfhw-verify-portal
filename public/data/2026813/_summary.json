@@ -3186,6 +3186,100 @@
     ]
   },
   {
+    "name": "RecSDK",
+    "displayName": "RecSDK",
+    "result": "success",
+    "buildStatus": "success",
+    "utStatus": "success",
+    "sampleStatus": "success",
+    "totalDuration": 7545,
+    "environmentDuration": 7149,
+    "buildDuration": 70,
+    "utDuration": 314,
+    "sampleDuration": 12,
+    "testPassed": 33,
+    "testFailed": 0,
+    "testTotal": 33,
+    "testSkipped": 0,
+    "generatedAt": "2026-08-14T12:51:56",
+    "environment": "unknown",
+    "url": "https://gitcode.com/Ascend/RecSDK.git",
+    "category": "MindSDK",
+    "hasStaticAnalysis": true,
+    "hasDevcontainer": true,
+    "file": "verification_report_RecSDK_20260814.json",
+    "issues": [
+      {
+        "problem": "首次运行测试时 10 个多卡分布式测试失败（NPU 设备 ID 无效），因容器仅挂载 1 张 NPU 卡",
+        "solution": "提交容器为镜像后重启，挂载 davinci1 和 davinci2 两张 NPU 卡，多卡测试全部通过",
+        "source": "test_train_and_eval.py 多卡分布式测试 + npu-smi 设备配置",
+        "timestamp": "2026-08-14T14:46:01"
+      },
+      {
+        "problem": "Tier 1 预构建镜像 aarch64 不可用",
+        "solution": "降级 Tier 2 使用 Dockerfile 构建，Dockerfile 中 ARCH=$(uname -m) 自动适配 aarch64",
+        "source": ".devcontainer/devcontainer.json + Ascend Hub registry",
+        "timestamp": "2026-08-14T14:57:41"
+      },
+      {
+        "problem": "Tier 2 docker build 步骤 18 失败：torch-npu==2.6.0 下载超时（files.pythonhosted.org ReadTimeoutError）",
+        "solution": "使用 docker build 缓存的步骤 1-17 中间镜像启动容器，手动执行步骤 18 命令，将 pip.conf timeout 从 200 增加到 600 秒",
+        "source": "docker/Dockerfile 步骤 18 + pip.conf",
+        "timestamp": "2026-08-14T14:57:41"
+      },
+      {
+        "problem": "fbgemm_gpu==1.1.0+cpu 安装卡住（numpy 从 download.pytorch.org 下载缓慢）",
+        "solution": "先从 aliyun 镜像安装 numpy，再从 download.pytorch.org 安装 fbgemm_gpu（numpy 已缓存无需重复下载）",
+        "source": "pip install fbgemm_gpu==1.1.0+cpu --index-url https://download.pytorch.org/whl/cpu",
+        "timestamp": "2026-08-14T14:57:41"
+      },
+      {
+        "problem": "hybrid_torchrec 导入失败：fbgemm_ascend 1.2.0 与 torch 2.6.0 不兼容（undefined symbol）",
+        "solution": "切换到 torch_v1_pt2.7.1 venv（PyTorch 2.7.1 + fbgemm_ascend 1.2.0 完整配套），从 torch_rec_v1 tar.gz 的 pt2.7_whl 目录安装对应 wheel",
+        "source": "hybrid_torchrec/__init__.py + fbgemm_ascend 兼容性",
+        "timestamp": "2026-08-14T14:57:41"
+      },
+      {
+        "problem": "单元测试首次运行 10 个多卡分布式测试失败（Invalid device ID）",
+        "solution": "提交容器为镜像后重启，挂载 davinci1 和 davinci2 两张 NPU 卡，多卡测试全部通过（33/33）",
+        "source": "test_train_and_eval.py + NPU 设备配置",
+        "timestamp": "2026-08-14T14:57:41"
+      },
+      {
+        "problem": "样例脚本输入张量在 CPU 上导致设备不匹配错误",
+        "solution": "将输入张量（ids, lengths）调用 .npu() 移到 NPU 设备上",
+        "source": "sample.py + torch.embedding_bag 设备检查",
+        "timestamp": "2026-08-14T14:57:41"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "body": "devcontainer.json 中 image 字段为 swr.cn-south-1.myhuaweicloud.com/ascendhub/rec_sdk-torch:26.0.0_debian12-x86，仅有 x86 架构 tag。aarch64 架构的 tag（26.0.0_debian12-aarch64/arm64/26.1.0 变体）均不存在，registry API 需要认证无法列出可用 tag。aarch64 用户无法直接使用预构建镜像。",
+        "source": ".devcontainer/devcontainer.json + Ascend Hub registry API",
+        "time": "2026-08-14T14:57:41",
+        "title": "devcontainer.json 预构建镜像仅有 x86 tag"
+      },
+      {
+        "body": "docker/Dockerfile.26.1.0-cann9.1.0-ubuntu22.04-py3.11-pt 步骤 18 将下载 RecSDK 包、创建 4 个 venv、安装 PyTorch/torch-npu/torchrec/fbgemm 等全部放在一个 RUN 指令中，pip.conf timeout=200 秒。从中国网络环境下载 torch-npu（files.pythonhosted.org）容易超时导致整个步骤失败，需分步安装或增加 timeout。",
+        "source": "docker/Dockerfile.26.1.0-cann9.1.0-ubuntu22.04-py3.11-pt 步骤 18",
+        "time": "2026-08-14T14:57:41",
+        "title": "Dockerfile 步骤 18 网络超时风险"
+      },
+      {
+        "body": "Dockerfile 中 torch_v1_pt2.6.0 venv 未安装 fbgemm_ascend，但 hybrid_torchrec 导入时需要 fbgemm_ascend 或 libfbgemm_npu_api.so。fbgemm_ascend 1.2.0 与 torch 2.6.0 不兼容（符号不匹配），需使用 torch 2.7.1 配套或单独编译 libfbgemm_npu_api.so。",
+        "source": "docker/Dockerfile 步骤 18 + hybrid_torchrec/__init__.py",
+        "time": "2026-08-14T14:57:41",
+        "title": "torch_v1_pt2.6.0 venv 缺少 fbgemm_ascend"
+      },
+      {
+        "body": "test/st/util.py 导入 pytz 模块，但 hybrid_torchrec/requirements.txt 中未列出 pytz 依赖。运行测试前需手动 pip install pytz，否则所有导入 util.py 的测试都会在收集阶段失败。",
+        "source": "training/torch_rec_v1/hybrid_torchrec/test/st/util.py + requirements.txt",
+        "time": "2026-08-14T14:57:41",
+        "title": "test/st/util.py 依赖 pytz 未在 requirements.txt 中声明"
+      }
+    ]
+  },
+  {
     "name": "stratovirt",
     "displayName": "stratovirt",
     "result": "partial_success",
