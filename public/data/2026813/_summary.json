@@ -2,64 +2,87 @@
   {
     "name": "AgentSDK",
     "displayName": "AgentSDK",
-    "result": "partial_success",
+    "result": "success",
     "buildStatus": "success",
-    "utStatus": "partial_success",
+    "utStatus": "success",
     "sampleStatus": "success",
-    "totalDuration": 2652,
-    "environmentDuration": 2357.7709999999997,
-    "buildDuration": 0.371,
-    "utDuration": 221.83,
-    "sampleDuration": 72.028,
-    "testPassed": 2600,
-    "testFailed": 208,
-    "testTotal": 2808,
-    "testSkipped": 0,
-    "generatedAt": "2026-08-13T16:46:36",
+    "totalDuration": 1882,
+    "environmentDuration": 1648,
+    "buildDuration": 1,
+    "utDuration": 145,
+    "sampleDuration": 88,
+    "testPassed": 3214,
+    "testFailed": 0,
+    "testTotal": 3214,
+    "generatedAt": "2026-08-14T16:16:54",
     "environment": "unknown",
     "url": "https://gitcode.com/Ascend/AgentSDK.git",
     "category": "MindSDK",
     "hasStaticAnalysis": true,
     "hasDevcontainer": true,
-    "file": "verification_report_AgentSDK_20260813.json",
+    "file": "verification_report_AgentSDK_20260814.json",
     "issues": [
       {
-        "problem": "NPU 卡 0 状态 Critical 无法使用，卡 1 被其他容器（RecSDK-ttfhw, IndexSDK-ttfhw）占用，卡 2 被 MindIE-SD-ttfhw 占用",
-        "solution": "通过 npu-smi info 检查各卡状态，选择空闲的卡 3 (davinci3) 挂载到容器，npu-smi 确认卡 3 状态 OK 且无运行进程",
-        "source": "远程机器 npu-smi + docker inspect",
-        "timestamp": "2026-08-13T17:07:02"
+        "problem": "CI 镜像内置 numpy 2.2.6 与 torch 2.1.0 不兼容，导致 import torch 报错 _ARRAY_API not found",
+        "solution": "降级 numpy 到 1.26.4（pip3 install \"numpy<2\"），修复后 torch 正常导入",
+        "source": "CI 镜像 mindx_arm:SDK_20260112_1 环境验证",
+        "timestamp": "2026-08-14T16:39:31"
       },
       {
-        "problem": "容器内 NumPy 2.2.6 与预装 torch 2.1.0 不兼容，导致 import torch 报错（_ARRAY_API not found）",
-        "solution": "降级 NumPy 至 1.26.4（numpy<2），兼容 torch 2.1.0",
-        "source": "容器内 python3 -c \"import torch\" 测试",
-        "timestamp": "2026-08-13T17:07:02"
+        "problem": "容器内 npu-smi 报错 libc_sec.so: cannot open shared object file",
+        "solution": "设置 LD_LIBRARY_PATH 包含 /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64/common:/usr/local/Ascend/driver/lib64/driver，并 source CANN 环境脚本",
+        "source": "容器启动后 NPU 可用性验证",
+        "timestamp": "2026-08-14T16:39:31"
       },
       {
-        "problem": "Aura UT 中 208 个测试失败，54 个收集错误，主要原因是缺少 vllm、mindspeed_rl 等三方源码依赖（需执行 download_third_party.sh 下载），以及 fastapi.__spec__ 兼容性问题",
-        "solution": "安装了 aura_ut.sh 中除 torch 版本变更外的所有 Python 依赖，克隆了 rllm 三方库。vllm/mindspeed_rl 等需要完整源码下载和编译，在当前验证环境内无法完成。14 个文件因 fastapi.__spec__ 收集错误被跳过。2092/2300 测试通过（91.0%）。",
-        "source": "Aura UT 执行结果",
-        "timestamp": "2026-08-13T17:23:28"
+        "problem": "aura_ut.sh 中 LD_PRELOAD 指向的 scikit_learn libgomp 库在 CI 镜像中不存在",
+        "solution": "该 LD_PRELOAD 路径不存在但不影响测试执行（ld.so 忽略缺失的预加载库），UT 正常通过",
+        "source": "script/aura_ut.sh 第87行 LD_PRELOAD 设置",
+        "timestamp": "2026-08-14T16:39:31"
+      },
+      {
+        "problem": "CI 镜像缺少 pytest/python/pip 命令行 symlink，导致 presmoke 脚本报 pytest is not installed / pip: command not found",
+        "solution": "创建 symlink：ln -sf /opt/buildtools/python-3.11.4/bin/pytest /usr/local/bin/pytest; ln -sf python3 /usr/local/bin/python; ln -sf pip3 /usr/local/bin/pip",
+        "source": "presmoke/aura/presmoke.sh + presmoke/openclaw/presmoke.sh",
+        "timestamp": "2026-08-14T16:48:16"
+      },
+      {
+        "problem": "openclaw presmoke 缺少 envsubst 工具（gettext-base 包未安装）",
+        "solution": "apt-get install -y gettext-base openssl",
+        "source": "presmoke/openclaw/presmoke.sh 第40行",
+        "timestamp": "2026-08-14T16:48:16"
       }
     ],
     "documentationGaps": [
       {
-        "body": "requirements.txt 要求 torch>=2.9.0，但 aura_ut.sh 安装 torch==2.5.1，而预构建镜像中预装 torch 2.1.0。三个版本不一致，开发者难以判断应使用哪个版本。",
-        "source": "aura/requirements.txt vs script/aura_ut.sh vs 容器预装",
-        "time": "2026-08-13T17:30:48",
-        "title": "aura_ut.sh 中 torch 版本与 requirements.txt 不一致"
+        "body": "script/compile.sh 引用 ci/config/config.ini 获取版本号，但该文件在 master 分支不存在。compile.sh 使用默认版本号 7.0.0，但 setup.py 中 version='5.0.0'，两者不一致。构建产出的 wheel 包版本为 5.0.0（setup.py 中的值）。",
+        "source": "script/compile.sh 第30行",
+        "time": "2026-08-14T16:48:16",
+        "title": "ci/config/config.ini 不存在"
       },
       {
-        "body": "presmoke/aura/presmoke.sh 使用 set -euo pipefail 但引用了未设置的 PYTHONPATH 变量，导致脚本在干净环境中直接报错退出。应在脚本中设置默认值。",
-        "source": "presmoke/aura/presmoke.sh:58",
-        "time": "2026-08-13T17:30:48",
-        "title": "presmoke 脚本依赖未声明的环境变量 PYTHONPATH"
+        "body": "contributing.md 声称 CI 镜像已具备构建验证的所有基础环境，但实际镜像中 pytest、python、pip 命令行工具未创建 symlink（只有 python3、pip3 和 python3 -m pytest）。presmoke 脚本使用 pytest 和 python 命令导致失败，需要手动创建 symlink。",
+        "source": "contributing.md 第60行 + presmoke/aura/presmoke.sh 第48行",
+        "time": "2026-08-14T16:48:16",
+        "title": "CI 镜像缺少 pytest/python/pip 命令行 symlink"
       },
       {
-        "body": "预构建镜像 mindx_arm:SDK_20260112_1 中 python3/pip3/pytest 存在但未创建 python/pip/pytest 符号链接，导致 presmoke 脚本中直接调用 python/pip/pytest 命令失败。",
-        "source": "容器环境检查",
-        "time": "2026-08-13T17:30:48",
-        "title": "容器内缺少 python/pip/pytest 命令符号链接"
+        "body": "CI 镜像 mindx_arm:SDK_20260112_1 内置 numpy 2.2.6，但 torch 2.1.0 编译于 numpy 1.x，导致 import torch 报错 _ARRAY_API not found。需手动降级 numpy 到 <2 才能正常使用。",
+        "source": "CI 镜像环境验证",
+        "time": "2026-08-14T16:48:16",
+        "title": "CI 镜像 numpy 版本与 torch 不兼容"
+      },
+      {
+        "body": "script/aura_ut.sh 第87行设置 LD_PRELOAD 指向 scikit_learn 的 libgomp 库，但该路径在 CI 镜像中不存在。虽然 ld.so 会忽略缺失的预加载库不影响测试，但会产生大量 ERROR 日志输出。",
+        "source": "script/aura_ut.sh 第87行",
+        "time": "2026-08-14T16:48:16",
+        "title": "aura_ut.sh LD_PRELOAD 路径在 CI 镜像中不存在"
+      },
+      {
+        "body": "presmoke/openclaw/presmoke.sh 检查 envsubst 是否安装，但 contributing.md 和安装指南中未提及 openclaw presmoke 需要 gettext-base 包。CI 镜像未预装此包，需手动安装。",
+        "source": "presmoke/openclaw/presmoke.sh 第40行",
+        "time": "2026-08-14T16:48:16",
+        "title": "openclaw presmoke 缺少 envsubst 依赖说明"
       }
     ]
   },
@@ -3087,72 +3110,78 @@
     "buildStatus": "success",
     "utStatus": "partial_success",
     "sampleStatus": "success",
-    "totalDuration": 2414,
-    "environmentDuration": 2284,
+    "totalDuration": 1601,
+    "environmentDuration": 1478,
     "buildDuration": 2,
-    "utDuration": 114,
-    "sampleDuration": 14,
+    "utDuration": 108,
+    "sampleDuration": 13,
     "testPassed": 857,
     "testFailed": 8,
     "testTotal": 866,
     "testSkipped": 1,
-    "generatedAt": "2026-08-13T17:32:47",
+    "generatedAt": "2026-08-14T16:33:37",
     "environment": "unknown",
     "url": "https://gitcode.com/Ascend/RAGSDK.git",
     "category": "MindSDK",
     "hasStaticAnalysis": true,
     "hasDevcontainer": true,
-    "file": "verification_report_RAGSDK_20260813.json",
+    "file": "verification_report_RAGSDK_20260814.json",
     "issues": [
       {
-        "problem": "run_py_test.sh 中 torch-2.10.0+cpu 下载链接为 x86_64 架构 (manylinux_2_28_x86_64)，在 aarch64 容器内不可用",
-        "solution": "跳过 torch+cpu 下载，直接使用预构建镜像内已有的 torch 2.1.0 (CPU 版本)，卸载 torch_npu 和 torchvision 避免导入错误。UT 使用 mock 不依赖 NPU。",
-        "source": "tests/run_py_test.sh 第 35 行 wget 命令",
-        "timestamp": "2026-08-13T18:00:09"
+        "problem": "容器内 npu-smi 执行报错: symbol lookup error libdrvdsmi_host.so undefined symbol drvSetDeviceInfo",
+        "solution": "宿主机驱动版本 25.5.0 与容器内 npu-smi 二进制版本不匹配。此为宿主机级别问题，不影响构建和 UT 步骤（UT 使用 mock 隔离 NPU 依赖）。",
+        "source": "docker exec RAGSDK-ttfhw npu-smi info",
+        "timestamp": "2026-08-14T16:44:25"
       },
       {
-        "problem": "test_graphrag_pipeline.py 的 setUp 方法中 os.makedirs(self.temp_dir) 未加 exist_ok=True，导致目录已存在时 7 个测试全部失败",
-        "solution": "测试代码缺陷，应改为 os.makedirs(self.temp_dir, exist_ok=True)。非产品代码问题，不影响 RAGSDK 功能验证结论。",
-        "source": "tests/unit_tests/graphrag/test_graphrag_pipeline.py 第 71 行",
-        "timestamp": "2026-08-13T18:00:09"
+        "problem": "容器内 torch_npu 导入失败: ImportError libruntime_common.so undefined symbol _ZN12ErrorManager19ATCReportErrMessageE",
+        "solution": "镜像内 CANN 9.0.0 的 libruntime_common.so 与 torch_npu 2.1.0.post13 编译时的 CANN 版本不匹配。UT 脚本 run_py_test.sh 会卸载 torch_npu 并安装 CPU 版 torch，不影响 UT 执行。",
+        "source": "docker exec RAGSDK-ttfhw python3 -c 'import torch_npu'",
+        "timestamp": "2026-08-14T16:44:25"
       },
       {
-        "problem": "test_sparse_embedding.py::test_encode_success 失败: RuntimeError: could not create a primitive descriptor for a matmul primitive",
-        "solution": "torch 2.1.0 在 aarch64 平台上 oneDNN matmul 原语兼容性问题。预构建镜像内 torch 版本 (2.1.0) 与 requirements.txt 指定版本 (2.10.0) 不一致。非产品代码问题。",
-        "source": "torch.nn.Linear.forward → F.linear → oneDNN matmul",
-        "timestamp": "2026-08-13T18:00:09"
+        "problem": "容器内 ascendfaiss 导入报错: libascendfaiss.so cannot open shared object file",
+        "solution": "libascendfaiss.so 位于 /usr/local/Ascend/mxIndex-26.0.0/host/lib/，需补充 LD_LIBRARY_PATH。.bashrc 中已配置 /usr/local/Ascend/mxIndex/lib 但实际库在 host/lib 子目录。",
+        "source": "docker exec RAGSDK-ttfhw python3 -c 'import ascendfaiss'",
+        "timestamp": "2026-08-14T16:44:25"
       },
       {
-        "problem": "parse_document 样例首次执行失败，缺少 NLTK punkt_tab 和 averaged_perceptron_tagger_eng 资源",
-        "solution": "在容器内执行 nltk.download('punkt_tab') 和 nltk.download('averaged_perceptron_tagger_eng') 下载资源后重试成功。预构建镜像设置了 AUTO_DOWNLOAD_NLTK=false 但未预装这些资源。",
-        "source": "example/parse_document/parse_document.py + mx_rag/__init__.py",
-        "timestamp": "2026-08-13T18:13:01"
+        "problem": "样例执行因缺少 NLTK punkt_tab 和 averaged_perceptron_tagger_eng 数据失败",
+        "solution": "从 GitHub 镜像 (ghfast.top) 下载 punkt_tab.zip 和 averaged_perceptron_tagger_eng.zip，通过 docker cp 复制到容器并解压到 /root/nltk_data/ 目录",
+        "source": "example/parse_document/parse_document.py 执行",
+        "timestamp": "2026-08-14T17:00:18"
       }
     ],
     "documentationGaps": [
       {
-        "body": "tests/run_py_test.sh 第 35 行的 wget 命令下载 torch-2.10.0+cpu-cp311-cp311-manylinux_2_28_x86_64.whl，该 wheel 仅适用于 x86_64 架构。在 aarch64 容器中执行会导致安装失败或被跳过，影响 UT 环境准备。应提供 aarch64 版本的 torch+cpu wheel 或使用 pip 安装。",
-        "source": "tests/run_py_test.sh 第 35 行",
-        "time": "2026-08-13T18:13:01",
-        "title": "run_py_test.sh 中 torch+cpu 下载链接仅支持 x86_64 架构"
+        "body": "quickstart.md 步骤5 执行 parse_document.py 样例时，unstructured 库的 partition_md 函数依赖 NLTK 的 punkt_tab 和 averaged_perceptron_tagger_eng 数据包，但镜像内未预装且文档未提及需手动下载。新开发者按文档执行会遇到 LookupError。",
+        "source": "docs/zh/quickstart.md 步骤5 + example/parse_document/parse_document.py",
+        "time": "2026-08-14T17:00:18",
+        "title": "quickstart.md 样例缺少 NLTK 数据依赖说明"
       },
       {
-        "body": "tests/unit_tests/graphrag/test_graphrag_pipeline.py 第 71 行 os.makedirs(self.temp_dir) 在目录已存在时会抛出 FileExistsError，导致 7 个测试用例全部失败。应改为 os.makedirs(self.temp_dir, exist_ok=True)。",
-        "source": "tests/unit_tests/graphrag/test_graphrag_pipeline.py 第 71 行",
-        "time": "2026-08-13T18:13:01",
-        "title": "test_graphrag_pipeline.py 的 setUp 方法中 os.makedirs 未加 exist_ok=True"
+        "body": "tests/run_py_test.sh 第42行下载 torch-2.10.0+cpu-cp311-cp311-manylinux_2_28_x86_64.whl，该 wheel 包仅适用于 x86_64 架构。在 aarch64 机器上执行会因架构不匹配而失败。脚本应按架构自动选择对应 wheel 包。",
+        "source": "tests/run_py_test.sh 第42行",
+        "time": "2026-08-14T17:00:18",
+        "title": "run_py_test.sh 脚本下载 x86_64 版 torch，不兼容 aarch64"
       },
       {
-        "body": "预构建镜像 ragsdk:26.0.0-910b-ubuntu22.04-py3.11 中安装的 torch 版本为 2.1.0，而 requirements.txt 指定 torch==2.10.0。版本不一致导致 torch_npu 导入报错 (libruntime_common.so undefined symbol) 和 test_sparse_embedding 测试中 matmul 原语创建失败。",
-        "source": "requirements.txt + 预构建镜像 pip list",
-        "time": "2026-08-13T18:13:01",
-        "title": "预构建镜像 torch 版本与 requirements.txt 不一致"
+        "body": "Tier 1 预构建镜像 (ragsdk:26.0.0-910b-ubuntu22.04-py3.11) 内 torch 版本为 2.1.0，但 requirements.txt 指定 torch==2.10.0。版本不匹配导致 torch_npu 导入失败和 sparse_embedding UT 失败（F.linear RuntimeError）。",
+        "source": "requirements.txt + 容器内 pip list",
+        "time": "2026-08-14T17:00:18",
+        "title": "镜像内 torch 版本与 requirements.txt 不匹配"
       },
       {
-        "body": "预构建镜像中未预装 NLTK 的 punkt_tab 和 averaged_perceptron_tagger_eng 资源，导致 parse_document 样例首次执行失败。mx_rag/__init__.py 设置了 AUTO_DOWNLOAD_NLTK=false（默认不自动下载），但镜像中也没有预装这些资源。应在镜像构建时预装或提供离线安装方式。",
-        "source": "mx_rag/__init__.py 第 34 行 + parse_document.py 样例执行",
-        "time": "2026-08-13T18:13:01",
-        "title": "预构建镜像未预装 NLTK 数据资源"
+        "body": "tests/unit_tests/graphrag/test_graphrag_pipeline.py 第71行 os.makedirs(self.temp_dir) 未设置 exist_ok=True，当多个测试方法共享同一临时目录时，第二个起的测试均因 FileExistsError 失败。应改为 os.makedirs(self.temp_dir, exist_ok=True)。",
+        "source": "tests/unit_tests/graphrag/test_graphrag_pipeline.py 第71行",
+        "time": "2026-08-14T17:00:18",
+        "title": "graphrag UT 测试 setUp 方法未处理目录已存在情况"
+      },
+      {
+        "body": "容器内 npu-smi 执行报错 symbol lookup error: libdrvdsmi_host.so undefined symbol drvSetDeviceInfo。宿主机驱动版本 25.5.0 与容器镜像内 npu-smi 二进制版本不匹配。文档未说明镜像配套的驱动版本要求。",
+        "source": "docker exec RAGSDK-ttfhw npu-smi info",
+        "time": "2026-08-14T17:00:18",
+        "title": "容器内 npu-smi 与宿主机驱动版本不匹配"
       }
     ]
   },
