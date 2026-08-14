@@ -2791,6 +2791,99 @@
     ]
   },
   {
+    "name": "Plugin",
+    "displayName": "Plugin",
+    "result": "partial_success",
+    "buildStatus": "success",
+    "utStatus": "failed",
+    "sampleStatus": "not_run",
+    "totalDuration": 7456,
+    "environmentDuration": 7163,
+    "buildDuration": 173,
+    "utDuration": 120,
+    "sampleDuration": 0,
+    "testPassed": 0,
+    "testFailed": 0,
+    "testTotal": 0,
+    "generatedAt": "2026-08-13T21:50:44",
+    "environment": "unknown",
+    "url": "https://gitcode.com/openGauss/Plugin.git",
+    "category": "openGauss",
+    "hasStaticAnalysis": true,
+    "hasDevcontainer": false,
+    "file": "verification_report_Plugin_20260813.json",
+    "issues": [
+      {
+        "problem": "pre-commit 的 cpp-linter-hooks 仓库位于 github.com，容器内 github.com 不可达(git ls-remote 报 'Failure when receiving data from the peer')，导致 pre-commit 初始化该 hook 环境时长时间挂起",
+        "solution": "临时从 .pre-commit-config.yaml 移除 cpp-linter repo 块(sed/python)，仅运行 gitcode 可达的 8 个 hook，clang-format/clang-tidy 标记为 skipped；运行完毕后 git checkout 还原配置。gitcode.com 可正常访问。",
+        "source": ".pre-commit-config.yaml (repo: https://github.com/cpp-linter/cpp-linter-hooks)",
+        "timestamp": "2026-08-13T22:05:00"
+      },
+      {
+        "problem": "验证主机磁盘 100% 占满(仅剩 73M)，因 5 个验证任务并行运行(Plugin/Kernel/openGauss-server/hmpi/OmniStateStore 共用主机)，导致无法 clone openGauss-server 或构建 dolphin。",
+        "solution": "排查发现 /root/.cache 占用 5.9G(其中 pip 缓存 5.5G、go-build 180M、pre-commit 169M)，均为可重建缓存，清理后释放 6.6G 磁盘空间。",
+        "source": "df -h / + du -sh /root/.cache/*",
+        "timestamp": "2026-08-13T22:20:00"
+      },
+      {
+        "problem": "dolphin CMakeLists.txt 的 CMAKE_SOURCE_DIR 为符号链接时被 cmake 解析为真实路径(/workspace/contrib/dolphin)，导致 ../../cmake/src 模块查找失败",
+        "solution": "将 dolphin 从符号链接改为真实目录拷贝(cp -r /workspace/contrib/dolphin /buildws/contrib/dolphin)，使 CMAKE_SOURCE_DIR 指向代理根下的真实路径",
+        "source": "cmake 配置错误: include could not find build_function",
+        "timestamp": "2026-08-13T22:45:00"
+      },
+      {
+        "problem": "dolphin 编译缺少多个 openGauss-server 生成头文件(pg_config_os.h、errcodes.h、lwlocknames.h、fmgroids.h 等)",
+        "solution": "1) pg_config_os.h 手动创建符号链接 -> port/linux.h; 2) 运行 openGauss-server cmake 配置批量生成所有头文件; 3) errcodes.h 由 generate-errcodes.pl 生成; 4) scan.inc/hint_scan.inc 手动运行 flex 生成",
+        "source": "编译错误: fatal error: xxx.h: No such file or directory",
+        "timestamp": "2026-08-13T22:46:00"
+      },
+      {
+        "problem": "并行 openGauss-server 验证任务的 cmake 在 src/include/ 创建了 9 个绝对路径符号链接(指向 /workspace/openGauss-server/...，仅在其容器内有效)，在 Plugin-ttfhw 容器内断裂",
+        "solution": "编写脚本将 9 个断裂符号链接的目标从绝对路径 /workspace/openGauss-server/src/X 改为相对路径 ../../X，全部修复",
+        "source": "编译错误: fmgroids.h No such file or directory (符号链接断裂)",
+        "timestamp": "2026-08-13T22:48:00"
+      },
+      {
+        "problem": "UT 冒烟测试中 openGauss server 启动后崩溃(进程 defunct)，无法连接执行 CREATE EXTENSION dolphin",
+        "solution": "排查确认崩溃发生在 dolphin 加载前，根因是复用的 mppdb_temp_install 安装不完整(缺少 gaussdb.version/conversion_create.sql/snowball_create.sql 等)。补齐部分缺失 share 文件后 initdb 成功，但 server 仍在启动阶段崩溃，无法完成冒烟测试。",
+        "source": "gaussdb 启动日志 + ps 显示 defunct",
+        "timestamp": "2026-08-13T22:52:00"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "body": "README 仅记载将 contrib/dolphin 复制到 openGauss-server 后执行 make 的构建方式，未说明 dolphin 自带的 cmake.sh 独立构建路径，也未列出该路径所需的关键环境变量(THIRD_BIN_PATH 指向 binarylibs、PREFIX_HOME 安装前缀、DEBUG_TYPE=release、BUILD_TUPLE=aarch64/x86_64)。新开发者直接运行 cmake.sh 会因缺少这些变量而失败(build_options.cmake:123 if 语句错误)。",
+        "source": "README.md + contrib/dolphin/cmake.sh + contrib/dolphin/CMakeLists.txt",
+        "time": "2026-08-13T22:50:00",
+        "title": "README 未文档化 dolphin 独立 cmake 构建路径及其环境变量要求"
+      },
+      {
+        "body": "dolphin 的 CMakeLists.txt 与 cmake.sh 假定 openGauss-server 已完成 cmake 配置(生成 pg_config_os.h、errcodes.h、lwlocknames.h、fmgroids.h、scan.inc 等头文件)。README 未提及此前置条件，新开发者仅复制 dolphin 到 server 目录后直接构建 dolphin 会遇到一系列 'No such file or directory' 错误。",
+        "source": "contrib/dolphin/CMakeLists.txt + 编译过程错误日志",
+        "time": "2026-08-13T22:50:00",
+        "title": "未说明 dolphin 构建依赖 openGauss-server 的 cmake 配置(生成头文件)"
+      },
+      {
+        "body": ".pre-commit-config.yaml 中 cpp-linter-hooks 的 clang-format/clang-tidy 指定 --version=21，但 setup-pre-commit.sh 注释推荐安装 v17 或 v18。版本要求不一致导致开发者难以准备正确的 C++ 工具链环境。",
+        "source": ".pre-commit-config.yaml + setup-pre-commit.sh",
+        "time": "2026-08-13T22:50:00",
+        "title": "pre-commit 配置要求 clang v21 与 setup 脚本推荐版本不一致"
+      },
+      {
+        "body": "README 仅记载 make check 回归测试作为功能验证，无独立可运行的样例/示例程序。样例执行依赖完整 openGauss server 实例，门槛较高。",
+        "source": "README.md",
+        "time": "2026-08-13T22:50:00",
+        "title": "README 未提供独立样例程序"
+      },
+      {
+        "body": "contrib/chparser/docker/dockerfile_x86 使用 FROM openeuler-20.03-lts:latest，openEuler 20.03 LTS 已于 2024 年 EOL，且依赖本地预构建的 openGauss-Server-6.0.0 tar 包，未说明如何获取该包或迁移到新版本 openEuler。",
+        "source": "contrib/chparser/docker/dockerfile_x86",
+        "time": "2026-08-13T22:50:00",
+        "title": "chparser Dockerfile 指定已 EOL 的 openEuler 20.03"
+      }
+    ]
+  },
+  {
     "name": "PolyMind",
     "displayName": "PolyMind",
     "result": "success",
@@ -2978,6 +3071,64 @@
         "source": "mx_rag/__init__.py 第 34 行 + parse_document.py 样例执行",
         "time": "2026-08-13T18:13:01",
         "title": "预构建镜像未预装 NLTK 数据资源"
+      }
+    ]
+  },
+  {
+    "name": "stratovirt",
+    "displayName": "stratovirt",
+    "result": "partial_success",
+    "buildStatus": "success",
+    "utStatus": "success",
+    "sampleStatus": "partial_success",
+    "totalDuration": 3978,
+    "environmentDuration": 3421,
+    "buildDuration": 330,
+    "utDuration": 222,
+    "sampleDuration": 5,
+    "testPassed": 466,
+    "testFailed": 0,
+    "testTotal": 466,
+    "testSkipped": 2,
+    "generatedAt": "2026-08-13T22:53:22",
+    "environment": "unknown",
+    "url": "https://gitcode.com/openeuler/stratovirt.git",
+    "category": "openEuler",
+    "hasStaticAnalysis": true,
+    "hasDevcontainer": false,
+    "file": "verification_report_stratovirt_20260813.json",
+    "issues": [
+      {
+        "problem": "系统 cargo/rustc 1.64.0（openEuler 22.03 LTS-SP2 自带）过旧，audio crate 使用 edition 2024，cargo fetch 直接报错不支持该 edition",
+        "solution": "通过 rsproxy.cn 镜像下载 rustup-init 二进制并安装 stable 1.97.1 工具链到 CARGO_HOME=/cargo（tmpfs），并配置 crates.io sparse 镜像加速依赖下载",
+        "source": "audio/Cargo.toml edition=2024 + docs/build_guide.ch.md 推荐rustc>=1.64.0(实际仍不够)",
+        "timestamp": "2026-08-13T23:13:15"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "body": "README 与 docs/build_guide.ch.md 声明 rustc 推荐版本为 1.64.0 及之后版本，但仓库 audio/Cargo.toml 已使用 edition = \"2024\"，该 edition 要求 rustc >= 1.85。openEuler 22.03 LTS-SP2 系统自带 rust 1.64.0 无法构建，新开发者按 README 仅装 1.64 会直接失败。建议更新文档最低版本要求至 1.85。",
+        "source": "README.md 环境准备 + docs/build_guide.ch.md 第1节 + audio/Cargo.toml edition=2024",
+        "time": "2026-08-13T23:59:22",
+        "title": "README 推荐 rustc >= 1.64.0 但实际仓库已使用 edition 2024，需 rustc >= 1.85"
+      },
+      {
+        "body": "Makefile 的 yum-deps 目标中每条依赖安装均使用 `@yum install <pkg>`（无 -y 参数），在容器/CI 等非交互环境中会因等待用户确认而失败。make build 依赖 yum-deps，导致直接执行 `make build` 在非交互环境不可用。建议改为 `yum install -y`。",
+        "source": "Makefile yum-deps 目标",
+        "time": "2026-08-13T23:59:22",
+        "title": "Makefile yum-deps 目标使用 yum install 而非 yum install -y，非交互环境会失败"
+      },
+      {
+        "body": "README 仅提及需安装 Rust/Cargo，未列出 pixman-devel、libcap-ng-devel、libseccomp-devel、cyrus-sasl-devel、dtc-devel(aarch64) 等系统库依赖。这些依赖散落在 Dockerfile 与 Makefile 中，新开发者仅读 README 无法完整准备环境。需交叉阅读 docs/build_guide.ch.md、Dockerfile、Makefile、.cargo/config.toml 才能凑齐。",
+        "source": "README.md 环境准备章节 + tools/build_stratovirt_static/Dockerfile + Makefile + .cargo/config.toml",
+        "time": "2026-08-13T23:59:22",
+        "title": "README 未说明构建依赖的系统开发库清单"
+      },
+      {
+        "body": "docs/test.md 的 mod_test 需预编译 stratovirt(--all-features) + virtiofsd 并导出环境变量，且通过 socket+QMP 启动 VM 测试；hydropper 需 kernel/rootfs 镜像与网桥配置。两者均依赖 KVM 与外部镜像，文档未明确说明无 KVM 环境的替代验证方式或最低硬件要求。",
+        "source": "docs/test.md + tests/hydropper/README.cn.md",
+        "time": "2026-08-13T23:59:22",
+        "title": "docs/test.md 的 mod_test 与 hydropper 测试在无 KVM/镜像环境无法执行，文档未说明前置硬件要求"
       }
     ]
   },

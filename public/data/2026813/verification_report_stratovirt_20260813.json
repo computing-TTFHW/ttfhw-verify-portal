@@ -1,0 +1,673 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md 使用说明 + 宿主机 uname -m",
+      "value": "aarch64（README 同时支持 x86_64 与 aarch64，验证机为 aarch64/Kunpeng 920）"
+    },
+    "build_commands": {
+      "source": "README.md 编译章节 + Makefile build 目标 + docs/build_guide.ch.md",
+      "value": "make build（等价 cargo build --workspace --bins --release），产物 target/release/stratovirt"
+    },
+    "dependencies": {
+      "source": "README.md + docs/build_guide.ch.md + Cargo.toml + .cargo/config.toml + Dockerfile + Makefile",
+      "value": [
+        "Rust 工具链（rustc \u003e= 1.64.0，edition 2021），README 推荐用 rustup 安装",
+        "cargo（openEuler 系统包可能版本过旧，改用 rustup）",
+        "pixman-devel（.cargo/config.toml 为非 musl 目标追加 -lpixman-1 链接）",
+        "libcap-devel / libcap-ng-devel / libseccomp-devel（Dockerfile）",
+        "cyrus-sasl-devel（Dockerfile + Makefile）",
+        "dtc-devel（aarch64 专属，Dockerfile）",
+        "musl-gcc（Dockerfile，静态构建用，默认 glibc 构建非必需）",
+        "clang / gtk3-devel / libusbx / alsa-lib-devel / pulseaudio / make（Makefile yum-deps）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "tools/build_stratovirt_static/Dockerfile RUN 指令 + Makefile yum-deps 目标",
+      "value": [
+        {
+          "original": "yum install -y cargo musl-gcc cyrus-sasl-devel",
+          "target_equivalent": "yum install -y cargo musl-gcc cyrus-sasl-devel（openEuler 原生，无需翻译）"
+        },
+        {
+          "original": "yum install -y libcap-devel libcap-ng-devel libseccomp-devel",
+          "target_equivalent": "yum install -y libcap-devel libcap-ng-devel libseccomp-devel（openEuler 原生，无需翻译）"
+        },
+        {
+          "original": "yum install -y dtc-devel (aarch64)",
+          "target_equivalent": "yum install -y dtc-devel（aarch64 专属，openEuler 原生）"
+        },
+        {
+          "original": "Makefile yum-deps: pixman-devel libcap-ng-devel cyrus-sasl-devel pulseaudio clang gtk3-devel libusbx alsa-lib-devel make",
+          "target_equivalent": "yum install -y pixman-devel libcap-ng-devel cyrus-sasl-devel pulseaudio clang gtk3-devel libusbx alsa-lib-devel make（openEuler 原生，无需翻译）"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "tools/build_stratovirt_static/Dockerfile FROM 指令",
+      "value": "Dockerfile 指定 openeuler/openeuler:22.03-lts-sp2，选择 openEuler 22.03 LTS-SP2 基础镜像"
+    },
+    "sample_commands": {
+      "source": "README.md 使用StratoVirt启动虚拟机章节",
+      "value": "./target/release/stratovirt -machine microvm -kernel \u003ckernel\u003e -append ... -drive ... （需 kernel/rootfs 镜像，验证环境无 KVM/镜像，改为二进制冒烟测试 stratovirt --version/-help）"
+    },
+    "special_dependencies": {
+      "source": "README.md + docs/build_guide.ch.md + docs/test.md",
+      "value": [
+        "rustup 安装较新 Rust 工具链（系统 cargo 版本可能 \u003c 1.64）",
+        "mod_test 需预编译 stratovirt + virtiofsd 并导出 STRATOVIRT_BINARY/VIRTIOFSD_BINARY，且 aarch64 文档称 x86_64 未完全支持",
+        "hydropper 黑盒测试需 kernel/rootfs 镜像、网桥、nmap/iperf3/bridge-utils",
+        "CARGO_HOME/RUSTUP_HOME 重定向到 /tmp tmpfs（根分区仅 7.1G 可用）"
+      ]
+    },
+    "ut_commands": {
+      "source": "docs/test.md - Unit test 章节",
+      "value": "cargo test --workspace --exclude mod_test -- --nocapture --test-threads=1"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "README 与 docs/build_guide.ch.md 声明 rustc 推荐版本为 1.64.0 及之后版本，但仓库 audio/Cargo.toml 已使用 edition = \"2024\"，该 edition 要求 rustc \u003e= 1.85。openEuler 22.03 LTS-SP2 系统自带 rust 1.64.0 无法构建，新开发者按 README 仅装 1.64 会直接失败。建议更新文档最低版本要求至 1.85。",
+      "source": "README.md 环境准备 + docs/build_guide.ch.md 第1节 + audio/Cargo.toml edition=2024",
+      "time": "2026-08-13T23:59:22",
+      "title": "README 推荐 rustc \u003e= 1.64.0 但实际仓库已使用 edition 2024，需 rustc \u003e= 1.85"
+    },
+    {
+      "body": "Makefile 的 yum-deps 目标中每条依赖安装均使用 `@yum install \u003cpkg\u003e`（无 -y 参数），在容器/CI 等非交互环境中会因等待用户确认而失败。make build 依赖 yum-deps，导致直接执行 `make build` 在非交互环境不可用。建议改为 `yum install -y`。",
+      "source": "Makefile yum-deps 目标",
+      "time": "2026-08-13T23:59:22",
+      "title": "Makefile yum-deps 目标使用 yum install 而非 yum install -y，非交互环境会失败"
+    },
+    {
+      "body": "README 仅提及需安装 Rust/Cargo，未列出 pixman-devel、libcap-ng-devel、libseccomp-devel、cyrus-sasl-devel、dtc-devel(aarch64) 等系统库依赖。这些依赖散落在 Dockerfile 与 Makefile 中，新开发者仅读 README 无法完整准备环境。需交叉阅读 docs/build_guide.ch.md、Dockerfile、Makefile、.cargo/config.toml 才能凑齐。",
+      "source": "README.md 环境准备章节 + tools/build_stratovirt_static/Dockerfile + Makefile + .cargo/config.toml",
+      "time": "2026-08-13T23:59:22",
+      "title": "README 未说明构建依赖的系统开发库清单"
+    },
+    {
+      "body": "docs/test.md 的 mod_test 需预编译 stratovirt(--all-features) + virtiofsd 并导出环境变量，且通过 socket+QMP 启动 VM 测试；hydropper 需 kernel/rootfs 镜像与网桥配置。两者均依赖 KVM 与外部镜像，文档未明确说明无 KVM 环境的替代验证方式或最低硬件要求。",
+      "source": "docs/test.md + tests/hydropper/README.cn.md",
+      "time": "2026-08-13T23:59:22",
+      "title": "docs/test.md 的 mod_test 与 hydropper 测试在无 KVM/镜像环境无法执行，文档未说明前置硬件要求"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "清理同名残留容器并克隆仓库到远程 /tmp/stratovirt-verify",
+      "command": "ssh root@123.60.114.33 'docker rm -f stratovirt-ttfhw; rm -rf /tmp/stratovirt-verify; git clone -b master https://gitcode.com/openeuler/stratovirt.git'",
+      "details": {
+        "clone_time_s": 1.75,
+        "commit": "fe9aa34f573d1fa1a8fd28f405c13a7170c11794"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "commit fe9aa34f !1999 Sync the patches from the dev branch to the master branch",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-13T22:56:43"
+    },
+    {
+      "action": "依据 Dockerfile FROM openeuler/openeuler:22.03-lts-sp2 选择 openEuler 22.03 LTS-SP2 基础镜像",
+      "command": "docker pull hub.oepkgs.net/openeuler/openeuler:22.03-lts-sp2",
+      "details": {
+        "dockerfile": "tools/build_stratovirt_static/Dockerfile",
+        "reason": "Dockerfile FROM 指定 openEuler，Docker Hub 不可达改用 hub.oepkgs.net 拉取同版本"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "Status: Downloaded newer image for hub.oepkgs.net/openeuler/openeuler:22.03-lts-sp2",
+      "result": "openEuler 22.03 LTS-SP2",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-13T22:56:43"
+    },
+    {
+      "action": "启动容器 stratovirt-ttfhw，挂载仓库到 /workspace，CARGO_HOME/RUSTUP_HOME 重定向到 /tmp tmpfs",
+      "command": "docker run -d --name stratovirt-ttfhw -v /tmp/stratovirt-verify/stratovirt:/workspace -v /tmp/stratovirt-cargo:/cargo -v /tmp/stratovirt-rustup:/rustup -e CARGO_HOME=/cargo -e RUSTUP_HOME=/rustup -w /workspace ... tail -f /dev/null",
+      "details": {
+        "container_name": "stratovirt-ttfhw",
+        "image": "hub.oepkgs.net/openeuler/openeuler:22.03-lts-sp2",
+        "mounts": [
+          "/workspace",
+          "/cargo",
+          "/rustup"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "aarch64, 394 cpus, openEuler 22.03 LTS-SP2, 1Ti mem",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-13T22:56:43"
+    },
+    {
+      "action": "在容器内读取 README.md / Dockerfile / Makefile / Cargo.toml / docs 提取依赖与构建命令",
+      "command": "ssh ... 'cd /tmp/stratovirt-verify/stratovirt \u0026\u0026 cat README.md Dockerfile Makefile Cargo.toml ...'",
+      "details": {
+        "build_cmd": "cargo build --workspace --bins --release",
+        "files_read": [
+          "README.md",
+          "tools/build_stratovirt_static/Dockerfile",
+          "Makefile",
+          "Cargo.toml",
+          ".cargo/config.toml",
+          "docs/build_guide.ch.md",
+          "docs/test.md",
+          "tests/mod_test/Cargo.toml",
+          "tests/hydropper/README.cn.md",
+          "_typos.toml",
+          "build.rs"
+        ],
+        "npu_required": false,
+        "os": "openEuler 22.03 LTS-SP2",
+        "ut_cmd": "cargo test --workspace --exclude mod_test"
+      },
+      "duration_seconds": 20,
+      "error": "",
+      "output": "Rust edition 2021, rustc\u003e=1.64, make build=cargo build --workspace --bins --release",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-13T22:56:43"
+    },
+    {
+      "action": "在容器内检查 .pre-commit-config.yaml 与 lint-runner 配置",
+      "command": "docker exec stratovirt-ttfhw bash -c 'cd /workspace \u0026\u0026 ls .pre-commit-config.yaml; find . -iname *lint-runner*'",
+      "details": {
+        "lint_runner_configured": false,
+        "pre_commit_configured": false,
+        "rustfmt_config": ".rustfmt.toml",
+        "typos_config": "_typos.toml"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "ls: cannot access .pre-commit-config.yaml: No such file or directory; lint-runner 搜索无结果",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-13T22:57:11"
+    },
+    {
+      "action": "在容器内检查 .devcontainer 目录",
+      "command": "docker exec stratovirt-ttfhw bash -c 'cd /workspace \u0026\u0026 ls -la .devcontainer'",
+      "details": {
+        "devcontainer_dir": null,
+        "dockerfile_present": "tools/build_stratovirt_static/Dockerfile"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "ls: cannot access .devcontainer: No such file or directory",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-08-13T22:57:11"
+    },
+    {
+      "action": "扫描仓库 NPU/Ascend/CANN 关键词",
+      "command": "grep -rIl -E 'CANN|Ascend|torch_npu|davinci|昇腾' . ",
+      "details": {
+        "keywords_matched": [],
+        "npu_required": false
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "无 NPU 关键词命中",
+      "result": "无需 NPU",
+      "returncode": 0,
+      "step": "npu_scan",
+      "success": true,
+      "timestamp": "2026-08-13T22:57:11"
+    },
+    {
+      "action": "第一层+第二层：yum makecache 后一次性安装系统工具链与 Dockerfile/Makefile 全部构建依赖",
+      "command": "yum makecache \u0026\u0026 yum install -y gcc gcc-c++ make cmake git python3 python3-pip cargo musl-gcc cyrus-sasl-devel libcap-devel libcap-ng-devel libseccomp-devel dtc-devel pixman-devel pulseaudio clang gtk3-devel libusbx alsa-lib-devel",
+      "details": {
+        "install_seconds": 101,
+        "makecache_seconds": 40,
+        "packages": [
+          "gcc",
+          "gcc-c++",
+          "make",
+          "cmake",
+          "git",
+          "python3",
+          "python3-pip",
+          "cargo",
+          "musl-gcc",
+          "cyrus-sasl-devel",
+          "libcap-devel",
+          "libcap-ng-devel",
+          "libseccomp-devel",
+          "dtc-devel",
+          "pixman-devel",
+          "pulseaudio",
+          "clang",
+          "gtk3-devel",
+          "libusbx",
+          "alsa-lib-devel"
+        ],
+        "source": "openEuler 22.03 LTS-SP2 官方仓库 (yum)",
+        "system_rust": "rustc 1.64.0-dev (openEuler 系统包，恰为 README 推荐最低版本)"
+      },
+      "duration_seconds": 141,
+      "error": "",
+      "output": "Complete! rust-1.64.0-2.oe2203sp2.aarch64, gcc 10.3.1, pixman-devel-0.40.0, clang-12.0.1 等",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T23:00:03"
+    },
+    {
+      "action": "验证关键依赖与开发库版本",
+      "command": "rustc --version; cargo --version; gcc --version; rpm -q pixman-devel libcap-ng-devel libcap-devel libseccomp-devel cyrus-sasl-devel dtc-devel musl-gcc clang",
+      "details": {
+        "cargo": "1.64.0-dev",
+        "clang": "12.0.1",
+        "cyrus-sasl-devel": "2.1.28",
+        "dtc-devel": "1.6.1",
+        "gcc": "10.3.1",
+        "libcap-devel": "2.61",
+        "libcap-ng-devel": "0.8.3",
+        "libpixman": "/usr/lib64/libpixman-1.so",
+        "libseccomp-devel": "2.5.3",
+        "make": "4.3",
+        "musl-gcc": "1.2.3",
+        "pixman-devel": "0.40.0",
+        "rustc": "1.64.0-dev"
+      },
+      "duration_seconds": 4,
+      "error": "",
+      "output": "所有依赖包已确认安装，libpixman-1.so 存在",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-13T23:00:03"
+    },
+    {
+      "action": "首次 cargo fetch 验证依赖解析（系统 cargo 1.64.0）",
+      "command": "cargo fetch",
+      "details": {
+        "cargo": "1.64.0-dev (系统包)",
+        "error": "audio crate 使用 edition 2024，需要 rustc \u003e= 1.85"
+      },
+      "duration_seconds": 1,
+      "error": "系统 rustc 1.64.0 不支持 edition 2024（audio/Cargo.toml）",
+      "output": "failed to parse the `edition` key: this version of Cargo is older than the `2024` edition, and only supports 2015/2018/2021",
+      "result": "失败",
+      "returncode": 101,
+      "step": "build_attempt",
+      "success": false,
+      "timestamp": "2026-08-13T23:13:15"
+    },
+    {
+      "action": "问题定位：系统 cargo 1.64.0 过旧，通过 rustup 安装 stable 工具链",
+      "command": "curl -o /tmp/rustup-init https://rsproxy.cn/rustup/dist/aarch64-unknown-linux-gnu/rustup-init \u0026\u0026 RUSTUP_DIST_SERVER=https://rsproxy.cn /tmp/rustup-init -y --profile minimal --default-toolchain stable",
+      "details": {
+        "mirror": "rsproxy.cn（Docker Hub/tuna 不可达，rsproxy 可用）",
+        "problem": "audio/Cargo.toml edition=2024 需 rustc\u003e=1.85，系统仅 1.64.0",
+        "rustup_init_binary_url": "https://rsproxy.cn/rustup/dist/aarch64-unknown-linux-gnu/rustup-init",
+        "solution": "下载 rustup-init 二进制（rsproxy.cn 镜像），安装 stable 1.97.1 到 /cargo（CARGO_HOME tmpfs）"
+      },
+      "duration_seconds": 20,
+      "error": "",
+      "output": "rustc 1.97.1 (8bab26f4f 2026-07-14), cargo 1.97.1",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-08-13T23:13:15"
+    },
+    {
+      "action": "第三层：通过 rustup 安装 Rust 1.97.1 stable 工具链（替代过旧的系统 1.64.0）",
+      "command": "rustup-init -y --profile minimal --default-toolchain stable",
+      "details": {
+        "cargo": "1.97.1",
+        "install_path": "/cargo/bin (CARGO_HOME=/cargo tmpfs)",
+        "rustc": "1.97.1",
+        "source": "rustup (rsproxy.cn 镜像)"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T23:13:15"
+    },
+    {
+      "action": "配置 crates.io 镜像（rsproxy sparse）并 cargo fetch 下载全部依赖",
+      "command": "cargo fetch (CARGO_HOME=/cargo, registry mirror=rsproxy-sparse)",
+      "details": {
+        "crates_downloaded": "数百个 crate",
+        "mirror": "sparse+https://rsproxy.cn/index/"
+      },
+      "duration_seconds": 12,
+      "error": "",
+      "output": "Downloaded ... sasl2-sys, clang-sys, libpulse-simple-sys 等；fetch 完成",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-13T23:13:15"
+    },
+    {
+      "action": "执行 cargo build --workspace --bins --release（并发 78，release profile 启用 LTO）",
+      "command": "cargo build --workspace --bins --release (CARGO_BUILD_JOBS=78)",
+      "details": {
+        "binaries_built": [
+          "stratovirt",
+          "stratovirt-img",
+          "ozone"
+        ],
+        "compiler": "rustc 1.97.1",
+        "concurrency": 78,
+        "concurrency_ratio": "20% (394 cores × 0.2)",
+        "note": "主二进制 stratovirt 于 15:19 生成（约 5-6 分钟完成全部 3 个 bin），首次 SSH 调用因管道缓冲 40min 未返回，二次 cargo build 确认 Finished in 0.32s（全部缓存）",
+        "profile": "release (lto=true, codegen-units=1, opt-level=s, debug=true)"
+      },
+      "duration_seconds": 330,
+      "error": "",
+      "output": "Finished `release` profile [optimized + debuginfo] target(s) in 0.32s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-13T23:54:19"
+    },
+    {
+      "action": "执行单元测试 cargo test --workspace --exclude mod_test -- --nocapture --test-threads=1",
+      "command": "cargo test --workspace --exclude mod_test -- --nocapture --test-threads=1",
+      "details": {
+        "compiler": "rustc 1.97.1",
+        "failed": 0,
+        "ignored": 2,
+        "note": "包含 lib 单元测试 + doc-tests；mod_test 排除（需 virtiofsd+KVM）；全部通过",
+        "passed": 466,
+        "profile": "dev (无 LTO)",
+        "total": 466
+      },
+      "duration_seconds": 222,
+      "error": "",
+      "output": "466 passed; 0 failed; 2 ignored; exit code 0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-13T23:59:22"
+    },
+    {
+      "action": "执行二进制冒烟测试：stratovirt/stratovirt-img/ozone -h 验证产物可用",
+      "command": "./target/release/stratovirt -h; ./target/release/stratovirt-img --help; ./target/release/ozone -h",
+      "details": {
+        "binaries_tested": [
+          "stratovirt",
+          "stratovirt-img",
+          "ozone"
+        ],
+        "kvm_available": false,
+        "reason": "容器内无 /dev/kvm 设备且无 kvm 内核模块，README 样例（启动 VM）需 KVM 加速 + kernel/rootfs/firmware 镜像，无法在容器内执行完整 VM 启动样例；改为二进制冒烟测试验证产物功能",
+        "stratovirt_version": "StratoVirt 2.5.0 commit-id fe9aa34"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "stratovirt: StratoVirt 2.5.0 commit-id fe9aa34, A light kvm-based hypervisor; stratovirt-img: disk image utility; ozone: A light security sandbox",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-13T23:59:22"
+    },
+    {
+      "action": "生成验证报告并校验",
+      "command": "python3 validate_report.py json_tmp/verification_report_stratovirt_20260813.json",
+      "details": {
+        "output_file": "json_tmp/verification_report_stratovirt_20260813.json"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "报告生成完成",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-08-13T23:59:40"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "stratovirt",
+          "path": "target/release/stratovirt",
+          "size": "52.6 MB (55138784 bytes)",
+          "type": "binary (ELF aarch64, dynamically linked)"
+        },
+        {
+          "name": "stratovirt-img",
+          "path": "target/release/stratovirt-img",
+          "size": "6.2 MB (6520928 bytes)",
+          "type": "binary (ELF aarch64)"
+        },
+        {
+          "name": "ozone",
+          "path": "target/release/ozone",
+          "size": "4.7 MB (4920712 bytes)",
+          "type": "binary (ELF aarch64)"
+        }
+      ],
+      "cmake": "N/A (Rust/Cargo 工程，无 CMake)",
+      "compiler": "rustc 1.97.1 (rustup stable)",
+      "concurrency": 78,
+      "concurrency_ratio": "20% (394 cores × 0.2，向下取整)",
+      "duration_seconds": 330,
+      "notes": "release profile 启用 LTO(codegen-units=1, opt-level=s)；系统 cargo 1.64 过旧不支持 edition 2024，改用 rustup 1.97.1；CARGO_HOME 重定向到 /tmp tmpfs 避免根分区(7.1G)写满",
+      "status": "成功"
+    },
+    "devcontainer": {
+      "config_dir": null,
+      "config_files": [],
+      "enabled": false,
+      "original_base_image": "openeuler/openeuler:22.03-lts-sp2 (来自 tools/build_stratovirt_static/Dockerfile)",
+      "summary": "仓库无 .devcontainer 目录，不具备 devcontainer 能力。但仓库在 tools/build_stratovirt_static/ 下提供独立 Dockerfile（FROM openeuler/openeuler:22.03-lts-sp2）及 build_stratovirt_from_docker.sh 脚本用于静态链接二进制构建，已据此选择 openEuler 22.03 LTS-SP2 作为验证基础镜像",
+      "used_image": "openEuler 22.03 LTS-SP2 (hub.oepkgs.net/openeuler/openeuler:22.03-lts-sp2)"
+    },
+    "sample": {
+      "duration_seconds": 5,
+      "reason": "README 样例为通过 stratovirt 启动 VM，需 KVM 加速器 + PE/bzImage 内核镜像 + ext4 rootfs + UEFI 固件。容器内无 /dev/kvm 且无 kvm 模块，且未提供 kernel/rootfs 镜像，无法执行完整 VM 启动样例。改为对全部 3 个构建产物执行冒烟测试（-h/--help），均正常输出帮助与版本信息，证明二进制构建正确可用。",
+      "results": [
+        {
+          "execution_status": "成功",
+          "execution_time": "1秒",
+          "output_summary": "输出 StratoVirt 2.5.0 commit-id fe9aa34，A light kvm-based hypervisor，完整 USAGE/FLAGS/OPTIONS 帮助（-accel kvm/-machine/-kernel/-device 等）",
+          "sample_name": "stratovirt -h"
+        },
+        {
+          "execution_status": "成功",
+          "execution_time": "1秒",
+          "output_summary": "StratoVirt 2.5.0 commit-id fe9aa34",
+          "sample_name": "stratovirt -V"
+        },
+        {
+          "execution_status": "成功",
+          "execution_time": "1秒",
+          "output_summary": "Stratovirt disk image utility，支持 create/info/check/resize/snapshot/convert 子命令",
+          "sample_name": "stratovirt-img --help"
+        },
+        {
+          "execution_status": "成功",
+          "execution_time": "1秒",
+          "output_summary": "A light security sandbox，USAGE/FLAGS/OPTIONS 帮助正常",
+          "sample_name": "ozone -h"
+        }
+      ],
+      "status": "partial_success"
+    },
+    "static_analysis": {
+      "enabled": false,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": null,
+        "configured": false,
+        "duration_seconds": 0,
+        "note": "仓库根目录不存在 .pre-commit-config.yaml，按 skill 规则唯一判定标准 configured=false，无需执行 pre-commit run",
+        "status": "未配置"
+      },
+      "summary": "仓库根目录无 .pre-commit-config.yaml，也无 lint-runner 配置，未配置静态检查工具。仓库存在 _typos.toml（typos 拼写检查配置）和 .rustfmt.toml（rustfmt 格式化配置），但均非 pre-commit/lint-runner 框架配置，故静态检查 enabled=false"
+    },
+    "ut": {
+      "duration_seconds": 222,
+      "failed": 0,
+      "failures": [],
+      "passed": 466,
+      "skipped": 2,
+      "status": "成功",
+      "total": 466
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "stratovirt-ttfhw",
+      "cpu_cores": 394,
+      "memory": "1.0Ti (无限制)",
+      "os": "openEuler 22.03 LTS-SP2"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 394,
+      "cpu_model": "Kunpeng 920 72F8",
+      "disk": "69G root (7.1G avail) + 494G /tmp tmpfs",
+      "docker_version": "Docker version 25.0.2, build 29cf629",
+      "memory": "1.0Ti",
+      "npu": {
+        "available": false,
+        "card_count": 0,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "本仓库为 Rust/Cargo 工程，无 CMakeLists.txt；.cargo/config.toml 对非 musl/非 ohos 目标追加 link-arg=-lpixman-1，故默认 glibc 构建必需 pixman-devel",
+        "from_dockerfile": "Dockerfile 使用 yum 安装：cargo, musl-gcc, cyrus-sasl-devel, libcap-devel, libcap-ng-devel, libseccomp-devel（aarch64 额外 dtc-devel）。Makefile yum-deps 额外安装 pixman-devel, libcap-ng-devel, cyrus-sasl-devel, pulseaudio, clang, gtk3-devel, libusbx, alsa-lib-devel, make。与基础镜像 OS 一致（openEuler），包名直接使用无需翻译",
+        "from_readme": "README 要求安装 Rust 语言环境和 Cargo（rustc \u003e= 1.64.0），构建命令 make build（即 cargo build --workspace --bins --release）",
+        "mappings": [
+          {
+            "original": "cargo",
+            "source": "Dockerfile RUN + Makefile yum-deps",
+            "target": "cargo（openEuler yum 原生包，版本可能过旧，需用 rustup 安装较新 rustc）"
+          },
+          {
+            "original": "musl-gcc",
+            "source": "Dockerfile RUN（仅 musl 静态构建需要，默认 glibc 构建非必需，仍按 Dockerfile 安装）",
+            "target": "musl-gcc"
+          },
+          {
+            "original": "cyrus-sasl-devel",
+            "source": "Dockerfile RUN + Makefile yum-deps",
+            "target": "cyrus-sasl-devel"
+          },
+          {
+            "original": "libcap-devel",
+            "source": "Dockerfile RUN",
+            "target": "libcap-devel"
+          },
+          {
+            "original": "libcap-ng-devel",
+            "source": "Dockerfile RUN + Makefile yum-deps",
+            "target": "libcap-ng-devel"
+          },
+          {
+            "original": "libseccomp-devel",
+            "source": "Dockerfile RUN",
+            "target": "libseccomp-devel"
+          },
+          {
+            "original": "dtc-devel",
+            "source": "Dockerfile RUN aarch64 分支",
+            "target": "dtc-devel（aarch64 专属）"
+          },
+          {
+            "original": "pixman-devel",
+            "source": "Makefile yum-deps + .cargo/config.toml",
+            "target": "pixman-devel（.cargo/config.toml 链接 -lpixman-1 必需）"
+          },
+          {
+            "original": "clang",
+            "source": "Makefile yum-deps",
+            "target": "clang（bindgen 类 crate 可能需要）"
+          },
+          {
+            "original": "pulseaudio",
+            "source": "Makefile yum-deps",
+            "target": "pulseaudio"
+          },
+          {
+            "original": "gtk3-devel",
+            "source": "Makefile yum-deps",
+            "target": "gtk3-devel"
+          },
+          {
+            "original": "libusbx",
+            "source": "Makefile yum-deps",
+            "target": "libusbx"
+          },
+          {
+            "original": "alsa-lib-devel",
+            "source": "Makefile yum-deps",
+            "target": "alsa-lib-devel"
+          },
+          {
+            "original": "make",
+            "source": "Makefile yum-deps",
+            "target": "make"
+          }
+        ]
+      },
+      "image_name": "hub.oepkgs.net/openeuler/openeuler:22.03-lts-sp2",
+      "selection_reason": "仓库 tools/build_stratovirt_static/Dockerfile 指定 FROM openeuler/openeuler:22.03-lts-sp2，使用对应版本 openEuler 22.03 LTS-SP2 基础镜像从零构建（Docker Hub 不可达，改用 hub.oepkgs.net 镜像源拉取同版本）",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "fe9aa34f573d1fa1a8fd28f405c13a7170c11794",
+    "duration_seconds": 3978,
+    "end_time": "2026-08-13T23:59:40",
+    "environment": "remote container stratovirt-ttfhw @ 123.60.114.33",
+    "repo_url": "https://gitcode.com/openeuler/stratovirt.git",
+    "start_time": "2026-08-13T22:53:22",
+    "total_steps": 17,
+    "verifier": "opencode-ttfhw-verify"
+  },
+  "problems_encountered": [
+    {
+      "problem": "系统 cargo/rustc 1.64.0（openEuler 22.03 LTS-SP2 自带）过旧，audio crate 使用 edition 2024，cargo fetch 直接报错不支持该 edition",
+      "solution": "通过 rsproxy.cn 镜像下载 rustup-init 二进制并安装 stable 1.97.1 工具链到 CARGO_HOME=/cargo（tmpfs），并配置 crates.io sparse 镜像加速依赖下载",
+      "source": "audio/Cargo.toml edition=2024 + docs/build_guide.ch.md 推荐rustc\u003e=1.64.0(实际仍不够)",
+      "timestamp": "2026-08-13T23:13:15"
+    }
+  ],
+  "session_export_file": "",
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "bailian/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}
