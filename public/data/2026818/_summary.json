@@ -1,0 +1,99 @@
+[
+  {
+    "name": "pytorch",
+    "displayName": "pytorch",
+    "result": "success",
+    "buildStatus": "success",
+    "utStatus": "success",
+    "sampleStatus": "success",
+    "totalDuration": 4691,
+    "environmentDuration": 3991,
+    "buildDuration": 600,
+    "utDuration": 90,
+    "sampleDuration": 10,
+    "testPassed": 939,
+    "testFailed": 0,
+    "testTotal": 996,
+    "testSkipped": 57,
+    "generatedAt": "2026-08-17T21:15:12",
+    "environment": "unknown",
+    "url": "https://github.com/pytorch/pytorch.git",
+    "category": "PyTorch",
+    "hasStaticAnalysis": true,
+    "hasDevcontainer": true,
+    "file": "verification_report_pytorch_20260817.json",
+    "issues": [
+      {
+        "timestamp": "2026-08-17T22:26:46",
+        "problem": "Tier 1 镜像 pytorch/pytorch:latest 拉取超时",
+        "solution": "aarch64 架构可能无对应镜像或网络问题, 降级到 Tier 3 使用本地已有的 quay.io/ascend/cann:9.1.0-910b-ubuntu22.04-py3.12 (Ubuntu 22.04 + Python 3.12) 作为基础镜像",
+        "source": "步骤4 镜像选择"
+      },
+      {
+        "timestamp": "2026-08-17T22:26:46",
+        "problem": "Tier 2 根 Dockerfile 构建需要 Docker>=23.0, 远程机器 Docker 版本 18.09.0",
+        "solution": "Docker 版本不满足 # syntax=docker/dockerfile:1 要求, 降级到 Tier 3 基础 OS 从零安装依赖",
+        "source": "步骤4 镜像选择"
+      },
+      {
+        "timestamp": "2026-08-17T22:26:46",
+        "problem": "aarch64 架构不支持 Intel MKL (mkl-static/mkl-include pip 包不可用)",
+        "solution": "使用 libopenblas-dev (apt) 替代 MKL, PyTorch 构建系统支持 OpenBLAS 作为 BLAS 后端",
+        "source": "步骤4 依赖安装"
+      },
+      {
+        "timestamp": "2026-08-17T22:26:46",
+        "problem": "aarch64 机器无 SVE 指令集支持, CMake 配置阶段 FindARM.cmake 报错",
+        "solution": "设置环境变量 BUILD_IGNORE_SVE_UNAVAILABLE=1 跳过 SVE 检查, 重新构建成功",
+        "source": "步骤5 构建执行"
+      }
+    ],
+    "documentationGaps": []
+  },
+  {
+    "name": "vllm",
+    "displayName": "vllm",
+    "result": "partial_success",
+    "buildStatus": "success",
+    "utStatus": "partial_success",
+    "sampleStatus": "success",
+    "totalDuration": 13316,
+    "environmentDuration": 12903,
+    "buildDuration": 120,
+    "utDuration": 173,
+    "sampleDuration": 120,
+    "testPassed": 123,
+    "testFailed": 2,
+    "testTotal": 127,
+    "testSkipped": 2,
+    "generatedAt": "2026-08-17T21:31:24",
+    "environment": "unknown",
+    "url": "https://github.com/vllm-project/vllm.git",
+    "category": "MindIE",
+    "hasStaticAnalysis": true,
+    "hasDevcontainer": false,
+    "file": "verification_report_vllm_20260817.json",
+    "issues": [
+      {
+        "timestamp": "2026-08-18T01:04:37",
+        "problem": "单元测试中 2 个测试 (test_embed_dimensions) 因尝试从 HuggingFace 下载模型信息超时失败",
+        "solution": "非构建问题, 远程机器到 HuggingFace 网络受限导致模型下载超时; 其余 123 个测试全部通过, 证明构建产物功能正常",
+        "source": "tests/test_pooling_params.py::test_embed_dimensions"
+      },
+      {
+        "timestamp": "2026-08-18T01:13:20",
+        "problem": "样例首次运行失败: /dev/shm 空间不足 (64MB < 160MB 需求), vllm EngineCore 初始化报错",
+        "solution": "容器以 --privileged 启动, 在容器内执行 umount /dev/shm && mount -t tmpfs -o size=1g tmpfs /dev/shm 将 /dev/shm 扩展到 1GB; 同时将编译产物 .so 文件从 build/ 复制到 vllm/ 源目录解决 ModuleNotFoundError",
+        "source": "vllm/distributed/device_communicators/shm_broadcast.py:check_shm_free_space"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "time": "2026-08-18T01:13:20",
+        "title": "ARM CPU 构建缺少 --shm-size 说明",
+        "body": "docs/getting_started/installation/cpu.arm.inc.md 的样例启动命令未提及 Docker 容器需设置 --shm-size 或 --ipc=host, 而 vllm V1 引擎需要至少 160MB /dev/shm 空间; Docker 默认 /dev/shm 仅 64MB, 会导致 EngineCore 初始化失败",
+        "source": "docs/getting_started/installation/cpu.arm.inc.md + docker/Dockerfile.cpu"
+      }
+    ]
+  }
+]

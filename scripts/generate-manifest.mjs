@@ -46,7 +46,7 @@ const REPO_COMMUNITY_MAP = {
   'ograc': 'openGauss', 'opengauss-connector-jdbc': 'openGauss', 'plugin': 'openGauss',
   'ubs-atomic': 'UBSCore',
   'kunpeng-extension-for-pytorch': 'HPCKit',
-  'vllm-ascend': 'MindIE', 'pymotor': 'MindIE',
+  'vllm-ascend': 'MindIE', 'vllm': 'MindIE', 'pymotor': 'MindIE',
   'triton-ascend': 'triton',
   'polymind': 'openEuler', 'witty-service': 'openEuler',
   'kpex': 'HPCKit',
