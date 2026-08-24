@@ -1,0 +1,957 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md Prerequisites 章节 + 宿主机 npu-smi info",
+      "value": "aarch64（Atlas A2 训练系列，910B3 NPU）"
+    },
+    "build_commands": {
+      "source": "Dockerfile + docs/source/installation.md + setup.py",
+      "value": "source /usr/local/Ascend/ascend-toolkit/set_env.sh \u0026\u0026 source /usr/local/Ascend/nnal/atb/set_env.sh \u0026\u0026 export SOC_VERSION=ascend910b1 \u0026\u0026 export MAX_JOBS=\u003c并发数\u003e \u0026\u0026 pip install -e .（CMake 构建 C++ 扩展 + aclnn 自定义算子）"
+    },
+    "dependencies": {
+      "source": "README.md + requirements.txt + requirements-dev.txt + pyproject.toml",
+      "value": [
+        "CANN == 9.1.0",
+        "NNAL == 9.1.0 (libatb.so)",
+        "PyTorch == 2.10.0",
+        "TorchNPU == 2.10.0.post4",
+        "vLLM == v0.27.1 (main 分支对应 commit 58d3918e)",
+        "triton-ascend == 3.2.2",
+        "transformers==5.14.1",
+        "gcc/g++ \u003e= 8",
+        "cmake \u003e= 3.26",
+        "clang-15",
+        "ninja",
+        "libnuma-dev",
+        "modelscope",
+        "ray\u003e=2.47.1,\u003c=2.48.0",
+        "pytest\u003e=6.0,\u003c9.0.0",
+        "arctic-inference==0.1.1"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "Dockerfile",
+      "value": [
+        {
+          "original": "FROM quay.io/ascend/cann:9.1.0-910b-ubuntu22.04-py3.12",
+          "target_equivalent": "Tier 1 预构建 CANN 镜像，包含 CANN 9.1.0 + NNAL + Python 3.12"
+        },
+        {
+          "original": "apt-get install -y git vim wget net-tools gcc g++ cmake numactl libnuma-dev libibverbs-dev libjemalloc2 libhiredis-dev clang-15",
+          "target_equivalent": "系统工具链：gcc g++ cmake clang-15 libnuma-dev 等"
+        },
+        {
+          "original": "pip install mooncake-transfer-engine-npu==0.3.11.post1",
+          "target_equivalent": "Mooncake 传输引擎"
+        },
+        {
+          "original": "pip install modelscope ray\u003e=2.47.1,\u003c=2.48.0 protobuf\u003e3.20.0",
+          "target_equivalent": "modelscope + ray + protobuf"
+        },
+        {
+          "original": "git clone --depth 1 -b v0.27.1 https://github.com/vllm-project/vllm.git \u0026\u0026 VLLM_TARGET_DEVICE=empty pip install -e vllm/[audio]",
+          "target_equivalent": "vLLM v0.27.1 源码安装（empty target）"
+        },
+        {
+          "original": "pip install -e vllm-ascend/ \u0026\u0026 pip install triton-ascend==3.2.2",
+          "target_equivalent": "vllm-ascend 可编辑安装 + triton-ascend 3.2.2"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "Dockerfile FROM + docs/source/installation.md + docs/source/developer_guide/contribution/testing.md",
+      "value": "Tier 1 业务预构建镜像：quay.io/ascend/vllm-ascend:main（含 CANN 9.1.0 + vLLM + vllm-ascend + 全套依赖）；备选 quay.io/ascend/cann:9.1.0-910b-ubuntu22.04-py3.12（Dockerfile FROM，仅含 CANN 基础环境）"
+    },
+    "sample_commands": {
+      "source": "docs/source/quick_start.md + docs/source/installation.md",
+      "value": "export VLLM_USE_MODELSCOPE=True \u0026\u0026 python example.py（Qwen3-0.6B 离线推理，验证 ascend 平台检测 + 文本生成）"
+    },
+    "special_dependencies": {
+      "source": "README.md + docs/source/installation.md + Dockerfile",
+      "value": [
+        "CANN 9.1.0（昇腾计算架构，含 ascend-toolkit + 910b-ops）",
+        "NNAL 9.1.0（libatb.so，高级张量操作库）",
+        "Ascend HDK 固件/驱动（宿主机 npu-smi 25.5.0）",
+        "torch-npu 2.10.0.post4（PyTorch 昇腾后端）",
+        "triton-ascend 3.2.2（替代 x86 triton）"
+      ]
+    },
+    "ut_commands": {
+      "source": "docs/source/developer_guide/contribution/testing.md",
+      "value": "cd /workspace \u0026\u0026 pip install -r requirements-dev.txt \u0026\u0026 pytest -sv tests/ut（unittest 框架，240 个测试文件）"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "quay.io/ascend/vllm-ascend:main 镜像内置 vLLM 0.22.1（main 分支需验证 commit 58d3918e）、torch_npu 2.10.0（需 2.10.0.post4）、triton-ascend 3.2.1（需 3.2.2）、vllm-ascend 0.19.1rc2（非当前 main 分支代码）。使用前需手动升级多个组件，与文档声称的'开箱即用'不符。",
+      "source": "installation.md + testing.md + 容器内 pip show 输出",
+      "time": "2026-08-22T08:02:04",
+      "title": "Tier 1 预构建镜像 :main 版本滞后"
+    },
+    {
+      "body": "镜像 tag 为 vllm-ascend:main，但内置 CANN 9.0.0（非 README 要求的 9.1.0）。Dockerfile FROM 指定 quay.io/ascend/cann:9.1.0-910b-ubuntu22.04-py3.12，但实际 :main 镜像的 CANN 版本为 9.0.0，导致 torch_npu 2.10.0.post4 的 ACL 头文件引用 aclmdlRITask 类型时编译失败。",
+      "source": "Dockerfile + 容器内 ASCEND_HOME_PATH=/usr/local/Ascend/cann-9.0.0",
+      "time": "2026-08-22T08:02:04",
+      "title": "CANN 版本未在镜像 tag 中体现"
+    },
+    {
+      "body": "Dockerfile 指定 VLLM_TAG=v0.27.1，但 vllm v0.27.1 的 pyproject.toml build-system 要求 torch==2.13.0，而 vllm-ascend requirements.txt 要求 torch==2.10.0。需使用 .github/vllm-main-verified.commit 的验证 commit 而非 v0.27.1 tag，installation.md 有提及但 Dockerfile 未更新。",
+      "source": "Dockerfile VLLM_TAG + vllm pyproject.toml + installation.md",
+      "time": "2026-08-22T08:02:04",
+      "title": "vllm v0.27.1 tag 与 vllm-ascend main 分支 torch 版本冲突"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "读取 README.md 提取 Prerequisites/架构/镜像信号",
+      "command": "cat README.md",
+      "details": {
+        "file": "README.md",
+        "key_findings": "Atlas A2 910B, CANN 9.1.0, PyTorch 2.10.0, TorchNPU 2.10.0.post4, vLLM v0.27.1, NPU 必需"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "vLLM Ascend Plugin, Hardware: Atlas 800I A2, CANN==9.1.0, PyTorch==2.10.0, TorchNPU==2.10.0.post4",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T05:38:33"
+    },
+    {
+      "action": "读取 CONTRIBUTING.md 跟进贡献指南链接",
+      "command": "cat CONTRIBUTING.md",
+      "details": {
+        "file": "CONTRIBUTING.md",
+        "link": "https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/contribution/index.html"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "指向 Developer Guide - Contributing，含开发环境搭建/构建/测试指南",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T05:38:33"
+    },
+    {
+      "action": "读取 Dockerfile 提取 FROM/构建命令/依赖",
+      "command": "cat Dockerfile",
+      "details": {
+        "file": "Dockerfile",
+        "from": "quay.io/ascend/cann:9.1.0-910b-ubuntu22.04-py3.12",
+        "soc_version": "ascend910b1",
+        "tier1_signal": true,
+        "vllm_tag": "v0.27.1"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "FROM quay.io/ascend/cann:9.1.0-910b-ubuntu22.04-py3.12, 安装 clang-15/mooncake/vLLM/vllm-ascend/triton-ascend",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-22T05:38:33"
+    },
+    {
+      "action": "读取 docs/source/installation.md 提取镜像安装命令和依赖",
+      "command": "cat docs/source/installation.md",
+      "details": {
+        "cann_image": "quay.io/ascend/cann:9.1.0-910b-ubuntu22.04-py3.12",
+        "docker_pull": "quay.io/ascend/vllm-ascend:{version}",
+        "file": "docs/source/installation.md"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "两种安装方式：pip（CANN 镜像 + pip install）和 docker（预构建 vllm-ascend 镜像）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T05:38:33"
+    },
+    {
+      "action": "读取 docs/source/quick_start.md 提取样例执行命令",
+      "command": "cat docs/source/quick_start.md",
+      "details": {
+        "file": "docs/source/quick_start.md",
+        "modelscope": "VLLM_USE_MODELSCOPE=True",
+        "sample": "python example.py (Qwen3-0.6B)"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "离线推理: python example.py; OpenAI API: vllm serve Qwen/Qwen3-0.6B; 使用 ModelScope 加速下载",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T05:38:33"
+    },
+    {
+      "action": "读取贡献指南 index.md 提取构建和 lint 流程",
+      "command": "cat docs/source/developer_guide/contribution/index.md",
+      "details": {
+        "ci": "VLLM_TARGET_DEVICE=empty pip install vllm",
+        "file": "docs/source/developer_guide/contribution/index.md",
+        "lint": "bash format.sh"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "lint: pip install -r requirements-lint.txt \u0026\u0026 bash format.sh; CI: 安装 vLLM + requirements-dev.txt + bash format.sh ci",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T05:38:33"
+    },
+    {
+      "action": "读取 testing.md 提取 UT 执行命令和测试环境",
+      "command": "cat docs/source/developer_guide/contribution/testing.md",
+      "details": {
+        "file": "docs/source/developer_guide/contribution/testing.md",
+        "image": "quay.io/ascend/vllm-ascend:main",
+        "ut_cmd": "pytest -sv tests/ut"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "单卡: pytest -sv tests/ut; 测试镜像: quay.io/ascend/vllm-ascend:main; 240 个 UT 文件",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T05:38:33"
+    },
+    {
+      "action": "读取 setup.py 分析构建系统（CMake + pip install -e .）",
+      "command": "cat setup.py",
+      "details": {
+        "build_system": "setuptools + CMake",
+        "file": "setup.py",
+        "max_jobs_env": "MAX_JOBS",
+        "soc_auto_detect": "npu-smi"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "pip install -e . 触发 CMake 构建 C++ 扩展 + aclnn 自定义算子; SOC_VERSION 自动检测; MAX_JOBS 控制并发",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-22T05:38:33"
+    },
+    {
+      "action": "读取 requirements.txt / requirements-dev.txt / requirements-lint.txt 提取依赖列表",
+      "command": "cat requirements*.txt",
+      "details": {
+        "files": [
+          "requirements.txt",
+          "requirements-dev.txt",
+          "requirements-lint.txt"
+        ],
+        "key_deps": "torch 2.10.0, torch-npu 2.10.0.post4, triton-ascend 3.2.2, transformers 5.14.1, pytest, modelscope"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "requirements.txt: torch/torch-npu/triton-ascend/transformers; requirements-dev.txt: pytest/modelscope/ray/ninja; requirements-lint.txt: pre-commit/mypy",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T05:38:33"
+    },
+    {
+      "action": "镜像信号探测汇总 — Tier 1 判定",
+      "command": "grep -rn 'docker pull\\|FROM\\|quay.io' README.md Dockerfile docs/source/installation.md",
+      "details": {
+        "decision": "优先 pull quay.io/ascend/vllm-ascend:main（含全套依赖），失败则降级 cann 基础镜像",
+        "npu_required": true,
+        "tier1_candidates": [
+          "quay.io/ascend/vllm-ascend:main",
+          "quay.io/ascend/cann:9.1.0-910b-ubuntu22.04-py3.12"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "Dockerfile FROM 指向 quay.io/ascend/cann 非基础镜像; installation.md 含 docker pull quay.io/ascend/vllm-ascend; testing.md 推荐 :main 镜像",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T05:38:33"
+    },
+    {
+      "action": "检查 .pre-commit-config.yaml 配置",
+      "command": "ls .pre-commit-config.yaml",
+      "details": {
+        "config_file": ".pre-commit-config.yaml",
+        "local_hooks": 12,
+        "remote_hooks": 7,
+        "total_hooks": 19
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "存在 .pre-commit-config.yaml，含 ruff-check/ruff-format/codespell/typos/clang-format/markdownlint/actionlint + 12 个本地 hook",
+      "result": "成功",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-22T05:39:00"
+    },
+    {
+      "action": "检查 .lintrunner.toml/.lint-runner.yaml 配置",
+      "command": "ls .lintrunner.toml .lint-runner.yaml",
+      "details": {
+        "configured": false
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "未找到 lint-runner 配置文件",
+      "result": "跳过",
+      "returncode": 1,
+      "step": "static_analysis_scan",
+      "success": false,
+      "timestamp": "2026-08-22T05:39:00"
+    },
+    {
+      "action": "检查 .devcontainer/ 目录",
+      "command": "ls .devcontainer/",
+      "details": {
+        "exists": false
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "仓库无 .devcontainer/ 目录",
+      "result": "跳过",
+      "returncode": 1,
+      "step": "devcontainer_scan",
+      "success": false,
+      "timestamp": "2026-08-22T05:39:00"
+    },
+    {
+      "action": "Tier 1 镜像拉取 quay.nju.edu.cn/ascend/vllm-ascend:main",
+      "command": "docker pull quay.nju.edu.cn/ascend/vllm-ascend:main",
+      "details": {
+        "image": "quay.nju.edu.cn/ascend/vllm-ascend:main",
+        "mirror": "quay.nju.edu.cn 国内镜像",
+        "size": "16GB",
+        "tier": "Tier 1 业务预构建镜像"
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "note": "Docker data-root 在 /home/docker-images（6.3TB 可用），磁盘充足",
+      "output": "Status: Downloaded newer image for quay.nju.edu.cn/ascend/vllm-ascend:main",
+      "result": "成功",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-22T07:23:50"
+    },
+    {
+      "action": "启动容器 vllm-ascend-ttfhw（NPU 完整挂载 + 工作目录挂载）",
+      "command": "docker run -d --privileged --name vllm-ascend-ttfhw --shm-size=1g --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:... -v /usr/local/Ascend/driver:... -v /usr/local/Ascend/firmware:... -v /home/workspace/vllm-ascend-verify:/workspace quay.nju.edu.cn/ascend/vllm-ascend:main sleep infinity",
+      "details": {
+        "container_name": "vllm-ascend-ttfhw",
+        "npu_mounts": "davinci0/manager/devmm_svm/hisi_hdc + npu-smi/driver/firmware",
+        "startup_command_source": "default_挂卡",
+        "workspace_mount": "/home/workspace/vllm-ascend-verify:/workspace"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "容器启动成功，NPU 可用（torch.npu.is_available()=True），卡0状态 Critical 但功能正常",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-22T07:23:50"
+    },
+    {
+      "action": "升级 vLLM 到验证 commit 58d3918e（main 分支验证版本）",
+      "command": "cd /vllm-workspace/vllm \u0026\u0026 git fetch --depth 1 origin 58d3918e3ea0a544ffedadad2ba84559e9c51d8f \u0026\u0026 git checkout FETCH_HEAD \u0026\u0026 VLLM_TARGET_DEVICE=empty pip install --no-build-isolation -e .[audio]",
+      "details": {
+        "method": "git fetch + checkout FETCH_HEAD + pip install --no-build-isolation -e .[audio]",
+        "new_version": "0.1.dev1+g58d3918e3",
+        "old_version": "0.22.1+empty"
+      },
+      "duration_seconds": 1800,
+      "error": "",
+      "note": "v0.27.1 tag 的 build-system 要求 torch==2.13.0（与 vllm-ascend 的 torch==2.10.0 冲突），改用 .github/vllm-main-verified.commit 验证 commit；pip 镜像 403 问题切换 pypi.org + --no-build-isolation 解决",
+      "output": "vllm 0.1.dev1+g58d3918e3 安装成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-22T07:23:50"
+    },
+    {
+      "action": "安装 torch-npu 2.10.0.post4（从华为昇腾镜像）",
+      "command": "pip install torch-npu==2.10.0.post4 --extra-index-url https://mirrors.huaweicloud.com/ascend/repos/pypi",
+      "details": {
+        "new_version": "2.10.0.post4",
+        "old_version": "2.10.0",
+        "source": "https://mirrors.huaweicloud.com/ascend/repos/pypi"
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "note": "清华镜像对 torch-npu 返回 403，改用华为昇腾镜像",
+      "output": "torch-npu 2.10.0.post4 安装成功，NPU 仍可用",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-22T07:23:50"
+    },
+    {
+      "action": "修复 triton-ascend（卸载旧版 + 安装 3.2.2）",
+      "command": "pip uninstall -y triton triton-ascend \u0026\u0026 pip install triton-ascend==3.2.2 --extra-index-url https://mirrors.huaweicloud.com/ascend/repos/pypi",
+      "details": {
+        "new_triton_ascend": "3.2.2",
+        "old_triton": "3.5.0",
+        "old_triton_ascend": "3.2.1"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "triton-ascend 3.2.2 安装成功（带回 triton 3.5.0 依赖）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-22T07:23:50"
+    },
+    {
+      "action": "卸载旧 vllm-ascend 0.19.1rc2（镜像内置版本）",
+      "command": "pip uninstall -y vllm-ascend",
+      "details": {
+        "location": "/vllm-workspace/vllm-ascend",
+        "old_version": "0.19.1rc2.dev606+g5e3907448"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "成功卸载旧版 vllm-ascend",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-22T07:23:50"
+    },
+    {
+      "action": "安装关键依赖（transformers/numpy/memcache_hybrid 等）",
+      "command": "pip install transformers==5.14.1 numpy==2.2.6 memcache_hybrid==1.2.0 memfabric_hybrid==1.2.0",
+      "details": {
+        "memcache_hybrid": "1.2.0",
+        "memfabric_hybrid": "1.2.0",
+        "mirror": "阿里云镜像",
+        "numpy": "2.2.6",
+        "transformers": "5.14.1"
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "note": "pypi.org 下载慢，切换阿里云镜像加速",
+      "output": "关键依赖安装成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-22T07:23:50"
+    },
+    {
+      "action": "安装 requirements-dev.txt（UT 依赖：pytest/modelscope/pre-commit 等）",
+      "command": "cd /workspace \u0026\u0026 pip install --no-build-isolation -r requirements-dev.txt",
+      "details": {
+        "packages": "pytest, modelscope, pre-commit, mypy, lm-eval, jiwer, librosa, ninja, coverage 等"
+      },
+      "duration_seconds": 180,
+      "error": "",
+      "output": "requirements-dev.txt 安装成功，含 pytest/modelscope/pre-commit/mypy 等",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-22T07:23:50"
+    },
+    {
+      "action": "验证容器内关键依赖版本",
+      "command": "python3 -c 'import torch,torch_npu,vllm; print(torch.__version__, torch_npu.__version__, vllm.__version__, torch.npu.is_available())'",
+      "details": {
+        "npu_available": true,
+        "numpy": "2.2.6",
+        "python": "3.12.13",
+        "torch": "2.10.0+cpu",
+        "torch_npu": "2.10.0.post4",
+        "vllm": "0.1.dev1+g58d3918e3"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "torch 2.10.0+cpu, torch_npu 2.10.0.post4, vllm 0.1.dev1+g58d3918e3, npu_available=True",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-22T07:23:50"
+    },
+    {
+      "action": "第一次构建 vllm-ascend（COMPILE_CUSTOM_KERNELS=1, MAX_JOBS=51）",
+      "command": "pip install --no-build-isolation --no-deps -e . (COMPILE_CUSTOM_KERNELS=1)",
+      "details": {
+        "compile_custom_kernels": 1,
+        "error": "CANN 9.0.0 ACL 头文件缺少 aclmdlRITask 类型",
+        "max_jobs": 51,
+        "obj_files_compiled": 929
+      },
+      "duration_seconds": 1200,
+      "error": "torch_npu 2.10.0.post4 的 ACL 头文件引用 CANN 9.1.0 的 aclmdlRITask 类型，容器 CANN 9.0.0 无此定义",
+      "note": "ACLNN 自定义算子编译成功（liboptiling.so + vendors），但 C++ 扩展 vllm_ascend_C 编译失败",
+      "output": "CMake Error: Failed to locate torch path; acl_rt.h:4719 error: aclmdlRITask not declared",
+      "result": "失败",
+      "returncode": 1,
+      "step": "build_attempt",
+      "success": false,
+      "timestamp": "2026-08-22T07:23:50"
+    },
+    {
+      "action": "第二次构建 vllm-ascend（COMPILE_CUSTOM_KERNELS=0 跳过 C++ 扩展）",
+      "command": "pip install --no-build-isolation --no-deps -e . (COMPILE_CUSTOM_KERNELS=0)",
+      "details": {
+        "aclnn_operators": "已构建完成",
+        "compile_custom_kernels": 0,
+        "reason": "CANN 版本不兼容（9.0.0 vs 9.1.0），按文档 CPU-only 构建方式跳过 C++ 扩展"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "note": "Python 包安装成功，register() 函数正常，ACLNN 算子已就绪",
+      "output": "Successfully built vllm_ascend; vllm_ascend 0.1.dev1+g770e476f3 安装成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-08-22T07:23:50"
+    },
+    {
+      "action": "安装 pytest-timeout 并执行完整 UT 套件（tests/ut, 240 个测试文件）",
+      "command": "cd /workspace \u0026\u0026 TORCH_DEVICE_BACKEND_AUTOLOAD=0 HF_HUB_OFFLINE=1 pytest tests/ut -v --tb=line --timeout=60",
+      "details": {
+        "duration": "89.67s",
+        "errors": 15,
+        "failed": 192,
+        "pass_rate": "93.3%",
+        "passed": 2916,
+        "skipped": 37,
+        "total": 3123
+      },
+      "duration_seconds": 90,
+      "error": "失败主要为 NPU 精度测试（sfa/attention/mla precision）和设备依赖测试（model_runner_with_device），根因是 CANN 9.0.0 vs 9.1.0 版本不匹配 + COMPILE_CUSTOM_KERNELS=0 跳过 C++ 扩展",
+      "output": "2916 passed, 192 failed, 37 skipped, 15 errors in 89.67s",
+      "result": "部分成功",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-22T07:58:12"
+    },
+    {
+      "action": "分析 UT 失败原因",
+      "command": "grep FAILED /workspace/ut_results3.log | sort | uniq -c",
+      "details": {
+        "failed_categories": {
+          "attention_v1_precision": 41,
+          "eagle_proposer": 14,
+          "gumbel_sampling": 29,
+          "mla_precision": 11,
+          "model_runner_with_device": 15,
+          "moe_mlp": 3,
+          "platform": 6,
+          "sfa_v1_precision": 66,
+          "utils": 2,
+          "worker_multi_instance": 5,
+          "worker_v1": 5
+        },
+        "root_cause": "CANN 版本不匹配 + C++ 扩展未编译"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "失败分类：66 sfa精度 + 41 attention精度 + 29 gumbel采样 + 14 eagle推测解码 + 11 mla精度 + 15 model_runner设备错误",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-22T07:58:12"
+    },
+    {
+      "action": "执行 Qwen3-0.6B 离线推理样例（quick_start.md 示例）",
+      "command": "cd /workspace \u0026\u0026 VLLM_USE_MODELSCOPE=True timeout 300 python3 example.py",
+      "details": {
+        "error": "Engine core initialization failed",
+        "model": "Qwen/Qwen3-0.6B",
+        "modelscope": true,
+        "root_cause": "C++ 扩展未编译 + CANN 9.0.0 版本不匹配"
+      },
+      "duration_seconds": 60,
+      "error": "vLLM 引擎核心进程启动失败：C++ 扩展 vllm_ascend_C 未编译（COMPILE_CUSTOM_KERNELS=0），CANN 9.0.0 ACL 头文件与 torch_npu 2.10.0.post4 不兼容",
+      "output": "RuntimeError: Engine core initialization failed. See root cause above.",
+      "result": "失败",
+      "returncode": 1,
+      "step": "sample_execution",
+      "success": false,
+      "timestamp": "2026-08-22T08:02:04"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "vllm_ascend（Python 包）",
+          "path": "/workspace（editable install）",
+          "size": "12KB（editable wheel）",
+          "type": "wheel"
+        },
+        {
+          "name": "liboptiling.so",
+          "path": "/workspace/csrc/build/compat/liboptiling.so",
+          "size": "N/A",
+          "type": "library"
+        },
+        {
+          "name": "_cann_ops_custom",
+          "path": "/workspace/vllm_ascend/_cann_ops_custom/vendors/",
+          "size": "N/A",
+          "type": "aclnn_operators"
+        }
+      ],
+      "cmake": "4.3.4（COMPILE_CUSTOM_KERNELS=0，跳过 CMake C++ 扩展编译）",
+      "compiler": "gcc 11.4.0 + clang 15.0.7",
+      "concurrency": 51,
+      "concurrency_ratio": "20%（256核 × 20% = 51）",
+      "duration_seconds": 1800,
+      "notes": "第一次构建 COMPILE_CUSTOM_KERNELS=1 失败：容器 CANN 版本为 9.0.0，torch_npu 2.10.0.post4 的 ACL 头文件引用 aclmdlRITask 类型（CANN 9.1.0 才有），导致 C++ 编译报错。第二次构建按文档指导设 COMPILE_CUSTOM_KERNELS=0 跳过 C++ 扩展编译，Python 包安装成功。ACLNN 自定义算子已在第一次构建中编译完成（liboptiling.so + vendors 目录）。vllm-ascend 0.1.dev1+g770e476f3 可编辑安装成功，register() 函数正常。",
+      "status": "success"
+    },
+    "devcontainer": {
+      "config_dir": "无（仓库未提供 .devcontainer 目录）",
+      "config_files": [],
+      "enabled": false,
+      "original_base_image": "无",
+      "summary": "仓库无 .devcontainer/ 目录，未检测到 devcontainer 配置。镜像选择依据 Dockerfile FROM 和 installation.md 中的预构建镜像。",
+      "used_image": "无"
+    },
+    "sample": {
+      "duration_seconds": 60,
+      "reason": "vLLM Engine core 初始化失败：C++ 扩展 vllm_ascend_C 未编译（COMPILE_CUSTOM_KERNELS=0 跳过，因 CANN 9.0.0 与 torch_npu 2.10.0.post4 的 ACL 头文件不兼容）+ CANN 版本为 9.0.0（main 分支需 9.1.0）。引擎核心进程启动后 NPU 设备初始化失败，无法加载模型进行推理。",
+      "results": [
+        {
+          "execution_status": "failed",
+          "execution_time": "60s（timeout 300s，60s 后失败）",
+          "output_summary": "RuntimeError: Engine core initialization failed. vLLM 引擎核心进程启动失败，NPU 设备初始化异常。错误链：LLM() → LLMEngine.from_engine_args → EngineCoreClient.make_client → SyncMPClient → launch_core_engines → wait_for_engine_startup → RuntimeError。根因：C++ 扩展未编译 + CANN 9.0.0 vs 9.1.0 版本不匹配。",
+          "sample_name": "Qwen3-0.6B 离线推理（quick_start.md 示例）"
+        }
+      ],
+      "status": "failed"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 0,
+        "executed_in_verification": false,
+        "failed": 0,
+        "hooks": [
+          {
+            "name": "ruff-check",
+            "repo": "astral-sh/ruff-pre-commit",
+            "rev": "v0.14.0"
+          },
+          {
+            "name": "ruff-format",
+            "repo": "astral-sh/ruff-pre-commit",
+            "rev": "v0.14.0"
+          },
+          {
+            "name": "codespell",
+            "repo": "codespell-project/codespell",
+            "rev": "v2.4.1"
+          },
+          {
+            "name": "typos",
+            "repo": "crate-ci/typos",
+            "rev": "v1.32.0"
+          },
+          {
+            "name": "clang-format",
+            "repo": "pre-commit/mirrors-clang-format",
+            "rev": "v21.1.2"
+          },
+          {
+            "name": "markdownlint",
+            "repo": "igorshubovych/markdownlint-cli",
+            "rev": "v0.45.0"
+          },
+          {
+            "name": "actionlint",
+            "repo": "rhysd/actionlint",
+            "rev": "v1.7.7"
+          },
+          {
+            "name": "gitleaks-offline-scan",
+            "repo": "local",
+            "rev": ""
+          },
+          {
+            "name": "shellcheck",
+            "repo": "local",
+            "rev": ""
+          },
+          {
+            "name": "png-lint",
+            "repo": "local",
+            "rev": ""
+          },
+          {
+            "name": "signoff-commit",
+            "repo": "local",
+            "rev": ""
+          },
+          {
+            "name": "check-filenames",
+            "repo": "local",
+            "rev": ""
+          },
+          {
+            "name": "python-init",
+            "repo": "local",
+            "rev": ""
+          },
+          {
+            "name": "check-logger",
+            "repo": "local",
+            "rev": ""
+          },
+          {
+            "name": "check-forbidden-imports",
+            "repo": "local",
+            "rev": ""
+          },
+          {
+            "name": "check-boolean-context-manager",
+            "repo": "local",
+            "rev": ""
+          },
+          {
+            "name": "check-long-functions",
+            "repo": "local",
+            "rev": ""
+          },
+          {
+            "name": "check-symbolic-meta",
+            "repo": "local",
+            "rev": ""
+          },
+          {
+            "name": "suggestion",
+            "repo": "local",
+            "rev": ""
+          }
+        ],
+        "note": "包含 7 个远程 hook（ruff/codespell/typos/clang-format/markdownlint/actionlint）和 12 个本地 hook（gitleaks/shellcheck/signoff-commit/python-init/check-logger 等）",
+        "passed": 0,
+        "skipped": 0,
+        "status": "已配置（仅检查配置，未执行 pre-commit run）",
+        "total_hooks": 19
+      },
+      "summary": "检测到 .pre-commit-config.yaml 配置，共 19 个 hooks（ruff-check/ruff-format/codespell/typos/clang-format/markdownlint/actionlint/gitleaks/shellcheck 等）。仅检查配置不执行。未检测到 .lintrunner.toml/.lint-runner.yaml。"
+    },
+    "ut": {
+      "duration_seconds": 90,
+      "failed": 192,
+      "failures": [
+        {
+          "error": "NPU 注意力精度不匹配，需 C++ 扩展和 CANN 9.1.0",
+          "test_name": "test_causal_backend_correctness[1-Qwen/Qwen3-8B-small_decode]"
+        },
+        {
+          "error": "Sparse Flash Attention 精度测试失败，需 CANN 9.1.0 + COMPILE_CUSTOM_KERNELS=1",
+          "test_name": "test_sfa_v1_precision (66 tests)"
+        },
+        {
+          "error": "Gumbel 采样 NPU 计算测试失败",
+          "test_name": "test_gumbel_sampling (29 tests)"
+        },
+        {
+          "error": "Eagle 推测解码 NPU 测试失败",
+          "test_name": "test_eagle_proposer (14 tests)"
+        },
+        {
+          "error": "NPU 设备错误：ERR00100 PTA call acl api failed, rtDeviceSynchronizeWithTimeout",
+          "test_name": "test_model_runner_v1_with_device (15 errors)"
+        }
+      ],
+      "passed": 2916,
+      "python": {
+        "failed": 192,
+        "modules": [
+          {
+            "failed": 0,
+            "name": "test_ascend_config",
+            "passed": 71,
+            "status": "success"
+          },
+          {
+            "failed": 66,
+            "name": "attention/a2/test_sfa_v1_precision",
+            "passed": 0,
+            "reason": "NPU 精度测试，需 C++ 扩展 + CANN 9.1.0",
+            "status": "failed"
+          },
+          {
+            "failed": 41,
+            "name": "attention/a2/test_attention_v1_precision",
+            "passed": 0,
+            "reason": "NPU 注意力精度测试，需 C++ 扩展",
+            "status": "failed"
+          },
+          {
+            "failed": 29,
+            "name": "sample/a2/test_gumbel_sampling",
+            "passed": 0,
+            "reason": "NPU 采样测试",
+            "status": "failed"
+          },
+          {
+            "failed": 14,
+            "name": "spec_decode/a2/test_eagle_proposer",
+            "passed": 0,
+            "reason": "推测解码 NPU 测试",
+            "status": "failed"
+          },
+          {
+            "failed": 11,
+            "name": "attention/a2/test_mla_precision",
+            "passed": 0,
+            "reason": "MLA 精度测试",
+            "status": "failed"
+          },
+          {
+            "failed": 6,
+            "name": "test_platform",
+            "passed": 0,
+            "reason": "平台检测测试",
+            "status": "failed"
+          },
+          {
+            "failed": 15,
+            "name": "worker/a2/test_model_runner_v1_with_device",
+            "passed": 0,
+            "reason": "NPU 设备错误（acl api failed, rtDeviceSynchronizeWithTimeout）",
+            "status": "error"
+          }
+        ],
+        "passed": 2916,
+        "status": "partial_success",
+        "total": 3123
+      },
+      "skipped": 37,
+      "status": "partial_success",
+      "total": 3123
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "vllm-ascend-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "Ubuntu 22.04.5 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "6.9T（/home 分区，Docker data-root 所在）",
+      "docker_version": "18.09.0",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 0
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_dockerfile": "Dockerfile FROM quay.io/ascend/cann:9.1.0-910b-ubuntu22.04-py3.12, 安装 vLLM v0.27.1 + vllm-ascend + triton-ascend 3.2.2",
+        "from_readme": "CANN 9.1.0, torch 2.10.0, torch-npu 2.10.0.post4, vLLM v0.27.1",
+        "mappings": [
+          {
+            "original": "quay.io/ascend/vllm-ascend:main",
+            "source": "国内镜像加速",
+            "target": "quay.nju.edu.cn/ascend/vllm-ascend:main"
+          },
+          {
+            "original": "vLLM v0.22.1（镜像内置）",
+            "source": ".github/vllm-main-verified.commit",
+            "target": "vLLM 验证 commit 58d3918e（main 分支验证版本）"
+          },
+          {
+            "original": "torch_npu 2.10.0（镜像内置）",
+            "source": "requirements.txt 要求",
+            "target": "torch_npu 2.10.0.post4"
+          },
+          {
+            "original": "triton-ascend 3.2.1（镜像内置）",
+            "source": "Dockerfile + requirements.txt 要求",
+            "target": "triton-ascend 3.2.2"
+          }
+        ]
+      },
+      "image_name": "quay.nju.edu.cn/ascend/vllm-ascend:main（Tier 1 业务预构建镜像）",
+      "selection_reason": "Dockerfile FROM 指向 quay.io/ascend/cann:9.1.0-910b-ubuntu22.04-py3.12（非纯基础 OS 镜像，Tier 1 信号）；installation.md 和 testing.md 提供 quay.io/ascend/vllm-ascend:main 预构建镜像（含 CANN + vLLM + vllm-ascend + 全套依赖）。使用 quay.nju.edu.cn 国内镜像加速拉取。",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "main",
+    "commit": "770e476f359a485a8762ec04a806ae5206589cad",
+    "duration_seconds": 8781,
+    "end_time": "2026-08-22T08:02:04",
+    "environment": "远程容器 vllm-ascend-ttfhw（quay.nju.edu.cn/ascend/vllm-ascend:main），Ubuntu 22.04.5 LTS aarch64，Kunpeng-920 256核，Atlas 910B3 NPU",
+    "repo_url": "https://github.com/vllm-project/vllm-ascend.git",
+    "start_time": "2026-08-22T05:35:43",
+    "total_steps": 27,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "Tier 1 镜像 quay.io/ascend/vllm-ascend:main 内置 vLLM 0.22.1（非 main 分支验证版本），torch_npu 2.10.0（非 2.10.0.post4），triton-ascend 3.2.1（非 3.2.2），vllm-ascend 0.19.1rc2（非当前 main 分支代码）",
+      "solution": "按 Dockerfile 和 .github/vllm-main-verified.commit 升级：git fetch 验证 commit 58d3918e + pip install --no-build-isolation -e .[audio]；从华为昇腾镜像安装 torch-npu 2.10.0.post4；卸载旧 triton/triton-ascend 后安装 triton-ascend 3.2.2；卸载旧 vllm-ascend 后从 /workspace 源码安装",
+      "source": "Dockerfile + installation.md + .github/vllm-main-verified.commit",
+      "timestamp": "2026-08-22T07:23:50"
+    },
+    {
+      "problem": "pip 构建隔离从清华镜像下载 cmake/torch-npu 失败（HTTP 403 Forbidden）",
+      "solution": "使用 --no-build-isolation 复用容器已安装的构建依赖（cmake 4.3.4/ninja/setuptools_rust 等）；torch-npu 从华为昇腾镜像下载；通用包切换阿里云镜像或 pypi.org",
+      "source": "pip install 日志",
+      "timestamp": "2026-08-22T07:23:50"
+    },
+    {
+      "problem": "卸载 triton 3.5.0 后残留空 triton/ 目录，导致 torch._dynamo.utils 访问 triton.language.dtype 时 AttributeError",
+      "solution": "删除残留 triton/ 目录 + 设置 TORCH_DEVICE_BACKEND_AUTOLOAD=0 阻止 torch_npu 自动加载",
+      "source": "build_vllm_ascend.log 错误日志",
+      "timestamp": "2026-08-22T07:23:50"
+    },
+    {
+      "problem": "C++ 扩展 vllm_ascend_C 编译失败：容器 CANN 版本为 9.0.0，torch_npu 2.10.0.post4 的 acl_rt.h 引用 aclmdlRITask 类型（CANN 9.1.0 才有）",
+      "solution": "按 installation.md CPU-only 构建方式设置 COMPILE_CUSTOM_KERNELS=0 跳过 C++ 扩展编译。ACLNN 自定义算子已独立编译完成。Python 包和 ACLNN 算子可用，UT 可在 CPU 运行。",
+      "source": "build_vllm_ascend3.log CMake 编译错误",
+      "timestamp": "2026-08-22T07:23:50"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

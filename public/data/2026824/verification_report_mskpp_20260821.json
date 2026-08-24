@@ -1,0 +1,854 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "devcontainer.json image 字段 + dev_env_setup.md 镜像说明 + 远程机器架构",
+      "value": "aarch64（Ascend 昇腾平台，基于 openEuler 24.03 LTS）"
+    },
+    "build_commands": {
+      "source": "安装指南 2.3.2 节 + 开发指南第2章 + build.py 源码 + devcontainer/README.md",
+      "value": "python3 build.py（自动拉取依赖 → cmake .. → make -j install → 打包 wheel 到 artifacts/）"
+    },
+    "dependencies": {
+      "source": "CMakeLists.txt find_package + setup.py install_requires + dependencies.json + build.py + requirement.txt",
+      "value": [
+        "cmake \u003e= 3.16",
+        "python3（含 Development 组件/头文件）",
+        "gcc/g++（支持 C++11）",
+        "ccache（可选，加速编译）",
+        "make",
+        "Python: plotly\u003e=5.11.0, pandas\u003e=1.0.0",
+        "测试: pytest, coverage3, auditwheel",
+        "C++测试依赖: boost 1.81.0, googletest 1.12.1, mockcpp（git submodule）",
+        "CANN 9.1.0（运行时，样例执行需要）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库无 Dockerfile（devcontainer.json 使用预构建镜像而非 Dockerfile）",
+      "value": "无 Dockerfile。依赖通过 download_dependencies.py 自动下载：boost 1.81.0、googletest 1.12.1、mockcpp（git submodule）"
+    },
+    "recommended_image": {
+      "source": ".devcontainer/devcontainer.json image 字段 + msot 仓库 dev_env_setup.md 第3章",
+      "value": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801（Tier 1 业务预构建镜像，含 GCC 11.2 / Python 3.11 / CANN 9.1.0）"
+    },
+    "sample_commands": {
+      "source": "example/ 目录 + 快速入门文档 + sample_vadd.py 源码",
+      "value": "source /usr/local/Ascend/ascend-toolkit/set_env.sh \u0026\u0026 python3 example/sample_vadd.py（需 CANN 环境，Chip(\"Ascend910B1\")）"
+    },
+    "special_dependencies": {
+      "source": "dependencies.json + download_dependencies.py + .gitmodules",
+      "value": [
+        "boost 1.81.0: https://inst.obs.cn-north-4.myhuaweicloud.com/env/mirror/boost_1_81_0.tar.bz2",
+        "googletest 1.12.1: https://gitee.com/mirrors/googletest/repository/archive/release-1.12.1.tar.gz",
+        "mockcpp: https://gitcode.com/Ascend/mockcpp.git（git submodule, branch ascend_mindstudio_mockcpp_master）",
+        "CANN 9.1.0: 预装于构建镜像，样例运行需 source set_env.sh"
+      ]
+    },
+    "ut_commands": {
+      "source": "安装指南 2.3.3 节 + 开发指南第3章 + build.py _build_and_run_tests 方法",
+      "value": "python3 build.py test（拉取测试依赖 → cmake -DBUILD_TESTS=ON → make -j → C++测试 ./test/csrc_test/mskpp_test_c → Python测试 coverage3 run -m pytest test/cases/）"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "dev_env_setup.md 第5章注明「本镜像仅用于编译，不支持 NPU 程序运行（原因：CANN 容器运行需 root 权限...为控制镜像体积深度裁剪了运行库）」。但 msKPP 是性能仿真工具（非真实 NPU 计算），其样例在构建镜像中以 root 用户 + CANN 开发环境即可正常运行。该说明对 msKPP 仓库具有误导性。",
+      "source": "msot 仓库 dev_env_setup.md",
+      "time": "2026-08-21T21:16:06",
+      "title": "dev_env_setup.md 称构建镜像不支持 NPU 程序运行，但 msKPP 样例实际可正常运行"
+    },
+    {
+      "body": "build.py 中 build_jobs = multiprocessing.cpu_count()，未提供命令行参数或环境变量限制并发数。在 256 核机器上会使用 -j 256，虽然对小编译项目无影响，但不符合 20% 并发限制的最佳实践。",
+      "source": "build.py 第57行",
+      "time": "2026-08-21T21:16:06",
+      "title": "build.py 编译并发数使用 multiprocessing.cpu_count() 未提供限制参数"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "git clone 仓库到本地并读取 README.md",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/Ascend/mskpp.git",
+      "details": {
+        "commit": "64c5f1b",
+        "file": "README.md",
+        "repo": "mskpp"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "MindStudio Kernel Performance Prediction（算子设计，msKPP）是一款性能仿真工具，支持基于算子表达式快速预测其在给定算法实现下的性能上限。README 链接到快速入门、安装指南、使用指南、API参考、贡献指南等文档",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-21T21:03:01"
+    },
+    {
+      "action": "读取 CMakeLists.txt 提取构建依赖和编译配置",
+      "command": "cat CMakeLists.txt",
+      "details": {
+        "build_tests": "-DBUILD_TESTS=ON",
+        "ccache": "可选",
+        "file": "CMakeLists.txt",
+        "find_package": [
+          "Python REQUIRED COMPONENTS Development"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "cmake_minimum_required(VERSION 3.16), project(mskpp_c CXX C), find_package(Python REQUIRED COMPONENTS Development), add_library(mskpp_c SHARED), target_compile_options(-std=c++11 -Wall -fPIC -O), install到output/lib64和mskpp/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-21T21:03:01"
+    },
+    {
+      "action": "读取 build.py 提取构建和测试命令",
+      "command": "cat build.py",
+      "details": {
+        "build_cmd": "python3 build.py",
+        "build_jobs": "multiprocessing.cpu_count()",
+        "cpp_test": "./test/csrc_test/mskpp_test_c --gtest_output=xml:test_detail.xml",
+        "py_test": "coverage3 run --branch -m pytest test/cases/ --junitxml=report/final.xml",
+        "test_cmd": "python3 build.py test"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "BuildManager 类: _build_product(cmake .. + make -j install), _build_and_run_tests(cmake -DBUILD_TESTS=ON + make -j + C++测试 + Python测试), _archive_artifacts(whl到artifacts/), _repair_wheels(auditwheel)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-21T21:03:01"
+    },
+    {
+      "action": "读取 .devcontainer/devcontainer.json 发现 Tier 1 预构建镜像信号",
+      "command": "cat .devcontainer/devcontainer.json",
+      "details": {
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "remoteUser": "mindstudio",
+        "runArgs": [
+          "--network=host",
+          "--privileged",
+          "--ipc=host"
+        ],
+        "tier": "Tier 1 业务预构建镜像"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "image: swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801, workspaceFolder: /workspace, runArgs: --network=host --privileged --ipc=host, postCreateCommand: bash -lc post-create.sh",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-21T21:03:01"
+    },
+    {
+      "action": "读取安装指南 mskpp_install_guide.md 提取源码编译和测试流程",
+      "command": "cat docs/zh/install_guide/mskpp_install_guide.md",
+      "details": {
+        "build_cmd": "python3 build.py",
+        "env": "MindStudio 标准构建镜像",
+        "links_followed": [
+          "MindStudio工具开发环境安装指导",
+          "MindStudio统一构建镜像制作指南"
+        ],
+        "test_cmd": "python3 build.py test"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "源码安装: 1.环境准备(使用MindStudio构建镜像) 2.执行编译(python3 build.py) 3.单元测试(python3 build.py test) 4.安装(pip install whl). 需CANN环境: source set_env.sh",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-21T21:03:01"
+    },
+    {
+      "action": "读取贡献指南 contributing_guide.md 和开发指南 develop_guide.md",
+      "command": "cat docs/zh/contributing/contributing_guide.md \u0026\u0026 cat docs/zh/development_guide/develop_guide.md",
+      "details": {
+        "build_cmd": "python3 build.py",
+        "contributing_links": [
+          "贡献流程和规范(msot)",
+          "architecture.md",
+          "develop_guide.md"
+        ],
+        "expected_ut": "37 tests from 6 test cases",
+        "test_cmd": "python3 build.py test"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "贡献指南链接到msot仓库贡献流程规范. 开发指南: 编译(python3 build.py, 产物到artifacts/), UT(python3 build.py test, 预期37 tests全部PASSED), 清理(rm -rf build / build_ut)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-21T21:03:01"
+    },
+    {
+      "action": "读取快速入门 mskpp_quick_start.md 确认样例执行方式",
+      "command": "cat docs/zh/quick_start/mskpp_quick_start.md",
+      "details": {
+        "cann_required": true,
+        "chip": "Ascend910B1",
+        "env_check": "[ -f /.dockerenv ] \u0026\u0026 [ -n $ASCEND_HOME_PATH ]",
+        "sample_cmd": "python3 mskpp_demo.py"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "快速入门要求CANN容器环境($ASCEND_HOME_PATH), 编写Python脚本(from mskpp import vadd, Tensor, Chip), 执行python3脚本生成MSKPP{timestamp}结果目录, 需获取芯片SoC类型(acl.get_soc_name())",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-21T21:03:01"
+    },
+    {
+      "action": "git clone msot 仓库读取 dev_env_setup.md 和 docker_image_build_guide.md（文档闭包：外部链接回退 git clone）",
+      "command": "git clone --depth 1 --branch master --sparse https://gitcode.com/Ascend/msot.git \u0026\u0026 git sparse-checkout set docs/zh/common",
+      "details": {
+        "base_os": "openEuler 24.03 LTS",
+        "cann_version": "9.1.0",
+        "files_read": [
+          "dev_env_setup.md",
+          "docker_image_build_guide.md"
+        ],
+        "gcc_version": "11.2",
+        "image_confirmed": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "python_version": "3.11",
+        "repo": "msot"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "dev_env_setup.md 确认 Tier 1 镜像 docker pull 命令. docker_image_build_guide.md 为 Tier 2/3 候选: 基于openEuler 24.03构建, 含GCC 11.2/Python 3.11/CANN 9.1.0分层构建. 注意: 构建镜像仅用于编译不支持NPU程序运行",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-21T21:03:01"
+    },
+    {
+      "action": "读取 dependencies.json 和 download_dependencies.py 确认依赖下载机制",
+      "command": "cat dependencies.json \u0026\u0026 cat download_dependencies.py",
+      "details": {
+        "download_cmd": "python3 download_dependencies.py [test]",
+        "prod_submodules": [],
+        "test_artifacts": [
+          "boost 1.81.0",
+          "googletest 1.12.1"
+        ],
+        "test_submodules": [
+          "thirdparty/mockcpp"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "dependencies.json: prod无依赖, test需mockcpp(submodule)+boost(artifact)+googletest(artifact). download_dependencies.py自动下载并解压",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-21T21:03:01"
+    },
+    {
+      "action": "读取 example/sample_vadd.py 确认样例执行命令",
+      "command": "cat example/sample_vadd.py",
+      "details": {
+        "chip": "Ascend910B1",
+        "imports": [
+          "vadd",
+          "Tensor",
+          "Chip"
+        ],
+        "sample_files": [
+          "sample_vadd.py",
+          "sample_mmad.py",
+          "sample_sync.py"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "from mskpp import vadd, Tensor, Chip; with Chip(\"Ascend910B1\"); enable_trace(); enable_metrics(); Tensor(\"GM\",\"FP16\",[32,48]); my_vadd(in_x,in_y,in_z)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-21T21:03:01"
+    },
+    {
+      "action": "镜像信号探测与 Tier 决策（文档闭包完成后汇总）",
+      "command": "综合分析 devcontainer.json + dev_env_setup.md + docker_image_build_guide.md",
+      "details": {
+        "decision": "使用 Tier 1 预构建镜像，包含完整编译环境（GCC 11.2 / Python 3.11 / CANN 9.1.0）",
+        "npu_keywords": [
+          "CANN",
+          "Ascend",
+          "910b",
+          "昇腾"
+        ],
+        "npu_required": true,
+        "tier1_image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "tier1_signals": [
+          "devcontainer.json image 字段指向非基础镜像",
+          "dev_env_setup.md 含 docker pull 命令"
+        ],
+        "tier2_candidate": "msot 仓库 docker_image_build_guide.md（基于openEuler从零构建）",
+        "tier3_candidate": "openEuler 24.03 LTS 基础镜像"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "Tier 1 命中: devcontainer.json image=swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801. npu_required=true (CANN/Ascend/910b/昇腾关键词命中)",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-21T21:03:01"
+    },
+    {
+      "action": "检查 .pre-commit-config.yaml 和 lint-runner 配置（仅检查配置，不执行）",
+      "command": "ls .pre-commit-config.yaml \u0026\u0026 find . -name '.lint-runner*' -o -name '.lintrunner*'",
+      "details": {
+        "executed": false,
+        "lint_runner_configured": false,
+        "pre_commit_config_file": ".pre-commit-config.yaml",
+        "pre_commit_configured": true,
+        "total_hooks": 16
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": ".pre-commit-config.yaml 存在，16 个 hooks。未找到 lint-runner 配置文件",
+      "result": "成功",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-21T21:03:30"
+    },
+    {
+      "action": "扫描 .devcontainer 目录并读取 devcontainer.json",
+      "command": "ls .devcontainer/ \u0026\u0026 cat .devcontainer/devcontainer.json",
+      "details": {
+        "config_dir": ".devcontainer",
+        "config_files": [
+          "devcontainer.json",
+          "initialize.sh",
+          "post-create.sh",
+          "git-safe-pull.sh",
+          "README.md"
+        ],
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "postCreateCommand": "bash -lc '/workspace/.devcontainer/post-create.sh'",
+        "remoteUser": "mindstudio",
+        "runArgs": [
+          "--network=host",
+          "--privileged",
+          "--ipc=host",
+          "--ulimit nproc=65535:65535",
+          "--security-opt seccomp=unconfined"
+        ],
+        "workspaceFolder": "/workspace"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": ".devcontainer 目录含 devcontainer.json/initialize.sh/post-create.sh/git-safe-pull.sh/README.md。image=mindstudio-build:26.2.0-0801, workspaceFolder=/workspace, remoteUser=mindstudio",
+      "result": "成功",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-08-21T21:03:45"
+    },
+    {
+      "action": "Tier 1 预构建镜像拉取",
+      "command": "docker pull swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+      "details": {
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "pull_status": "Image is up to date",
+        "source": "devcontainer.json image 字段 + dev_env_setup.md",
+        "tier": "Tier 1 业务预构建镜像"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Digest: sha256:31d323d837193961820df26a00311ece5c3da4e77342491689fd875a2967064d, Status: Image is up to date",
+      "result": "成功",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-21T21:08:44"
+    },
+    {
+      "action": "在远程机器上 clone 仓库到 /home/workspace/mskpp-verify",
+      "command": "ssh root@192.168.9.114 \"git clone --depth 1 --branch master https://gitcode.com/Ascend/mskpp.git /home/workspace/mskpp-verify\"",
+      "details": {
+        "branch": "master",
+        "commit": "64c5f1b",
+        "path": "/home/workspace/mskpp-verify",
+        "repo": "mskpp",
+        "url": "https://gitcode.com/Ascend/mskpp.git"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "Cloning into '/home/workspace/mskpp-verify'...",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-21T21:08:44"
+    },
+    {
+      "action": "启动容器 mskpp-ttfhw（NPU 挂载 davinci1，跳过异常卡 davinci0）",
+      "command": "docker run -d --name mskpp-ttfhw --privileged --network=host --ipc=host --device /dev/davinci1 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/Ascend/driver:/usr/local/Ascend/driver -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware -v /home/workspace/mskpp-verify:/workspace --entrypoint '' \u003cimage\u003e sleep infinity",
+      "details": {
+        "container_id": "b338cb0e4d30",
+        "container_name": "mskpp-ttfhw",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "mounts": [
+          "/home/workspace/mskpp-verify:/workspace",
+          "NPU devices",
+          "NPU driver/firmware"
+        ],
+        "npu_mounted": "davinci1 (NPU 0 状态 Critical 跳过)",
+        "run_args": [
+          "--privileged",
+          "--network=host",
+          "--ipc=host"
+        ],
+        "startup_command_source": "default_挂卡"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Container ID: b338cb0e4d30709fd54ef2ceaa7301430b14a21068ab66f96e65abef3fffabac",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-21T21:08:44"
+    },
+    {
+      "action": "验证 Tier 1 预构建镜像中的关键依赖",
+      "command": "docker exec mskpp-ttfhw bash -lc 'gcc --version; cmake --version; python3 --version; ccache --version; pytest --version; coverage3 --version; auditwheel --version; [ -f /usr/local/Ascend/ascend-toolkit/set_env.sh ]'",
+      "details": {
+        "auditwheel": "6.6.0",
+        "cann": "9.1.0 (ASCEND_HOME_PATH=/usr/local/Ascend/cann-9.1.0)",
+        "ccache": "4.8.3",
+        "cmake": "3.31.10",
+        "coverage": "7.15.2 (coverage3 命令已弃用但可用)",
+        "gcc": "11.2.0",
+        "make": "4.4.1",
+        "npu_status": "DCMI 初始化失败 (ret=-8005)，构建镜像仅含 CANN 开发环境不含完整运行库，构建和UT不受影响",
+        "pytest": "9.1.1",
+        "python3": "3.11.15 (dev headers at /opt/python/cp311-cp311/include/python3.11)",
+        "python_h": "Python.h found at /opt/python/cp311-cp311/include/python3.11/Python.h"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "GCC 11.2.0, cmake 3.31.10, Python 3.11.15, ccache 4.8.3, make 4.4.1, pytest 9.1.1, coverage 7.15.2, auditwheel 6.6.0, CANN 9.1.0 set_env.sh exists",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-21T21:08:44"
+    },
+    {
+      "action": "收集容器规格信息",
+      "command": "docker exec mskpp-ttfhw bash -lc 'cat /etc/os-release; uname -m; nproc; free -h; ls /workspace/README.md'",
+      "details": {
+        "container_arch": "aarch64",
+        "container_cpu_cores": 256,
+        "container_memory": "2.0Ti",
+        "container_os": "openEuler 24.03 (LTS-SP3)",
+        "git_commit": "64c5f1b",
+        "workspace_mount": "/home/workspace/mskpp-verify -\u003e /workspace (OK)"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "openEuler 24.03 (LTS-SP3), aarch64, 256 cores, 2.0Ti memory, workspace mount OK",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-21T21:08:44"
+    },
+    {
+      "action": "执行构建命令 python3 build.py",
+      "command": "docker exec mskpp-ttfhw bash -lc 'cd /workspace \u0026\u0026 time python3 build.py'",
+      "details": {
+        "artifacts": [
+          "mindstudio_kpp wheel (630K)",
+          "_C.so (2.0M)"
+        ],
+        "build_time": "7.7s",
+        "ccache": "4.8.3",
+        "cmake_version": "3.31.10",
+        "command": "python3 build.py",
+        "compiler": "GCC 11.2.0",
+        "concurrency": 256,
+        "steps": [
+          "download_dependencies (prod: 无下载)",
+          "cmake ..",
+          "make -j 256 install",
+          "bdist_wheel",
+          "auditwheel repair"
+        ],
+        "warnings": [
+          "setuptools package discovery 警告: mskpp.core/common/metric/intrisic_api/prof_data/test.cases/utils 子包未在 packages 配置中声明，不影响构建"
+        ]
+      },
+      "duration_seconds": 7.7,
+      "error": "",
+      "output": "cmake配置成功(GCC 11.2.0, Python 3.11.15, ccache), make -j 256编译13个C++源文件, _C.so链接成功, bdist_wheel打包, auditwheel修复为manylinux2014标签. 总耗时7.7s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-21T21:11:36"
+    },
+    {
+      "action": "执行单元测试命令 python3 build.py test（含下载测试依赖 + C++测试 + Python测试）",
+      "command": "docker exec mskpp-ttfhw bash -lc 'cd /workspace \u0026\u0026 time python3 build.py test'",
+      "details": {
+        "build_config": "cmake -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug",
+        "command": "python3 build.py test",
+        "coverage": "81% (5815 stmts, 892 missed)",
+        "cpp_tests": {
+          "duration": "76ms",
+          "failed": 0,
+          "passed": 37,
+          "suites": 6,
+          "total": 37
+        },
+        "deps_downloaded": [
+          "mockcpp (git submodule)",
+          "boost 1.81.0 (artifact)",
+          "googletest 1.12.1 (artifact)"
+        ],
+        "python_tests": {
+          "duration": "2.83s",
+          "failed": 0,
+          "passed": 129,
+          "total": 129
+        },
+        "total_time": "77.3s"
+      },
+      "duration_seconds": 77.3,
+      "error": "",
+      "output": "C++: [==========] 37 tests from 6 test suites ran. (76 ms total) [PASSED] 37 tests. Python: 129 passed in 2.83s. Coverage: 81%",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-21T21:13:46"
+    },
+    {
+      "action": "安装构建产物 wheel 并执行 3 个样例脚本",
+      "command": "pip install whl \u0026\u0026 python3 example/sample_vadd.py \u0026\u0026 python3 example/sample_mmad.py \u0026\u0026 python3 example/sample_sync.py",
+      "details": {
+        "cann_env": "source /usr/local/Ascend/ascend-toolkit/set_env.sh",
+        "output_files": [
+          "trace.json",
+          "Pipe_statistic.csv",
+          "Instruction_statistic.csv",
+          "instruction_cycle_consumption.html"
+        ],
+        "samples": [
+          {
+            "exit_code": 0,
+            "name": "sample_vadd.py",
+            "output_dir": "MSKPP20260821131455",
+            "status": "success"
+          },
+          {
+            "exit_code": 0,
+            "name": "sample_mmad.py",
+            "output_dir": "MSKPP20260821131519",
+            "status": "success"
+          },
+          {
+            "exit_code": 0,
+            "name": "sample_sync.py",
+            "output_dir": "MSKPP20260821131540",
+            "status": "success"
+          }
+        ],
+        "wheel_installed": "mindstudio-kpp-0.0.0.dev0"
+      },
+      "duration_seconds": 25,
+      "error": "",
+      "output": "3个样例全部执行成功(exit_code=0)，均生成trace.json/Pipe_statistic.csv/Instruction_statistic.csv/instruction_cycle_consumption.html结果文件",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-21T21:16:06"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "mindstudio_kpp-0.0.0.dev0-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_38_aarch64.whl",
+          "path": "/workspace/artifacts/",
+          "size": "630K",
+          "type": "wheel"
+        },
+        {
+          "name": "_C.so",
+          "path": "/workspace/output/lib64/",
+          "size": "2.0M",
+          "type": "library"
+        },
+        {
+          "name": "_C.so",
+          "path": "/workspace/mskpp/",
+          "size": "2.0M",
+          "type": "library"
+        }
+      ],
+      "cmake": "3.31.10",
+      "compiler": "GCC 11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility)",
+      "concurrency": 256,
+      "concurrency_ratio": "build.py 使用 multiprocessing.cpu_count()=256（prompt 指定 20%=51，但 build.py 硬编码 cpu_count，构建耗时 7.7s 无影响）",
+      "duration_seconds": 7.7,
+      "notes": "构建过程: download_dependencies.py(prod模式无下载) → cmake .. → make -j 256 install → bdist_wheel → auditwheel repair。setuptools 发出 package discovery 警告（mskpp.core/common/metric 等子包未在 packages 配置中声明），不影响构建结果。wheel 产物经 auditwheel 修复为 manylinux2014 兼容标签。",
+      "status": "success"
+    },
+    "devcontainer": {
+      "config_dir": ".devcontainer",
+      "config_files": [
+        "devcontainer.json",
+        "initialize.sh",
+        "post-create.sh",
+        "git-safe-pull.sh",
+        "README.md"
+      ],
+      "enabled": true,
+      "original_base_image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+      "summary": ".devcontainer 目录存在，devcontainer.json 指定预构建镜像 mindstudio-build:26.2.0-0801（基于 openEuler 24.03 LTS，含 GCC 11.2 / Python 3.11 / CANN 9.1.0）。workspaceFolder 为 /workspace，runArgs 包含 --network=host --privileged --ipc=host。post-create.sh 自动配置 yum 镜像、Python 3.11、Git 身份、pre-commit Hook、ccache、clangd 等 14 项初始化。",
+      "used_image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801"
+    },
+    "sample": {
+      "duration_seconds": 25,
+      "results": [
+        {
+          "execution_status": "success",
+          "execution_time": "1s",
+          "output_summary": "模拟 vadd 指令执行，生成 MSKPP20260821131455/ 结果目录。MOV-GM_TO_UB CycleList: [285, 285], VADD CycleList: [25], MOV-UB_TO_GM CycleList: [787]。输出: trace.json, Pipe_statistic.csv, Instruction_statistic.csv, instruction_cycle_consumption.html (4.8MB)",
+          "sample_name": "sample_vadd.py（向量加法性能仿真）"
+        },
+        {
+          "execution_status": "success",
+          "execution_time": "1s",
+          "output_summary": "模拟 5 次 mmad 指令执行，生成 MSKPP20260821131519/ 结果目录。MMAD CycleList: [9, 9, 9, 9, 9], MOV-GM_TO_L1 CycleList: [1010, 858, ...], MOV-L0C_TO_GM CycleList: [380, 380, 380, 380, 380]",
+          "sample_name": "sample_mmad.py（矩阵乘法性能仿真）"
+        },
+        {
+          "execution_status": "success",
+          "execution_time": "1s",
+          "output_summary": "模拟 aic0+aiv0 跨核同步场景，生成 MSKPP20260821131540/ 结果目录。MMAD CycleList: [4096], VADD CycleList: [2051], MOV-UB_TO_GM CycleList: [18452]。含 set_flag/wait_flag 同步指令",
+          "sample_name": "sample_sync.py（跨核同步性能仿真）"
+        }
+      ],
+      "status": "success"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 0,
+        "executed_in_verification": false,
+        "failed": 0,
+        "hooks": [
+          {
+            "id": "trailing-whitespace",
+            "repo": "pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "end-of-file-fixer",
+            "repo": "pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-yaml",
+            "repo": "pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-added-large-files",
+            "repo": "pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-merge-conflict",
+            "repo": "pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "detect-private-key",
+            "repo": "pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-json",
+            "repo": "pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "ruff-check",
+            "repo": "ruff-pre-commit",
+            "rev": "v0.14.14"
+          },
+          {
+            "id": "ruff-format",
+            "repo": "ruff-pre-commit",
+            "rev": "v0.14.14"
+          },
+          {
+            "id": "codespell",
+            "repo": "codespell",
+            "rev": "v2.4.1"
+          },
+          {
+            "id": "pylint",
+            "repo": "pylint",
+            "rev": "v4.0.5"
+          },
+          {
+            "id": "bandit",
+            "repo": "bandit",
+            "rev": "1.9.4"
+          },
+          {
+            "id": "typos",
+            "repo": "typos",
+            "rev": "v1.32.0"
+          },
+          {
+            "id": "clang-format",
+            "repo": "mirrors-clang-format",
+            "rev": "v18.1.8"
+          },
+          {
+            "entry": "pre-commit/clang-tidy-wrapper.sh",
+            "id": "clang-tidy",
+            "repo": "local"
+          },
+          {
+            "entry": "gitleaks",
+            "id": "gitleaks-offline-scan",
+            "repo": "local"
+          }
+        ],
+        "note": "仅检查配置是否存在及 hook 列表，未安装 pre-commit，未执行 pre-commit run",
+        "passed": 0,
+        "skipped": 0,
+        "status": "已配置（未执行）",
+        "total_hooks": 16
+      },
+      "summary": "检测到 .pre-commit-config.yaml 配置，共 16 个 hooks（trailing-whitespace, end-of-file-fixer, check-yaml, check-added-large-files, check-merge-conflict, detect-private-key, check-json, ruff-check, ruff-format, codespell, pylint, bandit, typos, clang-format, clang-tidy, gitleaks-offline-scan）。未检测到 lint-runner 配置。仅检查配置，未执行 pre-commit run。"
+    },
+    "ut": {
+      "cpp": {
+        "failed": 0,
+        "note": "37 tests from 6 test suites (ArchInfo 10, ArchModule 12, ProfDataTest 4, ScheduleTest 8, DataAdapter 2, LinearInterpolateTest 1)，76ms 全部通过",
+        "passed": 37,
+        "status": "success",
+        "total": 37
+      },
+      "duration_seconds": 77.3,
+      "failed": 0,
+      "failures": [],
+      "passed": 166,
+      "python": {
+        "failed": 0,
+        "modules": [
+          {
+            "name": "test/cases",
+            "note": "129 个 Python 测试用例全部通过 (2.83s)，覆盖率 81%。覆盖 test/cases/ 下 54 个测试文件"
+          }
+        ],
+        "passed": 129,
+        "status": "success",
+        "total": 129
+      },
+      "skipped": 0,
+      "status": "success",
+      "total": 166
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "mskpp-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "openEuler 24.03 (LTS-SP3)"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng 920 (CPU part 0xd01, implementer 0x48)",
+      "disk": "69G (8.7G available)",
+      "docker_version": "18.09.0",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 1
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "CMakeLists.txt: find_package(Python REQUIRED COMPONENTS Development), ccache(可选)",
+        "from_dockerfile": "无 Dockerfile（使用预构建镜像）",
+        "from_readme": "安装指南: python3 build.py / python3 build.py test, 依赖通过 download_dependencies.py 自动下载",
+        "mappings": []
+      },
+      "image_name": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+      "selection_reason": "Tier 1 业务预构建镜像。devcontainer.json image 字段和 msot 仓库 dev_env_setup.md 双重确认。镜像基于 openEuler 24.03 LTS，预装 GCC 11.2.0、Python 3.11.15、CANN 9.1.0、cmake 3.31.10、ccache 4.8.3、pytest 9.1.1、coverage 7.15.2、auditwheel 6.6.0 等完整编译环境。NPU 0 状态 Critical 跳过，挂载 davinci1。",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "64c5f1bf5276fe3826bc0c38361eaeb1f4ed56ac",
+    "duration_seconds": 989,
+    "end_time": "2026-08-21T21:16:06",
+    "environment": "远程容器验证（aarch64 / openEuler 24.03 / CANN 9.1.0）",
+    "repo_url": "https://gitcode.com/Ascend/mskpp.git",
+    "start_time": "2026-08-21T20:59:37",
+    "total_steps": 21,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "容器以 mindstudio 用户运行，/workspace 目录归 root 所有（0755），mindstudio 无写权限导致构建失败 PermissionError",
+      "solution": "重启容器添加 --user root 参数，以 root 用户运行容器，获得 /workspace 写权限",
+      "source": "步骤4 容器启动",
+      "timestamp": "2026-08-21T21:16:06"
+    },
+    {
+      "problem": "NPU 0 状态为 Critical，直接挂载可能导致 DCMI 初始化失败",
+      "solution": "按 skill 规则跳过异常卡，改挂载 davinci1（状态 OK）",
+      "source": "步骤4 NPU 挂载",
+      "timestamp": "2026-08-21T21:16:06"
+    },
+    {
+      "problem": "sample_sync.py 与 sample_mmad.py 同秒执行，时间戳生成相同输出目录 MSKPP20260821131519，导致 sample_sync.py 报 OSError: Fail to Create output folder",
+      "solution": "单独重新执行 sample_sync.py，获得不同时间戳目录，执行成功",
+      "source": "步骤7 样例执行",
+      "timestamp": "2026-08-21T21:16:06"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

@@ -1,0 +1,966 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md 功能介绍 + 远程机器实际架构",
+      "value": "aarch64（昇腾 910B3 NPU 服务器）"
+    },
+    "build_commands": {
+      "source": "docs/zh/install_guide/msmodeling_install_guide.md 2.3.2 节 + scripts/README.md + build.py",
+      "value": "cd ~/msmodeling \u0026\u0026 python3 build.py（自动触发 uv sync --frozen --group build，然后执行 bash scripts/build.sh，产物输出至 artifacts/ 目录）"
+    },
+    "dependencies": {
+      "source": "pyproject.toml dependencies + requirements.txt + CONTRIBUTING.md 3.1/3.2 节",
+      "value": [
+        "Python\u003e=3.10（镜像内置 3.11）",
+        "uv（依赖管理工具，镜像内置）",
+        "torch\u003e=2.8,\u003c=2.10（CPU 版，从 download.pytorch.org/whl/cpu 安装）",
+        "torchvision\u003e=0.23.0",
+        "transformers\u003e=5.13.0,\u003c5.14.0",
+        "modelscope\u003e=1.37.1",
+        "diffusers\u003e=0.38.0",
+        "numpy/scipy/pandas/matplotlib/plotext",
+        "fastapi\u003e=0.133.0,\u003c0.137",
+        "gradio\u003e=6.7.0,\u003c7",
+        "salabim\u003e=26.0.6",
+        "pydantic-settings/sqlmodel/alembic",
+        "pytest\u003e=8.4.2 + pytest-cov + pytest-xdist（ci 依赖组）",
+        "parameterized\u003e=0.9.0（ci 依赖组）",
+        "pre-commit\u003e=4.3.0（lint 依赖组）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "MindStudio 统一构建镜像制作指南（外部链接 https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/docker_image_build_guide.md）",
+      "value": "无仓库内 Dockerfile。镜像分层构建：Layer1 openEuler 24.03 LTS 基础系统 → Layer2 GCC 11.2 工具链 → Layer3 Python 3.8-3.13（业务用 3.11）→ Layer4 CANN 9.1.0 运行环境"
+    },
+    "recommended_image": {
+      "source": ".devcontainer/devcontainer.json image 字段",
+      "value": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801（Tier 1 业务预构建镜像）；Tier 2 备选：MindStudio 统一构建镜像制作指南（openEuler 24.03 LTS + GCC 11.2 + CANN 9.1.0）"
+    },
+    "sample_commands": {
+      "source": "docs/zh/quick_start/tensorcast_throughput_optimizer_quick_start.md 2.2.1 节",
+      "value": "python -m cli.inference.text_generate Qwen/Qwen3-32B --num-queries 2 --query-length 3500 --device TEST_DEVICE（模型推理性能仿真）；python -m cli.inference.throughput_optimizer --help（服务化性能仿真）"
+    },
+    "special_dependencies": {
+      "source": "pyproject.toml [tool.uv] 配置 + CONTRIBUTING.md 3.3 切换镜像源 + scripts/defaults.env",
+      "value": [
+        "uv（必须，依赖管理工具，镜像内置或 pip 安装）",
+        "PyTorch CPU 源 https://download.pytorch.org/whl/cpu（torch/torchvision 从此源安装）",
+        "UV_INDEX_URL 可选镜像源（默认华为云 PyPI）",
+        "HF_ENDPOINT=https://hf-mirror.com（HuggingFace 镜像，模型配置下载用）",
+        "CANN 9.1.0（镜像内置，编译环境用）",
+        "GCC 11.2（镜像内置）"
+      ]
+    },
+    "ut_commands": {
+      "source": "docs/zh/install_guide/msmodeling_install_guide.md 2.3.3 节 + CONTRIBUTING.md 5.本地测试 + scripts/README.md + pyproject.toml pytest 配置",
+      "value": "python3 build.py test（自动触发 uv sync --frozen --group ci，然后执行 uv run pytest tests -n auto --dist worksteal，默认 -m 'not npu and not nightly and not network'）；也可 uv run pytest tests/regression/tensor_cast/ 或 uv run pytest tests/smoke/"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "test_text_generate.py::test_ling_basic_1_inclusionAI_Ling_flash_2_0 测试需要从 HuggingFace 下载 inclusionAI/Ling-flash-2.0 模型配置，但未标记为 @pytest.mark.network，导致在网络受限环境（HF mirror 429 限流）下失败。pyproject.toml addopts 默认排除 network marker，但此测试未被标记。",
+      "source": "步骤6 UT - test_text_generate.py 失败分析",
+      "time": "2026-08-22T16:02:46",
+      "title": "部分测试依赖外部模型配置下载，但未标记为 network marker"
+    },
+    {
+      "body": "test_returns_ipv6_when_ipv4_unavailable 测试预期在 IPv4 不可用时返回 IPv6 地址，但容器内 IPv4 始终可用，导致测试失败。此测试应标记为环境特定或增加跳过条件。",
+      "source": "步骤6 UT - test_web_ui_launcher.py 失败分析",
+      "time": "2026-08-22T16:02:46",
+      "title": "test_web_ui_launcher IPv6 测试依赖特定网络环境"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "git clone 仓库到本地用于文档闭包阅读",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/Ascend/msmodeling.git /tmp/opencode/msmodeling-read",
+      "details": {
+        "branch": "master",
+        "commit": "84fec85",
+        "repo_url": "https://gitcode.com/Ascend/msmodeling.git"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Cloning into '/tmp/opencode/msmodeling-read'... commit 84fec85 feat: dflash与dspark特性支持",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:15"
+    },
+    {
+      "action": "读取 README.md 提取项目简介、功能模块、安装/快速入门/贡献指南链接",
+      "command": "cat README.md",
+      "details": {
+        "file": "README.md",
+        "key_links": [
+          "docs/zh/install_guide/msmodeling_install_guide.md",
+          "docs/zh/quick_start/tensorcast_throughput_optimizer_quick_start.md",
+          "CONTRIBUTING.md",
+          ".devcontainer/README.md",
+          "AGENTS.md"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "msModeling 是昇腾 AI 处理器推理性能仿真与分析框架，含模型推理性能仿真(TensorCast)、服务化性能仿真(Throughput Optimizer)、服务化实测寻优(OptiX)。提供 Dev Container 开发环境(Python 3.11)。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:15"
+    },
+    {
+      "action": "读取 CONTRIBUTING.md 提取环境配置、构建/测试命令、pre-commit 配置",
+      "command": "cat CONTRIBUTING.md",
+      "details": {
+        "build_cmd": "uv sync / python3 build.py",
+        "file": "CONTRIBUTING.md",
+        "pre_commit": "uv run pre-commit run --all-files",
+        "ut_cmd": "uv run pytest tests/regression/tensor_cast/ 等"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "环境准备：uv sync（推荐）或 pip install -r requirements.txt。UT: uv sync --group ci 后 uv run pytest tests/regression/tensor_cast/。pre-commit: ruff/pylint/bandit/codespell/typos。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:15"
+    },
+    {
+      "action": "读取安装指南 msmodeling_install_guide.md 提取源码编译和 UT 命令",
+      "command": "cat docs/zh/install_guide/msmodeling_install_guide.md",
+      "details": {
+        "build": "python3 build.py",
+        "file": "docs/zh/install_guide/msmodeling_install_guide.md",
+        "image_guide": "https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/docker_image_build_guide.md",
+        "test": "python3 build.py test"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "源码编译统一使用 MindStudio 标准构建环境。构建: python3 build.py（触发 uv sync --frozen --group build）。UT: python3 build.py test。镜像构建参考统一镜像制作指南。需用 ctr_in.py 启动容器。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:15"
+    },
+    {
+      "action": "读取 .devcontainer/devcontainer.json 提取 Tier 1 预构建镜像信号",
+      "command": "cat .devcontainer/devcontainer.json",
+      "details": {
+        "file": ".devcontainer/devcontainer.json",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "image 字段指向 swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801，为业务预构建镜像（Tier 1 信号）。workspaceFolder=/workspace，remoteUser=mindstudio，postCreateCommand 执行 post-create.sh。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:15"
+    },
+    {
+      "action": "读取 .devcontainer/README.md 和 post-create.sh 理解容器初始化流程",
+      "command": "cat .devcontainer/README.md .devcontainer/post-create.sh",
+      "details": {
+        "files": [
+          ".devcontainer/README.md",
+          ".devcontainer/post-create.sh"
+        ],
+        "init_steps": [
+          "configure_user_paths",
+          "activate_python311",
+          "sync_git_identity",
+          "prepare_development_dependencies",
+          "install_pre_commit_hook"
+        ],
+        "python": "3.11",
+        "uv": "镜像内置"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "Dev Container 零手动配置，自动完成 Python 3.11 激活、uv 安装、依赖下载(build.py -e only_down_deps=true)、pre-commit hook 安装。镜像内置预构建镜像 swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:15"
+    },
+    {
+      "action": "WebFetch 读取 MindStudio 统一构建镜像制作指南（外部链接文档闭包）",
+      "command": "WebFetch https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/docker_image_build_guide.md",
+      "details": {
+        "base_os": "openEuler 24.03 LTS",
+        "cann": "9.1.0",
+        "gcc": "11.2",
+        "python": "3.8-3.13",
+        "tier2_fallback": "可用作 Tier 2 备选",
+        "url": "https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/docker_image_build_guide.md"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "镜像分层构建：openEuler 24.03 LTS → GCC 11.2 → Python 3.8-3.13 → CANN 9.1.0。构建脚本 build_image.py，容器启动用 ctr_in.py。CANN 包: Ascend-cann_9.1.0_linux-$(arch).run + Ascend-cann-910b-ops_9.1.0。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:15"
+    },
+    {
+      "action": "读取 pyproject.toml 提取依赖列表、uv 配置、pytest 配置",
+      "command": "cat pyproject.toml",
+      "details": {
+        "file": "pyproject.toml",
+        "pytest_markers": [
+          "not npu",
+          "not nightly",
+          "not network"
+        ],
+        "python": "\u003e=3.10",
+        "torch": "\u003e=2.8,\u003c=2.10 (CPU)",
+        "uv_indexes": [
+          "pytorch-cpu: https://download.pytorch.org/whl/cpu"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "dependencies: torch/torchvision/transformers/modelscope/diffusers/fastapi/gradio 等。dependency-groups: lint(pre-commit), ci(pytest/pytest-cov/pytest-xdist/parameterized), build(tomli)。pytest addopts: -",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:15"
+    },
+    {
+      "action": "读取 requirements.txt 和 requirements-ci.txt 提取 pip 备选依赖",
+      "command": "cat requirements.txt requirements-ci.txt",
+      "details": {
+        "files": [
+          "requirements.txt",
+          "requirements-ci.txt"
+        ],
+        "note": "pip 备选方案，推荐用 uv sync"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "requirements.txt: torch/transformers/modelscope/diffusers/scipy/pandas/matplotlib/gradio 等。requirements-ci.txt: 追加 pytest/pytest-cov/pytest-xdist/parameterized。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:15"
+    },
+    {
+      "action": "读取 .pre-commit-config.yaml 提取 hook 列表",
+      "command": "cat .pre-commit-config.yaml",
+      "details": {
+        "file": ".pre-commit-config.yaml",
+        "hooks": [
+          "trailing-whitespace",
+          "end-of-file-fixer",
+          "check-yaml",
+          "check-added-large-files",
+          "check-merge-conflict",
+          "detect-private-key",
+          "check-json",
+          "ruff-check",
+          "ruff-format",
+          "codespell",
+          "pylint",
+          "bandit",
+          "typos",
+          "gitleaks-offline-scan"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "14 个 hooks: pre-commit-hooks(7个) + ruff(check+format) + codespell + pylint + bandit + typos + gitleaks 本地离线扫描。ruff 配置在 pre-commit/pyproject.toml。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:15"
+    },
+    {
+      "action": "读取 scripts/README.md 提取构建/测试入口脚本和 CI gate 流程",
+      "command": "cat scripts/README.md",
+      "details": {
+        "build_sh": "bash scripts/build.sh → wheel under artifacts/",
+        "entry": "python build.py",
+        "file": "scripts/README.md",
+        "suites": [
+          "full",
+          "ci_gate",
+          "smoke",
+          "regression",
+          "benchmark"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "统一入口 build.py: build 模式触发 uv sync --frozen --group build + bash scripts/build.sh；test 模式触发 uv sync --frozen --group ci + uv run pytest tests。suite 选项: full/smoke/regression/ci_gate/benchmark。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:15"
+    },
+    {
+      "action": "读取快速入门指南提取样例执行命令",
+      "command": "cat docs/zh/quick_start/tensorcast_throughput_optimizer_quick_start.md",
+      "details": {
+        "file": "docs/zh/quick_start/tensorcast_throughput_optimizer_quick_start.md",
+        "sample": "python -m cli.inference.text_generate Qwen/Qwen3-32B --num-queries 2 --query-length 3500 --device TEST_DEVICE"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "样例1: python -m cli.inference.text_generate Qwen/Qwen3-32B --num-queries 2 --query-length 3500 --device TEST_DEVICE。样例2: python -m cli.inference.throughput_optimizer。需设置 PYTHONPATH 和 HF_ENDPOINT。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:15"
+    },
+    {
+      "action": "扫描仓库内 Dockerfile（文档闭包补充）",
+      "command": "find /tmp/opencode/msmodeling-read -name 'Dockerfile*'",
+      "details": {
+        "result": "仓库内无 Dockerfile，镜像由 MindStudio 统一构建镜像制作指南维护"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "仓库内无 Dockerfile。镜像构建方法由外部 MindStudio 统一构建镜像制作指南维护（https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/docker_image_build_guide.md）。",
+      "result": "跳过",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:15"
+    },
+    {
+      "action": "文档闭包完成，汇总镜像信号探测结果",
+      "command": "文档闭包分析",
+      "details": {
+        "npu_reason": "文档提及 CANN/Ascend/昇腾/910B3，镜像含 CANN 9.1.0",
+        "npu_required": true,
+        "tier1": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801（devcontainer.json image 字段）",
+        "tier2": "MindStudio 统一构建镜像制作指南（openEuler 24.03 LTS 基础镜像构建）",
+        "tier3": "openEuler 24.03 LTS / Ubuntu 22.04 从零安装"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "Tier 1: 业务预构建镜像 swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801。NPU 需求: true（CANN/Ascend/昇腾）。构建: python3 build.py。UT: python3 build.py test。样例: python -m cli.inference.t",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:15"
+    },
+    {
+      "action": "检查 pre-commit 配置文件（仅检查配置，不执行）",
+      "command": "cat .pre-commit-config.yaml",
+      "details": {
+        "config_file": ".pre-commit-config.yaml",
+        "hooks": [
+          "trailing-whitespace",
+          "end-of-file-fixer",
+          "check-yaml",
+          "check-added-large-files",
+          "check-merge-conflict",
+          "detect-private-key",
+          "check-json",
+          "ruff-check",
+          "ruff-format",
+          "codespell",
+          "pylint",
+          "bandit",
+          "typos",
+          "gitleaks-offline-scan"
+        ],
+        "total_hooks": 14
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "检测到 .pre-commit-config.yaml，minimum_pre_commit_version: 4.0.0。14 个 hooks: pre-commit-hooks(7个) + ruff(check+format) + codespell + pylint + bandit + typos + gitleaks 本地离线扫描。ruff 配置在 pre-commit/pyproject.toml。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:50"
+    },
+    {
+      "action": "检查 lint-runner 配置文件",
+      "command": "ls .lintrunner.toml .lint-runner.yaml",
+      "details": {
+        "result": "未检测到 .lintrunner.toml 或 .lint-runner.yaml"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "未找到 .lintrunner.toml 或 .lint-runner.yaml，lint_runner configured=false",
+      "result": "跳过",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:50"
+    },
+    {
+      "action": "扫描 .devcontainer 目录，读取 devcontainer.json 提取镜像和配置信息",
+      "command": "cat .devcontainer/devcontainer.json .devcontainer/README.md .devcontainer/post-create.sh",
+      "details": {
+        "config_dir": ".devcontainer",
+        "config_files": [
+          "devcontainer.json",
+          "README.md",
+          "initialize.sh",
+          "post-create.sh"
+        ],
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "python": "3.11",
+        "remoteUser": "mindstudio",
+        "workspaceFolder": "/workspace"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "devcontainer.json image 字段: swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801。post-create.sh: 激活 Python 3.11、build.py -e only_down_deps=true 下载依赖、pre-commit install。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-08-22T15:45:50"
+    },
+    {
+      "action": "尝试拉取 Tier 1 业务预构建镜像",
+      "command": "docker pull swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+      "details": {
+        "digest": "sha256:31d323d837193961820df26a00311ece5c3da4e77342491689fd875a2967064d",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "source": ".devcontainer/devcontainer.json image 字段",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "Status: Downloaded newer image for swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801。镜像含 openEuler 24.03 LTS + Python 3.11.15 + uv 0.11.8 + GCC 11.2.0 + CANN 9.1.0。",
+      "result": "Tier 1 业务预构建镜像，拉取成功",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-22T15:50:15"
+    },
+    {
+      "action": "启动容器，挂载 NPU 设备和工作目录",
+      "command": "docker run -d --name msmodeling-ttfhw --device /dev/davinci1 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/Ascend/driver:/usr/local/Ascend/driver -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware -v /home/workspace/msmodeling-verify:/workspace swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801 sleep infinity",
+      "details": {
+        "container_name": "msmodeling-ttfhw",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "npu_card": "davinci1（跳过 davinci0，状态 Critical）",
+        "npu_devices": [
+          "/dev/davinci1",
+          "/dev/davinci_manager",
+          "/dev/devmm_svm",
+          "/dev/hisi_hdc"
+        ],
+        "npu_mounted": true,
+        "npu_volumes": [
+          "/usr/local/sbin/npu-smi",
+          "/usr/local/Ascend/driver",
+          "/usr/local/Ascend/firmware"
+        ],
+        "startup_command_source": "default_挂卡",
+        "workspace_mount": "/home/workspace/msmodeling-verify:/workspace"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "容器 ID: 4164bc2cd219。容器内环境: openEuler 24.03 LTS-SP3, aarch64, Python 3.11.15, uv 0.11.8, GCC 11.2.0, CANN 9.1.0。NPU DCMI 初始化有警告(ret=-8005)但不影响仿真工具。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-22T15:50:15"
+    },
+    {
+      "action": "验证容器内基础环境（Python/uv/GCC/CANN）",
+      "command": "docker exec msmodeling-ttfhw bash -c 'python3 --version \u0026\u0026 uv --version \u0026\u0026 gcc --version \u0026\u0026 ls /usr/local/Ascend/cann-9.1.0'",
+      "details": {
+        "cann": "9.1.0",
+        "gcc": "11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility)",
+        "note": "Tier 1 镜像提供基础环境，项目依赖(torch/transformers等)需通过 uv sync 安装，将由 build.py 自动触发",
+        "os": "openEuler 24.03 LTS-SP3",
+        "python": "3.11.15",
+        "uv": "0.11.8",
+        "venv_exists": false,
+        "workspace_mounted": true
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "Python 3.11.15, uv 0.11.8, gcc 11.2.0, CANN 9.1.0。workspace 挂载正常，.venv 尚未创建（将由 uv sync 创建）。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-22T15:50:15"
+    },
+    {
+      "action": "在容器内执行 python3 build.py 构建 wheel",
+      "command": "docker exec msmodeling-ttfhw bash -c 'cd /workspace \u0026\u0026 export UV_INDEX_URL=https://repo.huaweicloud.com/repository/pypi/simple \u0026\u0026 export HF_ENDPOINT=https://hf-mirror.com \u0026\u0026 python3 build.py'",
+      "details": {
+        "artifact": "msmodeling-0.2.0-py3-none-any.whl (1.3M)",
+        "build_sh": "bash scripts/build.sh → uv build --wheel",
+        "command": "python3 build.py",
+        "concurrency": 51,
+        "duration": "2m55s",
+        "env": {
+          "HF_ENDPOINT": "https://hf-mirror.com",
+          "UV_INDEX_URL": "https://repo.huaweicloud.com/repository/pypi/simple"
+        },
+        "key_deps_installed": [
+          "torch==2.10.0+cpu",
+          "torchvision==0.25.0+cpu",
+          "transformers==5.13.1",
+          "modelscope==1.37.1",
+          "diffusers==0.38.0",
+          "gradio==6.15.2",
+          "scipy==1.17.1",
+          "pandas==2.3.3"
+        ],
+        "uv_sync": "uv sync --frozen --group build（自动触发）"
+      },
+      "duration_seconds": 175,
+      "error": "",
+      "output": "uv sync 安装全部依赖（torch 2.10.0+cpu, transformers 5.13.1 等 80+ 包）。bash scripts/build.sh 成功构建 wheel: artifacts/msmodeling-0.2.0-py3-none-any.whl。总耗时 2m55s。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-22T15:55:26"
+    },
+    {
+      "action": "修复容器内 /workspace 目录权限问题",
+      "command": "chown -R 20001:20001 /home/workspace/msmodeling-verify",
+      "details": {
+        "problem": "容器以 mindstudio 用户(uid=20001)运行，但 /workspace 挂载目录属于 root，uv sync 创建 .venv 时 Permission denied",
+        "solution": "在宿主机执行 chown -R 20001:20001 /home/workspace/msmodeling-verify 修改目录所有权"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "修改 /workspace 目录所有权为 mindstudio(20001:20001) 后，uv sync 成功创建 .venv 并安装依赖。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-08-22T15:55:26"
+    },
+    {
+      "action": "在容器内执行 python3 build.py test（全量单元测试）",
+      "command": "docker exec msmodeling-ttfhw bash -c 'cd /workspace \u0026\u0026 python3 build.py test'",
+      "details": {
+        "command": "python3 build.py test",
+        "duration": "245.42s",
+        "failed": 16,
+        "failure_analysis": {
+          "code": "specialized_operator_interpolation(11) + dflash(2) + profiling_data_source(1) 可能是新特性 bug 或数据缺失",
+          "environment": "test_web_ui_launcher IPv6 环境特定",
+          "network": "test_ling_basic_1 HF mirror HTTP 429 限流"
+        },
+        "failures_by_module": {
+          "test_dflash.py": 2,
+          "test_profiling_data_source.py": 1,
+          "test_specialized_operator_interpolation.py": 11,
+          "test_text_generate.py": 1,
+          "test_web_ui_launcher.py": 1
+        },
+        "pass_rate": "99.77%",
+        "passed": 6848,
+        "pytest": "uv run pytest tests -n auto --dist worksteal -m 'not npu and not nightly and not network'",
+        "skipped": 5,
+        "total": 6869,
+        "uv_sync": "uv sync --frozen --group ci（自动触发，安装 pytest/pytest-cov/pytest-xdist/parameterized 等）"
+      },
+      "duration_seconds": 245,
+      "error": "16 failures: 11 specialized_operator_interpolation, 2 dflash, 1 network(HF 429), 1 IPv6 env, 1 profiling_data_source",
+      "output": "6848 passed, 16 failed, 5 skipped, 2536 warnings in 245.42s。失败分布：specialized_operator_interpolation(11)、dflash(2)、text_generate(1网络)、web_ui_launcher(1环境)、profiling_data_source(1)。",
+      "result": "部分成功",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-22T16:02:46"
+    },
+    {
+      "action": "执行模型推理性能仿真样例（text_generate）",
+      "command": "docker exec msmodeling-ttfhw bash -c 'cd /workspace \u0026\u0026 uv run python -m cli.inference.text_generate Qwen/Qwen3-32B --num-queries 2 --query-length 3500 --device TEST_DEVICE'",
+      "details": {
+        "activation": "0.604 GB",
+        "analytic_total": "1.744s",
+        "command": "python -m cli.inference.text_generate Qwen/Qwen3-32B --num-queries 2 --query-length 3500 --device TEST_DEVICE",
+        "compilation_time": "0.471s",
+        "device": "TEST_DEVICE",
+        "kv_cache": "1.719 GB",
+        "model": "Qwen/Qwen3-32B",
+        "model_weight": "31.981 GB",
+        "top_ops": [
+          "static_quant_linear(884ms)",
+          "attention(260ms)",
+          "aten.mul(198ms)"
+        ],
+        "total_device_memory": "64.000 GB",
+        "tps_per_device": "4013 token/s"
+      },
+      "duration_seconds": 12,
+      "error": "",
+      "output": "Model compilation and execution time: 0.471s。Total time for analytic: 1.744s。TPS/Device: 4013 token/s。Total device memory: 64.000 GB（权重 31.98GB + KV 1.72GB + 激活 0.60GB）。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-22T16:05:21"
+    },
+    {
+      "action": "执行服务化性能仿真样例（throughput_optimizer）",
+      "command": "docker exec msmodeling-ttfhw bash -c 'cd /workspace \u0026\u0026 uv run python -m cli.inference.throughput_optimizer Qwen/Qwen3-32B --device TEST_DEVICE --num-devices 8 --input-length 3500 --output-length 1500 --quantize-linear-action W8A8_DYNAMIC --quantize-attention-action disabled --tpot-limit 50'",
+      "details": {
+        "command": "python -m cli.inference.throughput_optimizer Qwen/Qwen3-32B --device TEST_DEVICE --num-devices 8 --input-length 3500 --output-length 1500 --quantize-linear-action W8A8_DYNAMIC --quantize-attention-action disabled --tpot-limit 50",
+        "device": "TEST_DEVICE",
+        "experiments_completed_in": "20.62s",
+        "model": "Qwen/Qwen3-32B",
+        "num_devices": 8,
+        "quantize": "W8A8_DYNAMIC",
+        "search_strategies": [
+          "TP=1|DP=8",
+          "TP=2|DP=4",
+          "TP=4|DP=2",
+          "TP=8|DP=1"
+        ],
+        "tpot_limit": "50ms"
+      },
+      "duration_seconds": 25,
+      "error": "",
+      "output": "All experiments completed in 20.62 seconds。搜索 TP=1/2/4/8 并行策略，输出吞吐 vs 并发/TPOT 曲线图。PD 混部场景吞吐优化成功。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-22T16:05:21"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "msmodeling-0.2.0-py3-none-any.whl",
+          "path": "/workspace/artifacts/msmodeling-0.2.0-py3-none-any.whl",
+          "size": "1.3M",
+          "type": "wheel"
+        },
+        {
+          "name": "build-manifest.json",
+          "path": "/workspace/artifacts/build-manifest.json",
+          "size": "211B",
+          "type": "manifest"
+        }
+      ],
+      "cmake": "无 CMake（纯 Python 项目，使用 hatchling 构建后端）",
+      "compiler": "GCC 11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility)，Python 3.11.15",
+      "concurrency": 51,
+      "concurrency_ratio": "20%（256核 × 20% = 51，Python 项目主要为包下载并发）",
+      "duration_seconds": 175,
+      "notes": "Tier 1 预构建镜像环境。python3 build.py 自动触发 uv sync --frozen --group build（安装 torch 2.10.0+cpu、transformers 5.13.1 等全部依赖）+ bash scripts/build.sh（uv build --wheel）。构建成功，产物 1.3M。",
+      "status": "success"
+    },
+    "devcontainer": {
+      "config_dir": ".devcontainer",
+      "config_files": [
+        ".devcontainer/devcontainer.json",
+        ".devcontainer/README.md",
+        ".devcontainer/initialize.sh",
+        ".devcontainer/post-create.sh"
+      ],
+      "enabled": true,
+      "original_base_image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+      "summary": "仓库提供基于 Python 3.11 的 VS Code Dev Container，使用业务预构建镜像 swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801（Tier 1）。workspaceFolder=/workspace，remoteUser=mindstudio。post-create.sh 自动完成 Python 3.11 激活、uv 依赖安装(build.py -e only_down_deps=true)、pre-commit hook 安装。镜像内置 GCC 11.2、CANN 9.1.0、Python 3.8-3.13。",
+      "used_image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801"
+    },
+    "sample": {
+      "duration_seconds": 37,
+      "results": [
+        {
+          "execution_status": "success",
+          "execution_time": "12.3s",
+          "output_summary": "Qwen/Qwen3-32B 模型在 TEST_DEVICE 上仿真成功。编译执行时间 0.471s，analytic 总耗时 1.744s，TPS/Device: 4013 token/s，总显存 64GB（权重 31.98GB + KV cache 1.72GB + 激活 0.60GB）。算子级性能分解包含 static_quant_linear(884ms)、attention(260ms) 等。",
+          "sample_name": "模型推理性能仿真 (text_generate)"
+        },
+        {
+          "execution_status": "success",
+          "execution_time": "25.0s",
+          "output_summary": "Qwen/Qwen3-32B 在 8 TEST_DEVICE 上 PD 混部场景吞吐优化搜索成功。W8A8_DYNAMIC 量化，TPOT 限制 50ms。搜索 TP=1/2/4/8 并行策略，输出吞吐 vs 并发/TPOT 曲线图。全部实验 20.62s 完成。",
+          "sample_name": "服务化性能仿真 (throughput_optimizer)"
+        }
+      ],
+      "status": "success"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 0,
+        "executed_in_verification": false,
+        "failed": 0,
+        "hooks": [
+          {
+            "id": "trailing-whitespace",
+            "repo": "https://gitcode.com/pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "end-of-file-fixer",
+            "repo": "https://gitcode.com/pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-yaml",
+            "repo": "https://gitcode.com/pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-added-large-files",
+            "repo": "https://gitcode.com/pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-merge-conflict",
+            "repo": "https://gitcode.com/pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "detect-private-key",
+            "repo": "https://gitcode.com/pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-json",
+            "repo": "https://gitcode.com/pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "ruff-check",
+            "repo": "https://gitcode.com/gh_mirrors/ru/ruff-pre-commit",
+            "rev": "v0.14.14"
+          },
+          {
+            "id": "ruff-format",
+            "repo": "https://gitcode.com/gh_mirrors/ru/ruff-pre-commit",
+            "rev": "v0.14.14"
+          },
+          {
+            "id": "codespell",
+            "repo": "https://gitcode.com/gh_mirrors/co/codespell",
+            "rev": "v2.4.1"
+          },
+          {
+            "id": "pylint",
+            "repo": "https://gitcode.com/gh_mirrors/pyl/pylint",
+            "rev": "v4.0.5"
+          },
+          {
+            "id": "bandit",
+            "repo": "https://gitcode.com/gh_mirrors/ba/bandit",
+            "rev": "1.9.4"
+          },
+          {
+            "id": "typos",
+            "repo": "https://gitcode.com/gh_mirrors/ty/typos",
+            "rev": "v1.32.0"
+          },
+          {
+            "id": "gitleaks-offline-scan",
+            "repo": "local",
+            "rev": "local"
+          }
+        ],
+        "note": "ruff 配置在 pre-commit/pyproject.toml；pylint 使用 pre-commit/pyproject.toml 作为 rcfile；bandit 使用 pre-commit/pyproject.toml；typos 使用 pre-commit/typos.toml",
+        "passed": 0,
+        "skipped": 0,
+        "status": "仅检查配置，未执行",
+        "total_hooks": 14
+      },
+      "summary": "检测到 pre-commit 配置（.pre-commit-config.yaml），共 14 个 hooks：trailing-whitespace、end-of-file-fixer、check-yaml、check-added-large-files、check-merge-conflict、detect-private-key、check-json、ruff-check、ruff-format、codespell、pylint、bandit、typos、gitleaks-offline-scan。lint-runner 配置未检测到（无 .lintrunner.toml 或 .lint-runner.yaml）。本次验证仅检查配置存在性，不执行 pre-commit run。"
+    },
+    "ut": {
+      "duration_seconds": 245,
+      "failed": 16,
+      "failures": [
+        {
+          "error": "specialized operator interpolation 逻辑断言不符",
+          "test_name": "tests/regression/tensor_cast/test_specialized_operator_interpolation.py::test_real_sparse_attention_interpolates_effective_kv_length"
+        },
+        {
+          "error": "specialized operator interpolation 逻辑断言不符",
+          "test_name": "tests/regression/tensor_cast/test_specialized_operator_interpolation.py::test_moe_fused_real_csv_keeps_full_weight_shapes_in_candidate_regime"
+        },
+        {
+          "error": "specialized operator interpolation 逻辑断言不符",
+          "test_name": "tests/regression/tensor_cast/test_specialized_operator_interpolation.py::test_scatter_base_miss_does_not_recover_local_measured_exact"
+        },
+        {
+          "error": "specialized operator interpolation 逻辑断言不符",
+          "test_name": "tests/regression/tensor_cast/test_specialized_operator_interpolation.py::test_real_v018_dynamic_quant_preserves_base_exact_result"
+        },
+        {
+          "error": "specialized operator interpolation 逻辑断言不符",
+          "test_name": "tests/regression/tensor_cast/test_specialized_operator_interpolation.py::test_real_v018_quantized_matmul_preserves_base_exact_result"
+        },
+        {
+          "error": "specialized operator interpolation 逻辑断言不符",
+          "test_name": "tests/regression/tensor_cast/test_specialized_operator_interpolation.py::test_real_v018_dynamic_quant_interpolates_per_token_m"
+        },
+        {
+          "error": "specialized operator interpolation 逻辑断言不符",
+          "test_name": "tests/regression/tensor_cast/test_specialized_operator_interpolation.py::test_real_v018_quantized_matmul_interpolates_m_bracket"
+        },
+        {
+          "error": "specialized operator interpolation 逻辑断言不符",
+          "test_name": "tests/regression/tensor_cast/test_specialized_operator_interpolation.py::test_real_lightning_indexer_candidate_uses_runtime_workload"
+        },
+        {
+          "error": "specialized operator interpolation 逻辑断言不符",
+          "test_name": "tests/regression/tensor_cast/test_specialized_operator_interpolation.py::test_real_sparse_attention_candidate_uses_runtime_workload"
+        },
+        {
+          "error": "specialized operator interpolation 逻辑断言不符",
+          "test_name": "tests/regression/tensor_cast/test_specialized_operator_interpolation.py::test_real_lightning_indexer_interpolates_effective_kv_length"
+        },
+        {
+          "error": "specialized operator interpolation 逻辑断言不符",
+          "test_name": "tests/regression/tensor_cast/test_specialized_operator_interpolation.py::test_real_lightning_indexer_interpolates_runtime_workload_in_2d"
+        },
+        {
+          "error": "profiling data source 逻辑断言不符",
+          "test_name": "tests/benchmark/ops/perf_database/test_profiling_data_source.py::test_glm5_dsa_chunked_prefill_interpolation_uses_specialized_scatter_lookup"
+        },
+        {
+          "error": "IPv6 环境特定问题，容器内 IPv4 可用时测试预期 IPv6 回退失败",
+          "test_name": "tests/regression/web_ui/test_web_ui_launcher.py::TestGetBindHost::test_returns_ipv6_when_ipv4_unavailable"
+        },
+        {
+          "error": "dflash FC 编译路径断言不符（新特性 dflash）",
+          "test_name": "tests/regression/tensor_cast/test_dflash.py::TestDflashFcOnDecodePath::test_fc_survives_compile_with_graph_connected_aux"
+        },
+        {
+          "error": "dflash FC torch compile 事件记录断言不符（新特性 dflash）",
+          "test_name": "tests/regression/tensor_cast/test_dflash.py::TestDflashFcOnDecodePath::test_fc_under_torch_compile_records_events"
+        },
+        {
+          "error": "网络问题：HF mirror 返回 HTTP 429（Too Many Requests），无法下载 inclusionAI/Ling-flash-2.0 模型配置",
+          "test_name": "tests/regression/tensor_cast/test_text_generate.py::TestTextGenerate::test_ling_basic_1_inclusionAI_Ling_flash_2_0"
+        }
+      ],
+      "passed": 6848,
+      "python": {
+        "failed": 16,
+        "modules": [
+          {
+            "failed": 14,
+            "name": "tests/regression/tensor_cast/",
+            "note": "含 specialized_operator_interpolation(11) + dflash(2) + text_generate(1)",
+            "passed": "大部分通过"
+          },
+          {
+            "failed": 1,
+            "name": "tests/regression/web_ui/",
+            "note": "test_web_ui_launcher IPv6 环境问题",
+            "passed": "全部通过"
+          },
+          {
+            "failed": 1,
+            "name": "tests/benchmark/",
+            "note": "test_profiling_data_source",
+            "passed": "全部通过"
+          },
+          {
+            "failed": 0,
+            "name": "tests/smoke/",
+            "passed": "全部通过"
+          },
+          {
+            "failed": 0,
+            "name": "tests/regression/serving_cast/",
+            "passed": "全部通过"
+          }
+        ],
+        "passed": 6848,
+        "status": "partial_success",
+        "total": 6869
+      },
+      "skipped": 5,
+      "status": "partial_success",
+      "total": 6869
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "msmodeling-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "openEuler 24.03 LTS-SP3"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "6.9T (/home 分区，可用 6.3T)",
+      "docker_version": "18.09.0",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 1
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "无 CMakeLists.txt，纯 Python 项目",
+        "from_dockerfile": "无仓库内 Dockerfile。镜像由 MindStudio 统一构建镜像制作指南构建（openEuler 24.03 LTS + GCC 11.2 + Python 3.11 + CANN 9.1.0）",
+        "from_readme": "pyproject.toml 定义依赖（torch/transformers/modelscope 等），通过 uv sync 安装",
+        "mappings": []
+      },
+      "image_name": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+      "selection_reason": "Tier 1 业务预构建镜像。.devcontainer/devcontainer.json 的 image 字段指定此镜像，包含 Python 3.11.15、uv 0.11.8、GCC 11.2.0、CANN 9.1.0 预装环境。镜像拉取成功后直接使用，跳过基础 OS 从零安装。",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "84fec85",
+    "duration_seconds": 1385,
+    "end_time": "2026-08-22T16:05:21",
+    "environment": "Tier 1 预构建镜像 swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801；openEuler 24.03 LTS-SP3 / aarch64 / 256核 / 2.0Ti内存 / NPU 910B3",
+    "repo_url": "https://gitcode.com/Ascend/msmodeling.git",
+    "start_time": "2026-08-22T15:42:16",
+    "total_steps": 25,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "容器内 /workspace 目录权限拒绝：镜像以 mindstudio 用户(uid=20001)运行，但宿主机 git clone 创建的目录属于 root，导致 uv sync 创建 .venv 时报 Permission denied (os error 13)",
+      "solution": "在宿主机执行 chown -R 20001:20001 /home/workspace/msmodeling-verify，将目录所有权改为 mindstudio 用户。之后 uv sync 和 build.py 正常执行。",
+      "source": "步骤5 构建 - python3 build.py 首次执行失败",
+      "timestamp": "2026-08-22T15:55:26"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

@@ -1,0 +1,929 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md + docker/Dockerfile_910b_aarch64.ubuntu + 远程机器 npu-smi",
+      "value": "aarch64 (Atlas 800I A2 / 910B3 NPU)"
+    },
+    "build_commands": {
+      "source": "docs/zh/developer_guide/build_guide.md + docs/zh/installation.md 源码安装",
+      "value": "python -m build --wheel --no-isolation (build_guide 推荐) 或 python setup.py bdist_wheel; 产物 dist/mindiesd-*.whl 后 pip install"
+    },
+    "dependencies": {
+      "source": "requirements.txt + installation.md + setup.py install_requires",
+      "value": [
+        "Python\u003e=3.10 (Dockerfile 用 3.11.4)",
+        "torch==2.9.0",
+        "torch_npu==2.9.0",
+        "triton\u003e=3.5.0",
+        "triton-ascend==3.2.1 (来源 https://triton-ascend.osinfra.cn/pypi/simple)",
+        "CANN 9.0.0 (toolkit + 910b-ops + nnal)",
+        "einops / numpy\u003e=1.26.4 / safetensors / strenum / zmq / decorator / scipy / attrs",
+        "测试依赖: coverage\u003e=7.6.10 / pytest\u003e=8.3.2 / timm\u003e=0.9.12 / packaging"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "docker/Dockerfile_910b_aarch64.ubuntu",
+      "value": [
+        {
+          "original": "ubuntu:24.04 基础镜像",
+          "target_equivalent": "FROM ubuntu:24.04"
+        },
+        {
+          "original": "apt: gcc-9/g++-9/gcc-13/g++-13 make cmake git vim wget curl build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev libffi-dev liblzma-dev rapidjson-dev ccache sqlite3 jq",
+          "target_equivalent": "apt-get install -y gcc g++ make cmake git ... (Dockerfile 原样)"
+        },
+        {
+          "original": "Python 3.11.4 源码编译",
+          "target_equivalent": "wget Python-3.11.4.tar.xz \u0026\u0026 ./configure --enable-optimizations \u0026\u0026 make -j \u0026\u0026 make altinstall"
+        },
+        {
+          "original": "CANN 9.0.0 toolkit + 910b-ops + nnal (.run 安装)",
+          "target_equivalent": "wget Ascend-cann-toolkit_9.0.0 + Ascend-cann-910b-ops_9.0.0 + Ascend-cann-nnal_9.0.0 \u0026\u0026 --install --quiet"
+        },
+        {
+          "original": "torch 2.9.0 + torch_npu 2.9.0 (华为 OBS wheel)",
+          "target_equivalent": "pip install torch-2.9.0-cp311-manylinux_2_28_aarch64.whl + torch_npu-2.9.0.*-cp311"
+        },
+        {
+          "original": "pip.conf: index-url=https://repo.huaweicloud.com/repository/pypi/simple, trusted-host=repo.huaweicloud.com, timeout=120",
+          "target_equivalent": "配置 /root/.pip/pip.conf (Dockerfile 原样)"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": ".devcontainer/cpu/devcontainer.json image 字段 + docker/README.md 构建命令",
+      "value": "Tier1 候选: swr.cn-north-4.myhuaweicloud.com/inference/ascend_mindie_ubuntu_aarch64:20260305_ubuntu24_3.0.0_cann8.5.1_torch2.9.0_py311 (可拉取但 CANN8.5.1 与文档要求 CANN9.0.0 不匹配，降级); Tier2: docker build -f docker/Dockerfile_910b_aarch64.ubuntu -t mindiesd:910b-aarch64 (ubuntu:24.04 + CANN9.0.0 + torch2.9.0, aarch64 专用)"
+    },
+    "sample_commands": {
+      "source": "examples/dummy_run/README.md",
+      "value": "cd examples/dummy_run \u0026\u0026 pip install -r requirements.txt \u0026\u0026 python wan_infer.py --device_id 1 (空权重前向推理, 仅下载 KB 级配置; quick_start 需下载 14B 权重不适用)"
+    },
+    "special_dependencies": {
+      "source": "docker/Dockerfile_910b_aarch64.ubuntu + installation.md",
+      "value": [
+        "CANN 9.0.0 toolkit: https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.0.0/Ascend-cann-toolkit_9.0.0_linux-aarch64.run",
+        "CANN 910b ops: Ascend-cann-910b-ops_9.0.0_linux-aarch64.run",
+        "CANN nnal: Ascend-cann-nnal_9.0.0_linux-aarch64.run",
+        "torch 2.9.0 wheel: https://pytorch-package.obs.cn-north-4.myhuaweicloud.com/pta/torch/v2.9.0/torch-2.9.0-cp311-cp311-manylinux_2_28_aarch64.whl",
+        "torch_npu 2.9.0: pytorch_v2.9.0-7.3.0_py311.tar.gz (华为 OBS)",
+        "triton-ascend==3.2.1: https://triton-ascend.osinfra.cn/pypi/simple"
+      ]
+    },
+    "ut_commands": {
+      "source": "docs/zh/developer_guide/test.md + tests/run_test.sh",
+      "value": "cd tests/ \u0026\u0026 bash run_test.sh --all (全量含 NPU, coverage+unittest); 或 bash tests/run_UT_test.sh (仅 CPU); 前置: pip install -r requirements.txt --extra-index-url https://triton-ascend.osinfra.cn/pypi/simple \u0026\u0026 pip install -r requirements-test.txt"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "docker/Dockerfile_910b_aarch64.ubuntu Step20 执行 pip install -r requirements.txt 时未加 --extra-index-url https://triton-ascend.osinfra.cn/pypi/simple, 而 requirements.txt 要求 triton-ascend==3.2.1 仅在该源提供, 导致 docker build 必然失败. installation.md 源码安装章节有写该参数, Dockerfile 未同步.",
+      "source": "docker/Dockerfile_910b_aarch64.ubuntu vs docs/zh/installation.md",
+      "time": "2026-08-22T12:00:18",
+      "title": "Dockerfile 遗漏 triton-ascend 专用 pip 源"
+    },
+    {
+      "body": "requirements.txt 同时声明 triton\u003e=3.5.0 与 triton-ascend==3.2.1, 但 triton-ascend 3.2.1 是 triton 的替换包(提供 triton 3.2.0 + Ascend 后端), 安装 triton 3.5.0 会覆盖 triton-ascend 的文件导致 Ascend 后端丢失. 文档未说明二者兼容关系与正确安装顺序.",
+      "source": "requirements.txt",
+      "time": "2026-08-22T12:00:18",
+      "title": "requirements.txt triton 与 triton-ascend 版本冲突"
+    },
+    {
+      "body": "requirements-test.txt 仅声明 timm\u003e=0.9.12, pip 默认安装 timm 1.0.28, 其传递依赖拉动 torch-\u003e2.13.0 破坏 torch_npu==2.9.0. 文档未提示需 --no-deps 或固定 timm/torchvision 版本以保持 torch==2.9.0.",
+      "source": "requirements-test.txt + docs/zh/developer_guide/test.md",
+      "time": "2026-08-22T12:00:18",
+      "title": "requirements-test.txt timm 版本未约束导致 torch 被升级"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "git clone MindIE-SD 仓库到本地用于文档闭包读取",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/Ascend/MindIE-SD.git /tmp/opencode/MindIE-SD",
+      "details": {},
+      "duration_seconds": 8,
+      "error": "",
+      "output": "Cloning into /tmp/opencode/MindIE-SD... 成功, 含 README.md/docs/docker/.devcontainer/setup.py 等",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 README.md 提取安装/构建/测试/样例入口链接",
+      "command": "cat README.md",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "MindIE SD 为 Stable Diffusion 推理套件; 安装: pip install mindiesd / docs/zh/installation.md; 构建: build_guide.md; 测试: docs/zh/developer_guide/test.md; 样例: quick_start.md; 贡献指南: contribution_guide.md",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 docs/zh/installation.md 提取依赖与 CANN 安装",
+      "command": "cat docs/zh/installation.md",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "OS:Linux Python\u003e=3.10 PyTorch2.6-2.10 torch-npu2.6-2.10 CANN9.0.1; CANN 安装指南 https://gitcode.com/cann/ops-cv/blob/master/docs/zh/install/quick_install.md; 源码安装: pip install -r requirements.txt --extra",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 docs/zh/developer_guide/build_guide.md 提取构建命令",
+      "command": "cat docs/zh/developer_guide/build_guide.md",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "构建命令: python -m build --wheel --no-isolation; 可编辑安装: pip install -e .",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 docs/zh/developer_guide/test.md 提取 UT 命令",
+      "command": "cat docs/zh/developer_guide/test.md",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "UT入口1(CPU): bash tests/run_UT_test.sh; 入口2(全量): cd tests/ \u0026\u0026 bash run_test.sh --all/--cpu_only/--npu_only; 产物 tests/UT/{run_UT.log,final.xml,coverage.xml}",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 docs/zh/developer_guide/contribution_guide.md 提取 lint/pre-commit/测试流程",
+      "command": "cat docs/zh/developer_guide/contribution_guide.md",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "lint: pip install -r requirements-lint.txt + pre-commit install; pre-commit hooks: ruff-check/ruff-format/pylint/bandit/codespell/typos/clang-format/markdownlint; NPU测试: bash tests/run_test.sh --all",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 docs/zh/developer_guide/dev_setup.md 提取开发镜像构建命令",
+      "command": "cat docs/zh/developer_guide/dev_setup.md",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "开发镜像构建: docker build --network=host -f docker/Dockerfile_910b_aarch64.ubuntu -t mindiesd:910b-aarch64-head .",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 docs/zh/quick_start.md 评估样例可行性",
+      "command": "cat docs/zh/quick_start.md",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "样例需克隆 Wan2.1 脚本 + 下载 14B 模型权重(HuggingFace) + 8卡推理; 权重过大不适用于验证, 改用 examples/dummy_run 空权重样例",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 docker/Dockerfile_910b_aarch64.ubuntu 提取完整依赖与构建链",
+      "command": "cat docker/Dockerfile_910b_aarch64.ubuntu",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "FROM ubuntu:24.04; Python3.11.4源码编译; CANN9.0.0(toolkit+910b-ops+nnal); torch2.9.0+torch_npu2.9.0(华为OBS); pip源 repo.huaweicloud.com; setup.py build_py",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 docker/README.md 提取镜像构建与运行命令",
+      "command": "cat docker/README.md",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "构建: docker build -f docker/Dockerfile_910b_aarch64.ubuntu -t mindiesd:910b-aarch64-head .; 运行: docker run -itd --privileged --ipc=host --net=host -v /usr/local/Ascend/driver:/usr/local/Ascend/driver:r",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 .devcontainer/cpu/devcontainer.json 探测 Tier1 预构建镜像信号",
+      "command": "cat .devcontainer/cpu/devcontainer.json",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "image: swr.cn-north-4.myhuaweicloud.com/inference/ascend_mindie_ubuntu_x86:20260305_ubuntu24_3.0.0_cann8.5.1_torch2.9.0_py311 (x86+CANN8.5.1); postCreateCommand source set_env.sh; npu/ 目录为空",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 .pre-commit-config.yaml 提取 hook 列表",
+      "command": "cat .pre-commit-config.yaml",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "pre-commit v4.0.0; hooks: trailing-whitespace/end-of-file-fixer/check-yaml/check-added-large-files/check-merge-conflict/detect-private-key/check-json/ruff-check/ruff-format/codespell/pylint/bandit/typ",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 setup.py 分析构建流程与依赖",
+      "command": "cat setup.py",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "CustomBuildPy: 运行 build/build_ops.sh(Ascend算子) + build/build_plugin.sh(PyTorch插件); install_requires: torch/torch_npu; python_requires\u003e=3.10; 产物 mindiesd wheel 含 ops/** 与 plugin/*.so",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 requirements.txt / requirements-test.txt / examples/dummy_run/requirements.txt",
+      "command": "cat requirements.txt requirements-test.txt",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "requirements.txt: torch==2.9.0 torch_npu==2.9.0 triton\u003e=3.5.0 triton-ascend==3.2.1 einops numpy\u003e=1.26.4 safetensors strenum zmq decorator scipy attrs; requirements-test: coverage pytest timm packaging",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 examples/dummy_run/README.md 确定轻量样例",
+      "command": "cat examples/dummy_run/README.md",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "空权重运行: 仅下载KB级配置文件构造模型前向推理; python wan_infer.py --device_id N --num_layers 2; 依赖 diffusers\u003e=0.34 transformers\u003e=4.44 huggingface_hub\u003e=0.23",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 tests/run_test.sh + run_UT_test.sh 分析 UT 执行机制",
+      "command": "cat tests/run_test.sh tests/run_UT_test.sh",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "run_test.sh: coverage run tests/run.py(加载所有test_*.py, unittest) + coverage report/xml/html + unittest_summary.py; --all/--cpu_only/--npu_only 模式; CPU模式 mock torch_npu",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "读取 contributing.md(根) 跟进外部社区链接",
+      "command": "cat contributing.md",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "外部链接指向 gitcode.com/Ascend/community 的 issue/PR/测试贡献指南等通用社区规范, 非MindIE-SD专属构建依赖; 仓内 contribution_guide.md 已覆盖构建/测试/lint",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "Tier1 探测: registry v2 API 列 tag (swr.cn-north-4)",
+      "command": "curl https://swr.cn-north-4.myhuaweicloud.com/v2/inference/ascend_mindie_ubuntu_x86/tags/list",
+      "details": {
+        "tried": [
+          "ascend_mindie_ubuntu_x86",
+          "ascend_mindie_ubuntu_aarch64",
+          "ascend_mindie_ubuntu"
+        ]
+      },
+      "duration_seconds": 15,
+      "error": "SWR 需认证, x86/aarch64/no-suffix 三个仓名均 DENIED",
+      "output": "{\"errors\":[{\"code\":\"DENIED\",\"message\":\"Authenticate Error\"}]}",
+      "result": "失败",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": false,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "Tier1 探测: docker pull aarch64 变体",
+      "command": "docker pull swr.cn-north-4.myhuaweicloud.com/inference/ascend_mindie_ubuntu_aarch64:20260305_ubuntu24_3.0.0_cann8.5.1_torch2.9.0_py311",
+      "details": {
+        "cann_version": "8.5.1",
+        "image": "ascend_mindie_ubuntu_aarch64:20260305_ubuntu24_3.0.0_cann8.5.1_torch2.9.0_py311",
+        "required_cann": "9.0.0"
+      },
+      "duration_seconds": 60,
+      "error": "CANN版本不匹配",
+      "output": "aarch64 变体可拉取(layer 下载中); 但 tag 标明 cann8.5.1, 与文档要求 CANN9.0.0/9.0.1 不匹配(NPU构建需CANN9.0.0), 不可用于跳过依赖",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "Tier 决策: Tier1 CANN版本不匹配, 降级 Tier2 (Dockerfile_910b_aarch64.ubuntu 构建)",
+      "command": "分析: docker/Dockerfile_910b_aarch64.ubuntu 为 aarch64+910B 专用, CANN9.0.0+torch2.9.0, 与远程机器(910B3/aarch64)匹配",
+      "details": {},
+      "duration_seconds": 1,
+      "error": "",
+      "output": "Tier1 预构建镜像 CANN8.5.1 不满足文档 CANN9.0.0 要求; Tier2 Dockerfile 为 NPU aarch64 专用构建链, 采用 docker build 原样构建",
+      "result": "成功",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-22T11:11:39"
+    },
+    {
+      "action": "检查 .pre-commit-config.yaml 配置(仅配置不执行)",
+      "command": "cat .pre-commit-config.yaml",
+      "details": {
+        "configured": true,
+        "executed": false,
+        "total_hooks": 16
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "存在 .pre-commit-config.yaml(pre-commit v4.0.0), 16 个 hook: ruff-check/ruff-format/pylint/bandit/codespell/typos/clang-format/markdownlint/gitleaks-offline-scan 等; requirements-lint.txt: pre-commit\u003e=4.5",
+      "result": "成功",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-22T11:12:14"
+    },
+    {
+      "action": "检查 lint-runner 配置",
+      "command": "ls .lint-runner.yaml .lintrunner.toml",
+      "details": {
+        "configured": false
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "未找到 .lint-runner.yaml 或 .lintrunner.toml, lint_runner configured=false",
+      "result": "成功",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-22T11:12:14"
+    },
+    {
+      "action": "扫描 .devcontainer/ 目录与 devcontainer.json",
+      "command": "cat .devcontainer/cpu/devcontainer.json",
+      "details": {
+        "arch_mismatch": true,
+        "cann_mismatch": true,
+        "image": "swr.cn-north-4.myhuaweicloud.com/inference/ascend_mindie_ubuntu_x86:20260305_ubuntu24_3.0.0_cann8.5.1_torch2.9.0_py311"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": ".devcontainer/ 存在; cpu/devcontainer.json image=ascend_mindie_ubuntu_x86:...cann8.5.1...(Tier1信号但x86/CANN8.5.1不匹配); npu/为空; postCreateCommand source set_env.sh + pip install coverage einops",
+      "result": "成功",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-08-22T11:12:14"
+    },
+    {
+      "action": "Tier2 docker build 启动: docker build -f docker/Dockerfile_910b_aarch64.ubuntu",
+      "command": "docker build --network=host -f docker/Dockerfile_910b_aarch64.ubuntu -t mindiesd:910b-aarch64-ttfhw .",
+      "details": {
+        "cached_steps": "1-19",
+        "cann": "9.0.0",
+        "torch": "2.9.0"
+      },
+      "duration_seconds": 2400,
+      "error": "",
+      "output": "Step1-19 成功: ubuntu:24.04 + Python3.11.4源码编译 + CANN9.0.0(toolkit+910b-ops+nnal, 华为云OBS快速下载) + torch2.9.0+torch_npu2.9.0 + pip.conf(huaweicloud)",
+      "result": "成功(Step1-19缓存)",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-22T12:00:18"
+    },
+    {
+      "action": "Tier2 docker build 在 Step20 失败: triton-ascend==3.2.1 未找到",
+      "command": "Step20: pip install -r requirements.txt \u0026\u0026 setup.py build_py",
+      "details": {
+        "failed_step": "20/23",
+        "root_cause": "Dockerfile 缺少 --extra-index-url"
+      },
+      "duration_seconds": 0,
+      "error": "triton-ascend==3.2.1 仅在 triton-ascend.osinfra.cn 提供, Dockerfile 未配置该源",
+      "output": "ERROR: Could not find a version that satisfies triton-ascend==3.2.1 (from versions: 3.2.0rc2..3.2.0); Dockerfile 遗漏 --extra-index-url https://triton-ascend.osinfra.cn/pypi/simple",
+      "result": "失败",
+      "returncode": 1,
+      "step": "image_selection",
+      "success": false,
+      "timestamp": "2026-08-22T12:00:18"
+    },
+    {
+      "action": "Tier3 降级: 复用 Tier2 缓存层 7811064ca7bd 手动安装依赖",
+      "command": "docker tag 7811064ca7bd mindiesd:910b-aarch64-base",
+      "details": {},
+      "duration_seconds": 30,
+      "error": "",
+      "output": "缓存层含 CANN9.0.0+torch2.9.0+torch_npu2.9.0.post1+Python3.11.4+pip.conf, 仅缺 triton-ascend 与 requirements.txt 依赖",
+      "result": "成功",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-22T12:00:18"
+    },
+    {
+      "action": "docker run 启动容器(挂载 NPU 设备/目录, 跳过 Critical 卡0改挂 davinci1)",
+      "command": "docker run -itd --name MindIE-SD-ttfhw --privileged --ipc=host --net=host --device /dev/davinci1 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:... -v /usr/local/Ascend/driver:... -v /usr/local/Ascend/firmware:... -v /home/workspace/MindIE-SD-verify:/workspace -w /workspace mindiesd:910b-aarch64-base sleep infinity",
+      "details": {
+        "mounted_card": 1,
+        "skipped_critical_card": 0,
+        "startup_command_source": "default_挂卡 + docker/README.md run 参数"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "容器 MindIE-SD-ttfhw 启动; NPU卡0状态Critical跳过, 挂载 davinci1; --privileged 使8卡均可见",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-22T12:00:18"
+    },
+    {
+      "action": "验证容器内 NPU 可用性",
+      "command": "docker exec ... python3.11 -c 'import torch,torch_npu;print(torch.npu.is_available(),torch.npu.device_count())'",
+      "details": {},
+      "duration_seconds": 15,
+      "error": "",
+      "output": "torch.npu.is_available()=True, device_count=8, get_device_name(0)=Ascend910B3; DCMI 初始化正常",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-22T12:00:18"
+    },
+    {
+      "action": "安装 requirements.txt (含 triton-ascend==3.2.1, 按 installation.md 加 --extra-index-url)",
+      "command": "pip install -r requirements.txt --extra-index-url https://triton-ascend.osinfra.cn/pypi/simple --trusted-host triton-ascend.osinfra.cn",
+      "details": {},
+      "duration_seconds": 120,
+      "error": "",
+      "output": "成功安装 triton-ascend-3.2.1 triton-3.5.0 einops-0.8.2 numpy-1.26.4 strenum zmq decorator attrs psutil pyzmq; torch_npu 重装 2.9.0.post1-\u003e2.9.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-22T12:00:18"
+    },
+    {
+      "action": "修复 triton-ascend 被 triton\u003e=3.5.0 覆盖(triton 3.5.0 覆盖了 triton-ascend 的 ascend 后端文件)",
+      "command": "pip install --force-reinstall --no-deps triton-ascend==3.2.1 --extra-index-url https://triton-ascend.osinfra.cn/pypi/simple --trusted-host triton-ascend.osinfra.cn",
+      "details": {
+        "conflict": "requirements.txt 同时要求 triton\u003e=3.5.0 与 triton-ascend==3.2.1, 后者为 triton 替换包, 安装顺序导致覆盖"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "重装后 triton.__version__=3.2.0, triton.language.extra.cann.extension 可导入(Ascend 后端恢复)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-22T12:00:18"
+    },
+    {
+      "action": "安装 requirements-test.txt (coverage/pytest/timm/packaging)",
+      "command": "pip install -r requirements-test.txt",
+      "details": {},
+      "duration_seconds": 90,
+      "error": "timm 1.0.28 传递依赖 torch 升级破坏 torch_npu",
+      "output": "安装 coverage-7.15.4 pytest-8.3.2 packaging timm-1.0.28; 但 timm 依赖拉动 torch-\u003e2.13.0 + triton-\u003e3.7.1 + torchvision, 破坏 torch_npu/triton-ascend",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-22T12:00:18"
+    },
+    {
+      "action": "修复 timm 破坏的 torch/torch_npu/triton-ascend (强制重装 --no-deps)",
+      "command": "pip install --force-reinstall --no-deps torch==2.9.0 torch_npu==2.9.0 \u0026\u0026 pip install --force-reinstall --no-deps triton-ascend==3.2.1",
+      "details": {},
+      "duration_seconds": 90,
+      "error": "",
+      "output": "torch 恢复 2.9.0+cpu, torch_npu 恢复 2.9.0, triton-ascend 恢复 3.2.0; 卸载 torchvision/triton 3.7.1",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-22T12:00:18"
+    },
+    {
+      "action": "安装 timm==0.9.16 --no-deps + torchvision==0.24.0 --no-deps (test_embedding 需要 timm.layers.to_2tuple)",
+      "command": "pip install --no-deps timm==0.9.16 \u0026\u0026 pip install --no-deps torchvision==0.24.0",
+      "details": {},
+      "duration_seconds": 60,
+      "error": "",
+      "output": "timm 0.9.16 导入时仍拉 torchvision.ops.misc, 故补装 torchvision 0.24.0(aarch64 manylinux, huaweicloud); --no-deps 避免再拉动 torch",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-22T12:00:18"
+    },
+    {
+      "action": "安装构建工具 build/wheel (build_guide 需要 python -m build)",
+      "command": "pip install build wheel",
+      "details": {},
+      "duration_seconds": 30,
+      "error": "",
+      "output": "build-1.5.1 pyproject_hooks-1.2.0 已安装",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-22T12:00:18"
+    },
+    {
+      "action": "验证完整依赖栈可用",
+      "command": "python3.11 -c 'import torch,torch_npu,triton,triton.language.extra.cann.extension,einops,numpy,scipy,safetensors,coverage,pytest,packaging,torchvision; from timm.layers import to_2tuple; print(torch.npu.is_available())'",
+      "details": {},
+      "duration_seconds": 20,
+      "error": "",
+      "output": "torch 2.9.0+cpu torch_npu 2.9.0 triton 3.2.0 tv 0.24.0; npu_avail True cards 8 dev Ascend910B3; to_2tuple(3)=(3,3)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-22T12:00:18"
+    },
+    {
+      "action": "执行构建: python -m build --wheel --no-isolation (并发 51)",
+      "command": "cd /workspace \u0026\u0026 source set_env.sh \u0026\u0026 export ASCEND_CUSTOM_OPP_PATH=... \u0026\u0026 export BUILD_JOB_NUM=51 \u0026\u0026 python3.11 -m build --wheel --no-isolation",
+      "details": {
+        "concurrency": 51,
+        "version": "3.0.0",
+        "wheel_mode": "fixed"
+      },
+      "duration_seconds": 169,
+      "error": "",
+      "output": "Successfully built mindiesd-3.0.0-cp311-cp311-linux_aarch64.whl; real 2m49s user 69m sys 3m29s; CustomBuildPy: build_ops.sh(AscendC算子)+build_plugin.sh(libPTAExtensionOPS.so)+bdist_wheel",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-22T12:06:18"
+    },
+    {
+      "action": "安装 wheel 并冒烟测试 (mindiesd 导入 + triton_on_ascend + RMSNorm NPU 前向)",
+      "command": "pip install --force-reinstall --no-deps dist/mindiesd-3.0.0-cp311-cp311-linux_aarch64.whl \u0026\u0026 python3.11 -c 'import mindiesd; RMSNorm NPU forward'",
+      "details": {},
+      "duration_seconds": 30,
+      "error": "",
+      "output": "mindiesd pkg version 3.0.0; has_triton True, triton_on_ascend True; RMSNorm NPU smoke: shape [2,8] float16 sum=3.15",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-22T12:06:18"
+    },
+    {
+      "action": "执行全量单元测试: bash tests/run_test.sh --all (NPU 模式, ASCEND_RT_VISIBLE_DEVICES=1 避开 Critical 卡0)",
+      "command": "cd /workspace \u0026\u0026 source set_env.sh \u0026\u0026 export ASCEND_RT_VISIBLE_DEVICES=1 \u0026\u0026 bash tests/run_test.sh --all",
+      "details": {
+        "coverage": "63%",
+        "failed": 0,
+        "passed": 559,
+        "skipped": 31,
+        "test_mode": "ALL (CPU+NPU)",
+        "total": 590
+      },
+      "duration_seconds": 685,
+      "error": "",
+      "output": "Ran 590 tests in 663.348s; OK (skipped=31); 0 failures 0 errors; coverage TOTAL 63%; real 11m25s; 31 跳过为 A5 专用算子在 910B3 不可用",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-22T12:19:41"
+    },
+    {
+      "action": "安装 examples/dummy_run 依赖 (diffusers/transformers/huggingface_hub/tensorboard)",
+      "command": "pip install transformers==5.2.0 diffusers==0.38.0 huggingface_hub tensorboard==2.20.0 (后强制重装 torch/torch_npu/torchvision/triton-ascend --no-deps 恢复)",
+      "details": {},
+      "duration_seconds": 120,
+      "error": "",
+      "output": "diffusers-0.38.0 transformers-5.2.0 tensorboard-2.20.0 安装; transformers 子依赖 httpx/tokenizers 等补齐; torch 恢复 2.9.0+cpu/torch_npu 2.9.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-22T12:25:33"
+    },
+    {
+      "action": "执行样例: python wan_infer.py --device_id 0 --num_layers 2 (Wan2.2 空权重, HF镜像)",
+      "command": "cd examples/dummy_run \u0026\u0026 ASCEND_RT_VISIBLE_DEVICES=1 HF_ENDPOINT=https://hf-mirror.com python3.11 wan_infer.py --device_id 0 --num_layers 2",
+      "details": {
+        "build_ms": 3203.71,
+        "layers": 2,
+        "model": "Wan2.2-T2V-A14B-Diffusers",
+        "passed": true
+      },
+      "duration_seconds": 55,
+      "error": "",
+      "output": "下载13个KB级配置; Build time 3203.71ms; Timed 1 step; Wan2.2 dummy weight verification PASSED; real 54.821s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-22T12:25:33"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "mindiesd-3.0.0-cp311-cp311-linux_aarch64.whl",
+          "path": "dist/mindiesd-3.0.0-cp311-cp311-linux_aarch64.whl",
+          "size": "13M",
+          "type": "wheel"
+        },
+        {
+          "name": "libPTAExtensionOPS.so",
+          "path": "mindiesd/plugin/libPTAExtensionOPS.so",
+          "size": "plugin",
+          "type": "library"
+        },
+        {
+          "name": "AscendC 自定义算子包",
+          "path": "mindiesd/ops/vendors/{aie_ascendc,customize,customize_transformer}",
+          "size": "ops",
+          "type": "ascendc_ops"
+        },
+        {
+          "name": "compile_commands_ascendc.json",
+          "path": "build/compile_commands_ascendc.json",
+          "size": "243K",
+          "type": "compile_db"
+        }
+      ],
+      "cmake": "容器内置 cmake (Dockerfile apt 安装), AscendC 算子 + PyTorch 插件 CMake 构建",
+      "compiler": "gcc-9 (Dockerfile update-alternatives 设置 gcc-9 为默认)",
+      "concurrency": 51,
+      "concurrency_ratio": "容器核数 256 × 20% = 51 (向下取整)",
+      "duration_seconds": 169,
+      "notes": "python -m build --wheel --no-isolation (build_guide 推荐); CustomBuildPy 依次执行 build_ops.sh(AscendC 算子) + build_plugin.sh(PyTorch 插件 libPTAExtensionOPS.so) + bdist_wheel; real 2m49s user 69m(并行) sys 3m29s; 冒烟测试: mindiesd 导入成功, triton_on_ascend=True, RMSNorm NPU 前向正常",
+      "status": "success"
+    },
+    "devcontainer": {
+      "config_dir": ".devcontainer",
+      "config_files": [
+        ".devcontainer/cpu/devcontainer.json",
+        ".devcontainer/README.md",
+        ".devcontainer/npu/.gitkeeper"
+      ],
+      "enabled": true,
+      "original_base_image": "swr.cn-north-4.myhuaweicloud.com/inference/ascend_mindie_ubuntu_x86:20260305_ubuntu24_3.0.0_cann8.5.1_torch2.9.0_py311",
+      "summary": ".devcontainer/ 存在; cpu/devcontainer.json 指向 Tier1 预构建镜像(x86+CANN8.5.1, 与本机aarch64/CANN9.0.0不匹配); npu/ 目录为空(仅.gitkeeper); devcontainer 镜像 CANN 版本不满足 NPU 构建要求, 实际采用 docker/Dockerfile_910b_aarch64.ubuntu 构建专用镜像",
+      "used_image": "mindiesd:910b-aarch64-ttfhw (Tier2 docker build, 待步骤4构建)"
+    },
+    "sample": {
+      "duration_seconds": 55,
+      "results": [
+        {
+          "execution_status": "success",
+          "execution_time": "54.8s (含配置下载+构建+推理)",
+          "output_summary": "下载 13 个 KB 级 HuggingFace 配置(hf-mirror); 构建 Wan2.2: Transformer(181ms,3.49GB)+Transformer_2(179ms,3.49GB)+VAE(59ms); Build time 3203.71ms; Timed 1 step 通过; Wan2.2 dummy weight verification PASSED",
+          "sample_name": "wan_infer.py (Wan2.2 空权重前向推理, 2 layers, device 0)"
+        }
+      ],
+      "status": "success"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 0,
+        "executed_in_verification": false,
+        "hooks": [
+          {
+            "name": "trailing-whitespace"
+          },
+          {
+            "name": "end-of-file-fixer"
+          },
+          {
+            "name": "check-yaml"
+          },
+          {
+            "name": "check-added-large-files"
+          },
+          {
+            "name": "check-merge-conflict"
+          },
+          {
+            "name": "detect-private-key"
+          },
+          {
+            "name": "check-json"
+          },
+          {
+            "name": "ruff-check"
+          },
+          {
+            "name": "ruff-format"
+          },
+          {
+            "name": "codespell"
+          },
+          {
+            "name": "pylint"
+          },
+          {
+            "name": "bandit"
+          },
+          {
+            "name": "typos"
+          },
+          {
+            "name": "markdownlint"
+          },
+          {
+            "name": "clang-format"
+          },
+          {
+            "name": "gitleaks-offline-scan"
+          }
+        ],
+        "note": "minimum_pre_commit_version: 4.0.0; ruff 配置读取 pre-commit/pyproject.toml; markdownlint 为 manual 阶段; gitleaks 为本地离线二进制扫描",
+        "status": "仅配置检查(未执行)",
+        "total_hooks": 16
+      },
+      "summary": "检测到 .pre-commit-config.yaml 配置(pre-commit v4.0.0), 共 16 个 hook(ruff-check/ruff-format/pylint/bandit/codespell/typos/clang-format/markdownlint/gitleaks 等); 仅检查配置不执行; 未检测到 lint-runner 配置"
+    },
+    "ut": {
+      "duration_seconds": 685,
+      "failed": 0,
+      "failures": [],
+      "passed": 559,
+      "python": {
+        "failed": 0,
+        "modules": [
+          {
+            "name": "layers (embedding/attention/rotary/layernorm/muls_add)",
+            "result": "通过, 含 NPU 算子精度与性能测试(Case2_LargeBatch NPU fusion attention passed)"
+          },
+          {
+            "name": "cache (CacheAgent/CacheConfig)",
+            "result": "通过"
+          },
+          {
+            "name": "compilation",
+            "result": "通过"
+          },
+          {
+            "name": "quantization",
+            "result": "通过"
+          },
+          {
+            "name": "eplb",
+            "result": "通过, 含贪心算法异常路径"
+          },
+          {
+            "name": "utils (file_utils/safe_pickle/share_memory/offload)",
+            "result": "通过, 含负向参数校验"
+          },
+          {
+            "name": "plugin (la_acc_prof)",
+            "result": "通过"
+          }
+        ],
+        "passed": 559,
+        "status": "success",
+        "total": 590
+      },
+      "skipped": 31,
+      "status": "success",
+      "total": 590
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "MindIE-SD-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "Ubuntu 24.04.4 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "6.9T(/home, 6.3T 可用)",
+      "docker_version": "18.09.0",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 1
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_dockerfile": "docker/Dockerfile_910b_aarch64.ubuntu (FROM ubuntu:24.04, CANN9.0.0, torch2.9.0, torch_npu2.9.0, pip.conf=huaweicloud)",
+        "from_readme": "docs/zh/installation.md 源码安装命令(pip install -r requirements.txt --extra-index-url https://triton-ascend.osinfra.cn/pypi/simple --trusted-host triton-ascend.osinfra.cn)",
+        "mappings": [
+          {
+            "original": "Dockerfile pip.conf index-url=https://repo.huaweicloud.com/repository/pypi/simple",
+            "source": "Dockerfile",
+            "target": "复用镜像内置 /root/.pip/pip.conf (huaweicloud 源)"
+          },
+          {
+            "original": "Dockerfile 缺失 --extra-index-url https://triton-ascend.osinfra.cn/pypi/simple",
+            "source": "docs/zh/installation.md",
+            "target": "按 installation.md 补齐 --extra-index-url 以安装 triton-ascend==3.2.1"
+          },
+          {
+            "original": "requirements-test.txt timm\u003e=0.9.12",
+            "source": "requirements-test.txt + 排查",
+            "target": "timm==0.9.16 --no-deps + torchvision==0.24.0 --no-deps (避免 timm 拉动 torch 升级破坏 torch_npu)"
+          }
+        ]
+      },
+      "image_name": "mindiesd:910b-aarch64-base (缓存层 7811064ca7bd, 源自 docker/Dockerfile_910b_aarch64.ubuntu 构建, ubuntu:24.04 + CANN9.0.0 + torch2.9.0 + torch_npu2.9.0 + Python3.11.4)",
+      "selection_reason": "Tier1 devcontainer 镜像(ascend_mindie_ubuntu_aarch64)CANN8.5.1 与文档要求 CANN9.0.0 不匹配, 降级; Tier2 docker build Dockerfile_910b_aarch64.ubuntu 在 Step20 失败(triton-ascend==3.2.1 未找到, Dockerfile 遗漏 --extra-index-url); 复用 Tier2 缓存层(Step1-19 含 CANN9.0.0+torch2.9.0 已下载安装)手动安装剩余依赖, 即 Tier3 用缓存镜像手动安装",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "044461f",
+    "duration_seconds": 4917,
+    "end_time": "2026-08-22T12:25:33",
+    "environment": "远程容器 MindIE-SD-ttfhw (Ubuntu 24.04.4 aarch64, CANN 9.0.0, torch 2.9.0+cpu, torch_npu 2.9.0, NPU 910B3)",
+    "repo_url": "https://gitcode.com/Ascend/MindIE-SD.git",
+    "start_time": "2026-08-22T11:03:36",
+    "total_steps": 40,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "Tier2 docker build 在 Step20 失败: Dockerfile 的 pip install -r requirements.txt 遗漏 --extra-index-url https://triton-ascend.osinfra.cn/pypi/simple, 导致 triton-ascend==3.2.1 在 huaweicloud 源找不到",
+      "solution": "降级 Tier3: 复用 Tier2 已成功的缓存层(Step1-19, 含 CANN9.0.0+torch2.9.0)启动容器, 按 installation.md 文档命令补齐 --extra-index-url 手动安装 requirements.txt",
+      "source": "docker/Dockerfile_910b_aarch64.ubuntu Step20 + docs/zh/installation.md",
+      "timestamp": "2026-08-22T12:00:18"
+    },
+    {
+      "problem": "requirements.txt 同时声明 triton\u003e=3.5.0 与 triton-ascend==3.2.1, 而 triton-ascend 是 triton 的替换包(将文件安装进 triton/ 目录), pip 按 requirements 顺序先装 triton-ascend 后被 triton 3.5.0 覆盖, 导致 triton.language.extra.cann.extension(Ascend 后端)丢失",
+      "solution": "用 pip install --force-reinstall --no-deps triton-ascend==3.2.1 强制重装, 恢复 Ascend 后端的 triton 模块",
+      "source": "requirements.txt + triton-ascend 3.2.1 RECORD",
+      "timestamp": "2026-08-22T12:00:18"
+    },
+    {
+      "problem": "requirements-test.txt 的 timm\u003e=0.9.12 传递依赖拉动 torch 升级到 2.13.0 与 triton 3.7.1, 破坏 torch_npu(需 torch==2.9.0)与 triton-ascend(需 triton 3.2.x); timm 1.0.28 还硬依赖 torchvision",
+      "solution": "卸载 timm 1.0.28, 强制重装 torch==2.9.0/torch_npu==2.9.0/triton-ascend 3.2.1(--no-deps), 改装 timm==0.9.16 + torchvision==0.24.0(--no-deps) 满足 test_embedding 的 to_2tuple 导入",
+      "source": "requirements-test.txt + timm 依赖链",
+      "timestamp": "2026-08-22T12:00:18"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 132000,
+    "model": "bailian/glm-5.2",
+    "output_tokens": 7200,
+    "tool": "opencode"
+  }
+}

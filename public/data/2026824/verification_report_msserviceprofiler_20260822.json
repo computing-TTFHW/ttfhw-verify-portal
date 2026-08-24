@@ -1,0 +1,1055 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "CONTRIBUTING.md 环境要求章节 + dev_env_setup.md 镜像说明",
+      "value": "aarch64（昇腾 NPU 工具，需 CANN 环境；统一构建镜像基于 openEuler 24.03 LTS，支持 ARM64/AMD64 多架构）"
+    },
+    "build_commands": {
+      "source": "build.py + docs/zh/msserviceprofiler_install_guide.md 2.3.2 节 + CONTRIBUTING.md",
+      "value": "python3 build.py（完整构建：下载三方依赖→cmake编译→whl打包→run包打包）；python3 build.py local（跳过依赖下载）；构建脚本链：download_thirdparty.sh → build.sh（python3 -m build --wheel 触发 scikit-build-core → cmake 编译 libms_service_profiler.so）→ build_whl.sh"
+    },
+    "dependencies": {
+      "source": "CONTRIBUTING.md + pyproject.toml + requirements.txt + CMakeLists.txt + 3rdparty/CMakeLists.txt + cpp/CMakeLists.txt + scripts/download_thirdparty.sh",
+      "value": [
+        "CANN 9.1.0（ASCEND_TOOLKIT_HOME 环境变量，含 ascendcl/msprofiler/ms_tools_ext/mspti 库）",
+        "CMake \u003e= 3.11（CMakeLists.txt cmake_minimum_required）",
+        "GCC 11.2（C++14，CMakeLists.txt CMAKE_CXX_STANDARD 14）",
+        "Python \u003e= 3.10（CONTRIBUTING.md 环境要求）",
+        "SQLite3（cpp/CMakeLists.txt find_package(SQLite3 REQUIRED)）",
+        "Protobuf v3.21.9（3rdparty/CMakeLists.txt FetchContent 从 gitcode.com 克隆并编译）",
+        "libboundscheck（3rdparty/CMakeLists.txt FetchContent 从 gitcode.com/openeuler/libboundscheck 克隆）",
+        "nlohmann/json v3.11.2（3rdparty/CMakeLists.txt FetchContent 从 gitcode.com 克隆）",
+        "GoogleTest release-1.12.1（3rdparty/CMakeLists.txt，仅 BUILD_TESTS=ON 时）",
+        "makeself v2.5.0.x（scripts/download_thirdparty.sh 从 gitcode.com/cann-src-third-party/makeself.git 克隆）",
+        "Python 依赖：pandas~=2.2, numpy, pydantic, psutil, scipy, pyyaml, matplotlib, msguard, loguru, opentelemetry-exporter-otlp-proto-grpc==1.33.1, opentelemetry-exporter-otlp-proto-http==1.33.1, packaging",
+        "Python 可选依赖：torch, torch_npu（profiler 功能）",
+        "Python 测试依赖：coverage, pytest, pytest-mock, pytest_check, jsonschema, pytest-asyncio",
+        "Python 构建依赖：scikit-build-core, build"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库内无 Dockerfile（glob 搜索未找到），依赖来源为 devcontainer.json image + dev_env_setup.md + docker_image_build_guide.md",
+      "value": "无 Dockerfile。统一构建镜像分层：Layer1 openEuler 24.03 LTS → Layer2 GCC 11.2 → Layer3 Python 3.8-3.13 → Layer4 CANN 9.1.0（toolkit+ops）。构建镜像仅用于编译，不支持 NPU 程序运行（运行库已裁剪）"
+    },
+    "recommended_image": {
+      "source": "devcontainer.json image 字段 + dev_env_setup.md 第3章 docker pull 命令",
+      "value": "Tier 1 业务预构建镜像：swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801（dev_env_setup.md 推荐，openEuler 24.03 基础，含 GCC 11.2/Python 3.8-3.13/CANN 9.1.0）；备选 devcontainer.json 中的 26.1.0-0701；Ubuntu 变体 26.2.0-0801-ubuntu22.04"
+    },
+    "sample_commands": {
+      "source": "test/presmoke/ 目录 + docs/zh/quick_start.md",
+      "value": "test/presmoke/ 下有 profiler_analyze_vllm.py、profiler_analyze_mindie.py 等预冒烟测试（pytest 格式，需实际 vLLM/MindIE 服务运行）；quick_start.md 描述的使用样例需实际推理服务（vLLM/SGLang/MindIE），无法在编译环境独立执行"
+    },
+    "special_dependencies": {
+      "source": "docs/zh/msserviceprofiler_install_guide.md + dev_env_setup.md + docker_image_build_guide.md",
+      "value": [
+        "CANN 9.1.0（Toolkit + Ops 包，需安装并配置 ASCEND_TOOLKIT_HOME 环境变量）",
+        "ctr_in.py 容器启动脚本（从 https://inst.obs.cn-north-4.myhuaweicloud.com/env/ctr_in.py 下载，用于正确初始化容器环境）",
+        "统一构建镜像仅用于编译，不支持 NPU 程序运行；如需运行 NPU 程序需使用 CANN 官方运行容器"
+      ]
+    },
+    "ut_commands": {
+      "source": "CONTRIBUTING.md 代码测试章节 + test/run_ut.sh + build.py _run_tests",
+      "value": "python3 build.py test（拉取依赖+Debug编译+执行全部UT）；或 cd test \u0026\u0026 bash run_ut.sh（全部）；bash run_ut.sh ms_service_profiler（Python UT）；bash run_ut.sh cpp（C++ UT，cmake -Dms_service_profiler_BUILD_TESTS=ON）；bash run_ut.sh ms_serviceparam_optimizer / msservice_advisor / ms_service_metric（各模块Python UT）"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "安装指南明确要求使用 ctr_in.py 启动容器，禁止普通 docker run 和 docker exec bash -c。但 ctr_in.py 打开交互式 Shell，不适合自动化/CI 环境。文档未提供自动化场景下的替代方案（如 docker run -d + docker exec bash -lc 的可行性说明）。",
+      "source": "docs/zh/msserviceprofiler_install_guide.md 2.3.1 节 + dev_env_setup.md 第5章",
+      "time": "2026-08-22T01:22:41",
+      "title": "安装指南要求使用 ctr_in.py 但未提供自动化/CI 环境指导"
+    },
+    {
+      "body": "dev_env_setup.md 说明编译镜像'仅用于编译，不支持 NPU 程序运行'，但未记录挂载 NPU 设备后 DCMI 初始化失败的具体错误码（ret=-8005）和原因（运行库已裁剪）。开发者挂载 NPU 设备后遇到 DCMI 错误可能无法快速定位。",
+      "source": "dev_env_setup.md 第5章注意事项",
+      "time": "2026-08-22T01:22:41",
+      "title": "编译镜像 NPU 设备挂载行为未明确记录"
+    },
+    {
+      "body": "test/presmoke/ 下的集成测试需要实际 vLLM/MindIE 推理服务运行，但 README 和 CONTRIBUTING.md 均未明确说明 presmoke 测试的运行条件和前置依赖。开发者需要阅读测试源码才能了解运行要求。",
+      "source": "test/presmoke/ + CONTRIBUTING.md 代码测试章节",
+      "time": "2026-08-22T01:22:41",
+      "title": "presmoke 测试前置条件未在 README 中说明"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "读取 README.md 了解项目定位和文档入口",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/Ascend/msserviceprofiler.git \u0026\u0026 cat README.md",
+      "details": {
+        "file": "README.md",
+        "key_links": [
+          "docs/zh/quick_start.md",
+          "docs/zh/msserviceprofiler_install_guide.md",
+          "CONTRIBUTING.md"
+        ]
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "MindStudio Service Profiler 昇腾 AI 服务化调优工具，面向大模型推理服务全栈性能分析。README 指向快速入门、安装指南、贡献指南等文档",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T00:59:33"
+    },
+    {
+      "action": "读取 CONTRIBUTING.md 提取环境要求和 UT 命令",
+      "command": "cat CONTRIBUTING.md",
+      "details": {
+        "file": "CONTRIBUTING.md",
+        "requirements": [
+          "CANN开源版本",
+          "Python 3.10+",
+          "CMake 3.11+"
+        ],
+        "ut_commands": [
+          "cd msserviceprofiler/test \u0026\u0026 bash run_ut.sh ms_service_profiler",
+          "bash run_ut.sh cpp"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "环境要求：需提前安装CANN、Python 3.10+、CMake 3.11+。UT：bash run_ut.sh ms_service_profiler / bash run_ut.sh cpp。安装测试参考安装指南",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T00:59:33"
+    },
+    {
+      "action": "读取 .devcontainer/devcontainer.json 提取镜像信号（Tier 1）",
+      "command": "cat .devcontainer/devcontainer.json",
+      "details": {
+        "file": ".devcontainer/devcontainer.json",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+        "tier": "Tier 1 业务预构建镜像"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "devcontainer.json image 字段指向 swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701，为华为云 SWR 预构建镜像，非基础 OS 镜像",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T00:59:33"
+    },
+    {
+      "action": "读取 .devcontainer/post-create.sh 了解容器初始化流程",
+      "command": "cat .devcontainer/post-create.sh",
+      "details": {
+        "configures": [
+          "pyenv Python",
+          "clangd",
+          "pre-commit hook"
+        ],
+        "file": ".devcontainer/post-create.sh",
+        "installs": [
+          "python3-devel/python3-dev",
+          "gitleaks",
+          "wheel",
+          "pre-commit",
+          "bandit[toml]"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "post-create.sh 配置 Python(pyenv)、安装 python3-devel/gitleaks/wheel/pre-commit/bandit、安装 pre-commit hook、配置 clangd",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T00:59:33"
+    },
+    {
+      "action": "读取 docs/zh/msserviceprofiler_install_guide.md 安装指南（源码安装章节）",
+      "command": "cat docs/zh/msserviceprofiler_install_guide.md",
+      "details": {
+        "build_cmd": "python3 build.py",
+        "file": "docs/zh/msserviceprofiler_install_guide.md",
+        "key_links": [
+          "https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/dev_env_setup.md",
+          "https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/docker_image_build_guide.md"
+        ],
+        "ut_cmd": "python3 build.py test"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "源码安装使用 MindStudio 标准构建环境。日常开发参考 dev_env_setup.md，复现环境参考 docker_image_build_guide.md。构建命令 python3 build.py，UT python3 build.py test。必须用 ctr_in.py 启动容器",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T00:59:33"
+    },
+    {
+      "action": "WebFetch 读取 dev_env_setup.md（msot 仓库）提取 docker pull 命令（Tier 1 镜像信号确认）",
+      "command": "WebFetch https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/dev_env_setup.md",
+      "details": {
+        "docker_pull": "docker pull swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "note": "编译镜像仅用于编译，不支持 NPU 程序运行",
+        "ubuntu_variant": "26.2.0-0801-ubuntu22.04",
+        "url": "https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/dev_env_setup.md"
+      },
+      "duration_seconds": 8,
+      "error": "",
+      "output": "dev_env_setup.md 提供明确 docker pull 命令：swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801（openEuler，推荐）。另提供 Ubuntu 变体 26.2.0-0801-ubuntu22.04。需用 ctr_in.py 启动容器",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T00:59:33"
+    },
+    {
+      "action": "WebFetch 读取 docker_image_build_guide.md（msot 仓库）了解镜像构建细节（Tier 2/3 候选）",
+      "command": "WebFetch https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/docker_image_build_guide.md",
+      "details": {
+        "base_os": "openEuler 24.03 LTS",
+        "build_script": "python3 build_image.py",
+        "layers": [
+          "openEuler系统",
+          "GCC 11.2",
+          "Python 3.8-3.13",
+          "CANN 9.1.0"
+        ],
+        "url": "https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/docker_image_build_guide.md"
+      },
+      "duration_seconds": 8,
+      "error": "",
+      "output": "镜像分层构建：openEuler 24.03 → GCC 11.2 → Python 3.8-3.13 → CANN 9.1.0。构建脚本 build_image.py，需传入 CANN toolkit 和 ops 包 URL。作为 Tier 2/3 候选记录",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T00:59:33"
+    },
+    {
+      "action": "搜索仓库内 Dockerfile（glob **/Dockerfile*）",
+      "command": "glob **/Dockerfile*",
+      "details": {
+        "found": false,
+        "search_pattern": "**/Dockerfile*"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "仓库内未找到 Dockerfile，Tier 2 不可用。Tier 1 信号已确认（devcontainer.json image + dev_env_setup.md docker pull）",
+      "result": "跳过",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-22T00:59:33"
+    },
+    {
+      "action": "读取 build.py 构建管理器提取构建流程",
+      "command": "cat build.py",
+      "details": {
+        "commands": {
+          "full_build": "python3 build.py",
+          "local_build": "python3 build.py local",
+          "test": "python3 build.py test"
+        },
+        "file": "build.py",
+        "scripts_chain": [
+          "scripts/download_thirdparty.sh",
+          "scripts/build.sh",
+          "scripts/build_whl.sh"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "build.py 统一构建管理：python3 build.py（下载依赖+Release编译）、python3 build.py local（跳过依赖）、python3 build.py test（UT）。调用 download_thirdparty.sh → build.sh → build_whl.sh",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T00:59:33"
+    },
+    {
+      "action": "读取 CMakeLists.txt + 3rdparty/CMakeLists.txt + cpp/CMakeLists.txt 提取 C++ 依赖",
+      "command": "cat CMakeLists.txt 3rdparty/CMakeLists.txt cpp/CMakeLists.txt",
+      "details": {
+        "ascend_libs": [
+          "ascendcl",
+          "msprofiler",
+          "ms_tools_ext",
+          "mspti"
+        ],
+        "cmake_min_version": "3.11",
+        "cxx_standard": 14,
+        "fetchcontent": [
+          "libboundscheck",
+          "json v3.11.2",
+          "protobuf v3.21.9",
+          "googletest release-1.12.1"
+        ],
+        "find_package": [
+          "Python3",
+          "Threads",
+          "SQLite3",
+          "Protobuf"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "CMake 3.11+，C++14。依赖 SQLite3/Protobuf/Threads。FetchContent 下载 libboundscheck/json/protobuf/googletest。CANN 通过 ASCEND_TOOLKIT_HOME 环境变量引入 ascendcl/msprofiler 等",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T00:59:33"
+    },
+    {
+      "action": "读取 test/run_ut.sh 提取 UT 执行流程",
+      "command": "cat test/run_ut.sh",
+      "details": {
+        "cpp_ut": "cmake -Dms_service_profiler_BUILD_TESTS=ON \u0026\u0026 cmake --build --target ms_service_profiler_run_uts",
+        "file": "test/run_ut.sh",
+        "modules": [
+          "ms_service_profiler",
+          "cpp",
+          "ms_serviceparam_optimizer",
+          "msservice_advisor",
+          "ms_service_metric"
+        ],
+        "python_ut": "pip3 install -e ${PROJECT_DIR}[test] \u0026\u0026 pytest"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "UT 脚本支持5个模块。Python UT: pip install -e .[test] + pytest。C++ UT: cmake -Dms_service_profiler_BUILD_TESTS=ON + cmake --build + 运行测试二进制。含覆盖率检查",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T00:59:33"
+    },
+    {
+      "action": "读取 pyproject.toml + requirements.txt 提取 Python 依赖",
+      "command": "cat pyproject.toml requirements.txt",
+      "details": {
+        "build_system": "scikit-build-core",
+        "dependencies": [
+          "pandas~=2.2",
+          "numpy",
+          "pydantic",
+          "psutil",
+          "scipy",
+          "pyyaml",
+          "matplotlib",
+          "msguard",
+          "loguru",
+          "opentelemetry exporters",
+          "packaging"
+        ],
+        "file": "pyproject.toml",
+        "optional": [
+          "torch",
+          "torch_npu"
+        ],
+        "test": [
+          "coverage",
+          "pytest",
+          "pytest-mock",
+          "pytest_check",
+          "jsonschema",
+          "pytest-asyncio"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "Python 包名 ms_service_profiler，构建系统 scikit-build-core。核心依赖 12 个，可选 torch/torch_npu，测试依赖 6 个",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T00:59:33"
+    },
+    {
+      "action": "读取 .pre-commit-config.yaml 提取静态检查配置",
+      "command": "cat .pre-commit-config.yaml",
+      "details": {
+        "file": ".pre-commit-config.yaml",
+        "hooks": [
+          "trailing-whitespace",
+          "end-of-file-fixer",
+          "check-yaml",
+          "check-added-large-files",
+          "check-merge-conflict",
+          "detect-private-key",
+          "check-json",
+          "ruff-check",
+          "ruff-format",
+          "codespell",
+          "pylint",
+          "bandit",
+          "typos",
+          "clang-format",
+          "gitleaks-offline-scan"
+        ],
+        "total_hooks": 15
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "pre-commit 配置 15 个 hook：基础检查(7) + ruff(2) + codespell + pylint + bandit + typos + clang-format + gitleaks",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T00:59:33"
+    },
+    {
+      "action": "读取 test/presmoke/ 目录了解预冒烟测试",
+      "command": "ls test/presmoke/ \u0026\u0026 cat test/presmoke/profiler_analyze_vllm.py",
+      "details": {
+        "dir": "test/presmoke/",
+        "files": [
+          "profiler_analyze_vllm.py",
+          "profiler_analyze_mindie.py",
+          "serviceprofiler_param_optimizer.py"
+        ],
+        "note": "需实际 vLLM/MindIE 服务运行，无法在编译环境独立执行"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "presmoke 测试为集成测试，需实际推理服务（vLLM/MindIE）运行，无法在编译环境独立执行",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-22T00:59:33"
+    },
+    {
+      "action": "检查 pre-commit 配置（.pre-commit-config.yaml 存在性 + hook 列表解析）",
+      "command": "cat .pre-commit-config.yaml",
+      "details": {
+        "config_file": ".pre-commit-config.yaml",
+        "executed": false,
+        "hook_categories": {
+          "C++格式化": 1,
+          "代码质量": 5,
+          "基础检查": 7,
+          "安全扫描": 1,
+          "拼写检查": 1
+        },
+        "total_hooks": 15
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": ".pre-commit-config.yaml 存在，minimum_pre_commit_version 4.0.0，共 15 个 hooks。仅检查配置，未执行 pre-commit run",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-22T01:00:15"
+    },
+    {
+      "action": "检查 lint-runner 配置（.lint-runner.yaml / .lintrunner.toml）",
+      "command": "glob **/.lint-runner* \u0026\u0026 glob **/.lintrunner*",
+      "details": {
+        "found": false,
+        "search_patterns": [
+          ".lint-runner*",
+          ".lintrunner*"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "未找到 lint-runner 配置文件",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-22T01:00:15"
+    },
+    {
+      "action": "检查 .devcontainer 目录及配置文件",
+      "command": "ls .devcontainer/ \u0026\u0026 cat .devcontainer/devcontainer.json",
+      "details": {
+        "config_dir": ".devcontainer",
+        "files": [
+          "devcontainer.json",
+          "post-create.sh"
+        ],
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+        "remoteUser": "mindstudio",
+        "runArgs": [
+          "--network=host",
+          "--privileged",
+          "--ipc=host",
+          "--ulimit=nproc=65535:65535",
+          "--security-opt=seccomp=unconfined"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "devcontainer.json image: mindstudio-build:26.1.0-0701（华为云 SWR 预构建镜像）。post-create.sh 配置 Python/clangd/pre-commit。dev_env_setup.md 推荐更新版本 26.2.0-0801",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-08-22T01:00:15"
+    },
+    {
+      "action": "Tier 1 镜像选择：基于 dev_env_setup.md docker pull 命令确定预构建镜像",
+      "command": "docker pull swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+      "details": {
+        "candidate_images": [
+          "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801 (dev_env_setup.md 推荐)",
+          "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701 (devcontainer.json)",
+          "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801-ubuntu22.04 (Ubuntu 变体)"
+        ],
+        "reason": "dev_env_setup.md 提供明确 docker pull 命令，推荐基于 openEuler 的最新版本",
+        "selected": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "Digest: sha256:31d323d837193961820df26a00311ece5c3da4e77342491689fd875a2967064d. Status: Image is up to date",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-22T01:04:58"
+    },
+    {
+      "action": "启动容器 msserviceprofiler-ttfhw（挂载 NPU 设备+驱动+工作区）",
+      "command": "docker run -d --name msserviceprofiler-ttfhw --privileged --network=host --ipc=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/Ascend/driver:/usr/local/Ascend/driver -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware -v /home/workspace/msserviceprofiler-verify:/workspace -w /workspace swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801 sleep infinity",
+      "details": {
+        "container_name": "msserviceprofiler-ttfhw",
+        "driver_mounts": [
+          "/usr/local/sbin/npu-smi",
+          "/usr/local/Ascend/driver",
+          "/usr/local/Ascend/firmware"
+        ],
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "npu_mounts": [
+          "/dev/davinci0",
+          "/dev/davinci_manager",
+          "/dev/devmm_svm",
+          "/dev/hisi_hdc"
+        ],
+        "run_args": [
+          "--privileged",
+          "--network=host",
+          "--ipc=host"
+        ],
+        "startup_command_source": "default_挂卡",
+        "workspace_mount": "/home/workspace/msserviceprofiler-verify:/workspace"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Container ID: aa29e9a63242ecfda2682ca3908361bc378c40a8b0ba569e6c7ac72c2c16e411, Status: Up",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-22T01:04:58"
+    },
+    {
+      "action": "验证容器内环境（Python/GCC/CMake/CANN/SQLite3/Git）",
+      "command": "docker exec msserviceprofiler-ttfhw bash -lc 'python3 --version \u0026\u0026 gcc --version \u0026\u0026 cmake --version \u0026\u0026 ls /usr/local/Ascend/ \u0026\u0026 python3 -c \"import sqlite3; print(sqlite3.sqlite_version)\" \u0026\u0026 git --version'",
+      "details": {
+        "build_pkg": "1.5.0",
+        "cann": "9.1.0 (ASCEND_TOOLKIT_HOME=/usr/local/Ascend/cann-9.1.0)",
+        "cmake": "3.31.10",
+        "gcc": "11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility)",
+        "git": "2.54.0",
+        "npu_access": "DCMI初始化失败(ret=-8005)，编译镜像裁剪了运行库，不影响编译",
+        "os": "openEuler 24.03 (LTS-SP3)",
+        "python": "3.11.15",
+        "sqlite3": "3.53.0 (/opt/_internal/sqlite3)"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "Python 3.11.15, GCC 11.2.0, CMake 3.31.10, CANN 9.1.0, SQLite3 3.53.0, Git 2.54.0 — 全部就绪",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-22T01:04:58"
+    },
+    {
+      "action": "验证 NPU 设备挂载和工作区挂载",
+      "command": "docker exec msserviceprofiler-ttfhw bash -lc 'ls /workspace/ \u0026\u0026 npu-smi info \u0026\u0026 df -h /workspace'",
+      "details": {
+        "disk_available": "6.2T (/workspace on /home)",
+        "npu_devices_mounted": [
+          "davinci0",
+          "davinci_manager",
+          "devmm_svm",
+          "hisi_hdc"
+        ],
+        "npu_smi": "npu-smi 可执行但 DCMI 初始化失败(ret=-8005)",
+        "workspace_mounted": true
+      },
+      "duration_seconds": 8,
+      "error": "DCMI初始化失败(ret=-8005)，编译镜像不支持NPU程序运行，仅用于编译",
+      "output": "工作区挂载成功，仓库文件可见。NPU设备已挂载但DCMI初始化失败(编译镜像裁剪运行库)。磁盘6.2T可用",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-22T01:04:58"
+    },
+    {
+      "action": "首次构建尝试：python3 build.py（权限不足失败）",
+      "command": "docker exec msserviceprofiler-ttfhw bash -lc 'cd /workspace \u0026\u0026 python3 build.py'",
+      "details": {
+        "error": "mkdir: cannot create directory '/workspace/scripts/../opensource': Permission denied",
+        "root_cause": "容器以 mindstudio 用户运行，/workspace 挂载目录属主为 root"
+      },
+      "duration_seconds": 1,
+      "error": "Permission denied: mindstudio 用户无法在 root 属主的 /workspace 创建目录",
+      "output": "download_thirdparty.sh 执行时 mkdir /workspace/opensource 权限拒绝",
+      "result": "失败",
+      "returncode": 1,
+      "step": "build_attempt",
+      "success": false,
+      "timestamp": "2026-08-22T01:08:30"
+    },
+    {
+      "action": "修复 /workspace 权限：chown -R mindstudio:mindstudio /workspace",
+      "command": "docker exec --user root msserviceprofiler-ttfhw bash -lc 'chown -R mindstudio:mindstudio /workspace'",
+      "details": {
+        "reason": "容器以 mindstudio 用户运行，挂载目录需修改属主",
+        "solution": "docker exec --user root chown -R mindstudio:mindstudio /workspace"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "/workspace 属主已改为 mindstudio:mindstudio",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-08-22T01:08:30"
+    },
+    {
+      "action": "重新构建：python3 build.py（并发51，完整流程 download_thirdparty → build → build_whl）",
+      "command": "docker exec msserviceprofiler-ttfhw bash -lc 'cd /workspace \u0026\u0026 export CMAKE_BUILD_PARALLEL_LEVEL=51 \u0026\u0026 python3 build.py'",
+      "details": {
+        "artifacts": [
+          "mindstudio-service-profiler_1.0.0_aarch64.run (2.3M)",
+          "ms_service_profiler-1.0.0-py3-none-linux_aarch64.whl (1.3M)",
+          "ms_service_metric-1.0.0-py3-none-any.whl (130K)",
+          "libms_service_profiler.so (3.1M)"
+        ],
+        "build_time": "48.867s",
+        "cmake_configure": "25.3s",
+        "compiled_objects": 63,
+        "concurrency": 51,
+        "concurrency_ratio": "20%",
+        "fetchcontent": [
+          "libboundscheck",
+          "json v3.11.2",
+          "protobuf v3.21.9"
+        ],
+        "warnings": [
+          "packed member address (DbExecutorMsptiMstxData.h:38)",
+          "sign comparison (ServiceProfilerMspti.cpp:268)"
+        ]
+      },
+      "duration_seconds": 49,
+      "error": "",
+      "output": "Successfully built ms_service_profiler-26.0.0-py3-none-linux_aarch64.whl → run package → build_whl.sh → ms_service_profiler-1.0.0 + ms_service_metric-1.0.0 whl。artifacts 归档完成。real 48.867s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-08-22T01:08:30"
+    },
+    {
+      "action": "执行全部单元测试（python3 build.py test → bash test/run_ut.sh 全部5个模块）",
+      "command": "docker exec msserviceprofiler-ttfhw bash -lc 'cd /workspace \u0026\u0026 python3 build.py test'",
+      "details": {
+        "all_failed": 0,
+        "all_passed": 2963,
+        "command": "python3 build.py test",
+        "coverage_all_passed": true,
+        "cpp_st_speed_warnings": [
+          "TestSpan 6\u003e5μs",
+          "TestSpan100NumAttr 17\u003e5μs",
+          "TestSpan100ObjAttr 45\u003e5μs"
+        ],
+        "cpp_total": 226,
+        "modules_run": [
+          "ms_service_profiler (Python)",
+          "cpp (C++ UT+ST)",
+          "msservice_advisor (Python)",
+          "ms_service_metric (Python)",
+          "ms_serviceparam_optimizer (Python)"
+        ],
+        "python_total": 2737,
+        "skipped": 7,
+        "total_time": "9m30s"
+      },
+      "duration_seconds": 570,
+      "error": "",
+      "output": "Python UT: 2737 passed, 7 skipped. C++ UT: 226 passed. C++ ST: 完成（3个速度警告）. 所有覆盖率检查达标。总耗时 9m30s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-22T01:20:28"
+    },
+    {
+      "action": "安装构建产物 whl 包并执行 CLI 冒烟测试",
+      "command": "pip3 install artifacts/ms_service_profiler-1.0.0-py3-none-linux_aarch64.whl \u0026\u0026 msserviceprofiler --version \u0026\u0026 msserviceprofiler --help",
+      "details": {
+        "cli_commands": [
+          "analyze",
+          "parse",
+          "split",
+          "compare"
+        ],
+        "cli_version": "msserviceprofiler 1.0.0 (5065761ff22e)",
+        "install": "pip3 install artifacts/ms_service_profiler-1.0.0-py3-none-linux_aarch64.whl → Successfully installed",
+        "module_import": "ms_service_profiler 及 C++ 扩展库正确加载",
+        "presmoke_status": "未执行（需实际推理服务）"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "msserviceprofiler 1.0.0 (5065761ff22e)，CLI 4 个子命令可用，模块导入成功。presmoke 集成测试未执行（需实际推理服务）",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-22T01:22:41"
+    },
+    {
+      "action": "停止并删除容器 msserviceprofiler-ttfhw",
+      "command": "docker rm -f msserviceprofiler-ttfhw",
+      "details": {
+        "container_name": "msserviceprofiler-ttfhw"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "msserviceprofiler-ttfhw",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-08-22T01:22:41"
+    },
+    {
+      "action": "生成验证报告",
+      "command": "",
+      "details": {
+        "output_file": "verification_report_msserviceprofiler_20260822.json"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-08-22T01:22:41"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "mindstudio-service-profiler_1.0.0_aarch64.run",
+          "path": "artifacts/mindstudio-service-profiler_1.0.0_aarch64.run",
+          "size": "2.3M",
+          "type": "run_package"
+        },
+        {
+          "name": "ms_service_profiler-1.0.0-py3-none-linux_aarch64.whl",
+          "path": "artifacts/ms_service_profiler-1.0.0-py3-none-linux_aarch64.whl",
+          "size": "1.3M",
+          "type": "wheel"
+        },
+        {
+          "name": "ms_service_metric-1.0.0-py3-none-any.whl",
+          "path": "artifacts/ms_service_metric-1.0.0-py3-none-any.whl",
+          "size": "130K",
+          "type": "wheel"
+        },
+        {
+          "name": "libms_service_profiler.so",
+          "path": "build/py3-none-linux_aarch64/cpp/libms_service_profiler.so",
+          "size": "3.1M",
+          "type": "library"
+        }
+      ],
+      "cmake": "CMake 3.31.10 + Ninja 生成器（scikit-build-core 1.0.3 驱动）",
+      "compiler": "GCC 11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility), C++14",
+      "concurrency": 51,
+      "concurrency_ratio": "20%（256核 × 20% = 51）",
+      "duration_seconds": 49,
+      "notes": "构建流程：download_thirdparty.sh（下载 makeself v2.5.0.x）→ build.sh（scikit-build-core → CMake 配置 25.3s → FetchContent 下载 libboundscheck/json v3.11.2/protobuf v3.21.9 → 编译 63 个 C/C++ 文件 → 链接 libms_service_profiler.so → 打包 whl + run 包）→ build_whl.sh（重建版本 1.0.0 的 whl + ms_service_metric whl）。编译有少量 warning（packed member 地址、符号比较）但无 error。首次构建因 /workspace 权限失败（mindstudio 用户无写权限），chown 修复后重试成功。",
+      "status": "success"
+    },
+    "devcontainer": {
+      "config_dir": ".devcontainer",
+      "config_files": [
+        "devcontainer.json",
+        "post-create.sh"
+      ],
+      "enabled": true,
+      "original_base_image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0-0701",
+      "summary": "仓库配置了 devcontainer，image 字段指向华为云 SWR 预构建镜像 mindstudio-build:26.1.0-0701（Tier 1 信号）。dev_env_setup.md 推荐更新版本 26.2.0-0801（openEuler 24.03 基础，含 GCC 11.2/Python 3.8-3.13/CANN 9.1.0）。post-create.sh 安装 python3-devel/gitleaks/wheel/pre-commit/bandit 并配置 pyenv Python/clangd/pre-commit hook。runArgs 含 --network=host --privileged --ipc=host。remoteUser 为 mindstudio。",
+      "used_image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801"
+    },
+    "sample": {
+      "duration_seconds": 15,
+      "reason": "仓库 presmoke 集成测试（test/presmoke/）需要实际推理服务（vLLM/MindIE/SGLang）运行，编译镜像不支持 NPU 程序运行，无法在编译环境执行。已通过 pip install 安装构建产物并执行 CLI 冒烟测试验证工具可用性。",
+      "results": [
+        {
+          "execution_status": "成功",
+          "execution_time": "2s",
+          "output_summary": "msserviceprofiler 1.0.0 (5065761ff22e)，显示 MindStudio banner、版权信息、依赖版本（Pandas 2.3.3/NumPy 2.4.6/OpenTelemetry 1.33.1/PyYAML 6.0.3）",
+          "sample_name": "CLI 冒烟测试（msserviceprofiler --version）"
+        },
+        {
+          "execution_status": "成功",
+          "execution_time": "1s",
+          "output_summary": "显示4个子命令：analyze（分析性能数据）、parse（解析为db/csv/json）、split（拆分prefill/decode）、compare（对比性能profile）",
+          "sample_name": "CLI 帮助测试（msserviceprofiler --help）"
+        },
+        {
+          "execution_status": "成功",
+          "execution_time": "1s",
+          "output_summary": "ms_service_profiler 包及其 C++ 扩展库（libms_service_profiler.so）正确加载，parse 模块可导入",
+          "sample_name": "模块导入测试（import ms_service_profiler）"
+        },
+        {
+          "execution_status": "未执行",
+          "execution_time": "0s",
+          "output_summary": "presmoke 测试需实际 vLLM/MindIE 推理服务运行，编译镜像不支持 NPU 程序运行（DCMI ret=-8005），无法在编译环境执行",
+          "sample_name": "presmoke 集成测试（test/presmoke/）"
+        }
+      ],
+      "status": "partial_success"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 0,
+        "executed_in_verification": false,
+        "failed": 0,
+        "hooks": [
+          {
+            "id": "trailing-whitespace",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "end-of-file-fixer",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-yaml",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-added-large-files",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-merge-conflict",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "detect-private-key",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "check-json",
+            "repo": "pre-commit/pre-commit-hooks",
+            "rev": "v4.6.0"
+          },
+          {
+            "id": "ruff-check",
+            "repo": "gh_mirrors/ru/ruff-pre-commit",
+            "rev": "v0.14.14"
+          },
+          {
+            "id": "ruff-format",
+            "repo": "gh_mirrors/ru/ruff-pre-commit",
+            "rev": "v0.14.14"
+          },
+          {
+            "id": "codespell",
+            "repo": "gh_mirrors/co/codespell",
+            "rev": "v2.4.1"
+          },
+          {
+            "id": "pylint",
+            "repo": "gh_mirrors/pyl/pylint",
+            "rev": "v4.0.5"
+          },
+          {
+            "id": "bandit",
+            "repo": "gh_mirrors/ba/bandit",
+            "rev": "1.9.4"
+          },
+          {
+            "id": "typos",
+            "repo": "gh_mirrors/ty/typos",
+            "rev": "v1.32.0"
+          },
+          {
+            "id": "clang-format",
+            "repo": "pre-commit-clang/mirrors-clang-format",
+            "rev": "v18.1.8"
+          },
+          {
+            "id": "gitleaks-offline-scan",
+            "repo": "local",
+            "rev": "system"
+          }
+        ],
+        "note": "minimum_pre_commit_version: 4.0.0；ruff/pylint/bandit/typos 配置文件为 pre-commit/pyproject.toml；clang-format 风格 BasedOnStyle: Google, IndentWidth: 4, ColumnLimit: 120",
+        "passed": 0,
+        "skipped": 0,
+        "status": "已配置（未执行，仅检查配置）",
+        "total_hooks": 15
+      },
+      "summary": "检测到 pre-commit 配置（.pre-commit-config.yaml），共 15 个 hooks（基础检查7个：trailing-whitespace/end-of-file-fixer/check-yaml/check-added-large-files/check-merge-conflict/detect-private-key/check-json；代码质量5个：ruff-check/ruff-format/codespell/pylint/bandit；拼写检查1个：typos；C++格式化1个：clang-format；安全扫描1个：gitleaks-offline-scan）。未检测到 lint-runner 配置。本次仅检查配置存在性，未执行 pre-commit run。"
+    },
+    "ut": {
+      "cpp": {
+        "failed": 0,
+        "note": "C++ UT（ms_service_profiler_run_uts）226 个测试全部通过。C++ ST（ms_service_profiler_run_sts）也完成执行，有 3 个性能基准速度警告（TestSpan 6\u003e5μs、TestSpan100NumAttr 17\u003e5μs、TestSpan100ObjAttr 45\u003e5μs），为机器性能相关的时序断言，非功能失败。",
+        "passed": 226,
+        "status": "success",
+        "total": 226
+      },
+      "duration_seconds": 570,
+      "failed": 0,
+      "failures": [],
+      "passed": 2963,
+      "python": {
+        "failed": 0,
+        "modules": [
+          {
+            "branch_coverage": "67.85%",
+            "duration": "25.03s",
+            "failed": 0,
+            "line_coverage": "82.55%",
+            "name": "ms_service_profiler",
+            "passed": 1678,
+            "skipped": 7,
+            "total": 1678
+          },
+          {
+            "branch_coverage": "74.24%",
+            "duration": "2.77s",
+            "failed": 0,
+            "line_coverage": "86.68%",
+            "name": "msservice_advisor",
+            "passed": 90,
+            "skipped": 0,
+            "total": 90
+          },
+          {
+            "branch_coverage": "72.97%",
+            "duration": "3.72s",
+            "failed": 0,
+            "line_coverage": "86.03%",
+            "name": "ms_service_metric",
+            "passed": 392,
+            "skipped": 0,
+            "total": 392
+          },
+          {
+            "branch_coverage": "66.33%",
+            "duration": "259.82s",
+            "failed": 0,
+            "line_coverage": "80.37%",
+            "name": "ms_serviceparam_optimizer",
+            "passed": 577,
+            "skipped": 0,
+            "total": 577
+          }
+        ],
+        "passed": 2737,
+        "status": "success",
+        "total": 2737
+      },
+      "skipped": 7,
+      "status": "success",
+      "total": 2963
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "msserviceprofiler-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "openEuler 24.03 (LTS-SP3)"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng 920 (aarch64, 256核)",
+      "disk": "69G (root 8.6G可用; /home 6.9T 6.2T可用)",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 0
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "CMakeLists.txt 需 find_package(Python3/Threads/SQLite3/Protobuf)；3rdparty/CMakeLists.txt 通过 FetchContent 自动下载 libboundscheck/json/protobuf/googletest",
+        "from_dockerfile": "仓库内无 Dockerfile。统一构建镜像已预装全部依赖（GCC/Python/CANN/CMake/SQLite3/Git），无需额外安装",
+        "from_readme": "CONTRIBUTING.md 要求 CANN/Python 3.10+/CMake 3.11+，均已预装",
+        "mappings": []
+      },
+      "image_name": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+      "selection_reason": "Tier 1 业务预构建镜像：dev_env_setup.md（msot 仓库）提供明确 docker pull 命令，镜像基于 openEuler 24.03 LTS 分层构建（Layer1 openEuler → Layer2 GCC 11.2 → Layer3 Python 3.8-3.13 → Layer4 CANN 9.1.0），预装 GCC 11.2.0/Python 3.11.15/CMake 3.31.10/CANN 9.1.0/SQLite3/Git 2.54.0，与仓库 CMakeLists.txt（cmake\u003e=3.11, C++14）和 CONTRIBUTING.md（Python\u003e=3.10, CANN）要求完全匹配。devcontainer.json image 字段（26.1.0-0701）为同系列旧版，dev_env_setup.md 推荐更新版本 26.2.0-0801。",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "5065761",
+    "duration_seconds": 1581,
+    "end_time": "2026-08-22T01:22:41",
+    "environment": "远程容器验证（192.168.9.114, aarch64, 256核, 8×910B3 NPU）",
+    "repo_url": "https://gitcode.com/Ascend/msserviceprofiler.git",
+    "start_time": "2026-08-22T00:56:20",
+    "total_steps": 28,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "容器内 mindstudio 用户无权限在 /workspace 创建目录（mkdir: Permission denied）",
+      "solution": "通过 docker exec --user root 执行 chown -R mindstudio:mindstudio /workspace 修改挂载目录属主，使 mindstudio 用户获得写权限",
+      "source": "build.py → download_thirdparty.sh → mkdir /workspace/opensource",
+      "timestamp": "2026-08-22T01:08:30"
+    },
+    {
+      "problem": "容器内 NPU DCMI 初始化失败（ret=-8005），npu-smi info 无法正常输出",
+      "solution": "编译镜像（mindstudio-build:26.2.0-0801）为控制体积深度裁剪了 CANN 运行库，仅保留编译所需headers/libs。此为预期行为（dev_env_setup.md 已说明'仅用于编译'），不影响编译和单元测试。如需运行 NPU 程序，应使用 CANN 官方运行容器。",
+      "source": "dev_env_setup.md 第5章 + 容器内 npu-smi info 输出",
+      "timestamp": "2026-08-22T01:22:41"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}
