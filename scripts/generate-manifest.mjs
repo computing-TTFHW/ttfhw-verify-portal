@@ -44,6 +44,7 @@ const REPO_COMMUNITY_MAP = {
   'mstx': 'MindStudio', 'multimodalsdk': 'MindSDK',
   'kae': 'BoostKit', 'kpglibc': 'BoostKit', 'ultrascan': 'BoostKit',
   'ograc': 'openGauss', 'opengauss-connector-jdbc': 'openGauss', 'plugin': 'openGauss',
+  'opengauss-server': 'openGauss',
   'ubs-atomic': 'UBSCore',
   'kunpeng-extension-for-pytorch': 'HPCKit',
   'vllm-ascend': 'MindIE', 'vllm': 'MindIE', 'pymotor': 'MindIE',

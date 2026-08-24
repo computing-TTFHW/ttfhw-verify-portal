@@ -1,0 +1,1079 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "docs/zh/release_notes.md 版本配套说明 + README.md",
+      "value": "aarch64（鲲鹏920新型号处理器），但 README 明确说明 vLLM-Router 对实际硬件环境不做要求，能运行 vLLM 推理框架即可"
+    },
+    "build_commands": {
+      "source": "README.md + requirements.txt（Python 项目，无编译步骤）",
+      "value": "pip install -r requirements.txt（Python 项目无需编译，安装依赖即为构建）"
+    },
+    "dependencies": {
+      "source": "requirements.txt + docs/zh/release_notes.md + launch_server.py 代码分析",
+      "value": [
+        "Python \u003e= 3.10（来源：release_notes.md 版本配套说明）",
+        "pydantic\u003e=2.5.3（来源：requirements.txt）",
+        "aiohttp\u003e=3.9.5（来源：requirements.txt）",
+        "fastapi\u003e=0.115.12（来源：requirements.txt）",
+        "uvicorn（来源：launch_server.py 中 import uvicorn，online_test 文件中也使用，为隐式运行时依赖）",
+        "starlette（来源：launch_server.py 中 from starlette.requests import Request，fastapi 会自动安装）",
+        "pytest（测试运行器，test 目录下测试使用 unittest 框架但可用 pytest 执行）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库根目录扫描",
+      "value": "无 Dockerfile"
+    },
+    "recommended_image": {
+      "source": "仓库根目录扫描 + README + docs/zh/release_notes.md",
+      "value": "无预构建镜像、无 Dockerfile、无 .devcontainer。Tier 3 基础 OS 从零安装。release_notes.md 指定 openEuler 22.03 LTS SP2 + Python \u003e= 3.10"
+    },
+    "sample_commands": {
+      "source": "docs/zh/user_guide.md 启动数据并行路由章节 + launch_server.py",
+      "value": "python launch_server.py --host 127.0.0.1 --port 8008 --worker_urls http://127.0.0.1:8001 http://127.0.0.1:8002 --policy round_robin"
+    },
+    "special_dependencies": {
+      "source": "README.md + docs/zh/user_guide.md",
+      "value": []
+    },
+    "ut_commands": {
+      "source": "test/ 目录文件分析（test_router.py / test_server.py / test_tree.py 均使用 unittest 框架，末尾有 unittest.main()）",
+      "value": "cd /workspace \u0026\u0026 python -m pytest test/ -v（或 python -m unittest discover -s test -v）"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "release_notes.md 版本配套说明指定操作系统为 openEuler 22.03 LTS SP2 且 Python \u003e= 3.10，但 openEuler 22.03 LTS SP2 基础镜像默认 Python 版本为 3.9.9，不满足 Python \u003e= 3.10 要求。代码 launch_server.py 中使用 PEP 604 union 语法（如 str | List[str]、asyncio.Task | None）需要 Python 3.10+。文档未说明如何在 openEuler 22.03 LTS SP2 上安装 Python 3.10+，也未提供替代 OS 方案。本次验证升级使用 openEuler 24.03 LTS（Python 3.11.6）。",
+      "source": "docs/zh/release_notes.md 版本配套说明 + launch_server.py PEP 604 语法",
+      "time": "2026-08-24T11:36:51",
+      "title": "release_notes.md 指定 openEuler 22.03 LTS SP2 但默认 Python 版本不满足要求"
+    },
+    {
+      "body": "launch_server.py 中 import uvicorn（第 734 行 if __name__ == '__main__': import uvicorn），online_test1.py 和 online_test2.py 也使用 uvicorn，但 requirements.txt 仅列出 pydantic、aiohttp、fastapi 三个依赖，未包含 uvicorn。新开发者按 requirements.txt 安装依赖后直接运行 launch_server.py 会报 ModuleNotFoundError: No module named 'uvicorn'。",
+      "source": "requirements.txt + launch_server.py 第 734 行 + test/online_test1.py 第 22 行",
+      "time": "2026-08-24T11:36:51",
+      "title": "requirements.txt 未列出 uvicorn 隐式依赖"
+    },
+    {
+      "body": "test/online_test2.py 第 7 行 async def generate(body): 缺少 body: CompletionRequest 类型注解，导致 FastAPI 将 body 作为查询参数而非请求体解析。转发到 server2 的请求返回 422 Unprocessable Entity 错误。online_test1.py 有正确的类型注解（body: CompletionRequest），可作为对比。这是测试 mock 服务的 bug，不影响路由器本身的功能。",
+      "source": "test/online_test2.py 第 7 行 vs test/online_test1.py 第 9 行",
+      "time": "2026-08-24T11:36:51",
+      "title": "online_test2.py body 参数缺少类型注解导致 422 错误"
+    },
+    {
+      "body": "README.md 和 docs/zh/user_guide.md 均未说明如何执行单元测试。test/ 目录下的测试使用 unittest 框架，但文档未提供 pytest 或 unittest 的执行命令。新开发者需要自行从代码中推导测试执行方式。",
+      "source": "README.md + docs/zh/user_guide.md + test/ 目录",
+      "time": "2026-08-24T11:36:51",
+      "title": "README 未提供 UT 执行命令"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "git clone 仓库到本地 /tmp/opencode/vllm_router 以阅读文档",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/boostkit/vllm_router.git /tmp/opencode/vllm_router",
+      "details": {
+        "branch": "master",
+        "clone_path": "/tmp/opencode/vllm_router",
+        "repo_url": "https://gitcode.com/boostkit/vllm_router.git"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "克隆成功，仓库包含 README.md、requirements.txt、launch_server.py、router/、src/、test/、utils/、docs/ 等目录",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:14"
+    },
+    {
+      "action": "读取 README.md 提取项目介绍、目录结构、学习文档链接和贡献声明",
+      "command": "读取 /tmp/opencode/vllm_router/README.md",
+      "details": {
+        "file": "README.md",
+        "key_findings": [
+          "vLLM-Router 是鲲鹏参与 vLLM 开源社区的路由插件",
+          "支持数据并行部署，提供请求路由与负载均衡",
+          "内置前缀缓存感知/随机/轮询负载均衡算法",
+          "贡献指南链接: https://gitcode.com/boostkit/community/blob/master/docs/contributor/contributing.md"
+        ],
+        "sections_read": [
+          "项目介绍",
+          "目录结构",
+          "版本说明",
+          "学习文档",
+          "通信矩阵",
+          "贡献声明"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "vLLM-Router是鲲鹏参与vLLM开源社区的路由插件，旨在支持数据并行部署。目录包含 router/、src/、test/、utils/、docs/、launch_server.py、requirements.txt",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:14"
+    },
+    {
+      "action": "读取 requirements.txt 提取 Python 依赖列表",
+      "command": "读取 /tmp/opencode/vllm_router/requirements.txt",
+      "details": {
+        "dependencies": [
+          "pydantic\u003e=2.5.3",
+          "aiohttp\u003e=3.9.5",
+          "fastapi\u003e=0.115.12"
+        ],
+        "file": "requirements.txt"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "pydantic\u003e=2.5.3, aiohttp\u003e=3.9.5, fastapi\u003e=0.115.12",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:14"
+    },
+    {
+      "action": "读取 .pre-commit-config.yaml 检查静态检查配置",
+      "command": "读取 /tmp/opencode/vllm_router/.pre-commit-config.yaml",
+      "details": {
+        "file": ".pre-commit-config.yaml",
+        "hooks": [
+          "trailing-whitespace",
+          "end-of-file-fixer",
+          "check-yaml",
+          "check-added-large-files",
+          "check-merge-conflict",
+          "detect-private-key",
+          "check-json",
+          "clang-format"
+        ],
+        "min_version": "4.0.0"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "minimum_pre_commit_version: 4.0.0，含 8 个 hooks：trailing-whitespace, end-of-file-fixer, check-yaml, check-added-large-files, check-merge-conflict, detect-private-key, check-json, clang-format",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:14"
+    },
+    {
+      "action": "读取 docs/zh/user_guide.md 提取安装环境、启动 vLLM 实例和路由的方法",
+      "command": "读取 /tmp/opencode/vllm_router/docs/zh/user_guide.md",
+      "details": {
+        "file": "docs/zh/user_guide.md",
+        "key_findings": [
+          "以鲲鹏920+沐曦C500 GPU为例",
+          "vLLM-Router对实际硬件环境不做要求",
+          "启动路由命令: python launch_server.py --host 127.0.0.1 --port \u003cport\u003e --worker_urls ... --policy round_robin",
+          "安装后验证用 vLLM 官方 Benchmark 测试框架"
+        ],
+        "sections_read": [
+          "安装vLLM推理软硬件环境",
+          "启动vLLM实例",
+          "安装后验证"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "用户指南说明 vLLM-Router 作为 vLLM 外挂插件，对硬件不做要求。启动路由: python launch_server.py --host 127.0.0.1 --port 8008 --worker_urls http://127.0.0.1:8001 http://127.0.0.1:8002 --policy round_robin",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:14"
+    },
+    {
+      "action": "读取 docs/zh/api_reference.md 提取路由器初始化参数和 API 接口",
+      "command": "读取 /tmp/opencode/vllm_router/docs/zh/api_reference.md",
+      "details": {
+        "apis": [
+          "/v1/completions",
+          "/add_workers",
+          "/remove_workers",
+          "/list_workers",
+          "/health",
+          "/pretty_print_tree"
+        ],
+        "file": "docs/zh/api_reference.md",
+        "policies": [
+          "random",
+          "round_robin",
+          "cache_aware"
+        ],
+        "port_range": "7000~9000"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "API 参考: POST /v1/completions, POST /add_workers, POST /remove_workers, GET /list_workers, GET /health, GET /pretty_print_tree。路由端口范围 7000~9000",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:14"
+    },
+    {
+      "action": "读取 docs/zh/release_notes.md 提取版本配套说明（OS、CPU、Python 版本要求）",
+      "command": "读取 /tmp/opencode/vllm_router/docs/zh/release_notes.md",
+      "details": {
+        "boostkit_version": "26.1.RC1",
+        "cpu": "鲲鹏920新型号处理器",
+        "file": "docs/zh/release_notes.md",
+        "os": "openEuler 22.03 LTS SP2",
+        "python": "\u003e= 3.10",
+        "version": "1.0.0"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "版本配套: openEuler 22.03 LTS SP2, 鲲鹏920新型号处理器, Python \u003e= 3.10。软件版本 1.0.0, BoostKit 26.1.RC1",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:14"
+    },
+    {
+      "action": "读取 docs/zh/menu_vllm_router.md 确认文档目录结构完整",
+      "command": "读取 /tmp/opencode/vllm_router/docs/zh/menu_vllm_router.md",
+      "details": {
+        "file": "docs/zh/menu_vllm_router.md",
+        "linked_docs": [
+          "../../README.md",
+          "./release_notes.md",
+          "./user_guide.md",
+          "./api_reference.md"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "文档目录: 项目介绍(README.md)、版本说明书、用户指南、API参考",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:14"
+    },
+    {
+      "action": "git clone community 仓库读取贡献指南 contributing.md（WebFetch 无法获取 gitcode 页面内容，回退 git clone）",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/boostkit/community.git /tmp/opencode/community",
+      "details": {
+        "clone_path": "/tmp/opencode/community",
+        "file": "community/docs/contributor/contributing.md",
+        "key_findings": [
+          "贡献指南为通用 BoostKit 社区指南",
+          "未包含 vllm_router 特定的构建/测试命令",
+          "指向各项目 README.md 了解环境准备",
+          "贡献流程: fork → clone → 本地构建验证 → 提交 PR"
+        ],
+        "source_url": "https://gitcode.com/boostkit/community/blob/master/docs/contributor/contributing.md"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "贡献指南为通用社区指南，未包含 vllm_router 特定构建/测试命令，指向各项目 README.md 了解环境准备",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:14"
+    },
+    {
+      "action": "读取 launch_server.py 分析服务启动入口、依赖和命令行参数",
+      "command": "读取 /tmp/opencode/vllm_router/launch_server.py",
+      "details": {
+        "default_policy": "cache_aware",
+        "default_port": 8008,
+        "default_worker_urls": [
+          "http://127.0.0.1:8001",
+          "http://127.0.0.1:8002"
+        ],
+        "entry_point": "if __name__ == '__main__'",
+        "file": "launch_server.py",
+        "imports": [
+          "aiohttp",
+          "fastapi",
+          "starlette",
+          "uvicorn",
+          "router.protocol",
+          "src.router",
+          "utils.error",
+          "utils.logger"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "launch_server.py 是服务启动入口，使用 fastapi + uvicorn + aiohttp。默认端口 8008，默认策略 cache_aware，默认 worker_urls http://127.0.0.1:8001 和 8002",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:14"
+    },
+    {
+      "action": "读取 test/ 目录下所有测试文件（test_router.py, test_server.py, test_tree.py, online_test1.py, online_test2.py）分析 UT 框架和命令",
+      "command": "读取 test/ 目录下 test_router.py / test_server.py / test_tree.py / online_test1.py / online_test2.py",
+      "details": {
+        "entry": "unittest.main()",
+        "files": [
+          "test/test_router.py",
+          "test/test_server.py",
+          "test/test_tree.py",
+          "test/online_test1.py",
+          "test/online_test2.py"
+        ],
+        "framework": "unittest",
+        "test_classes": [
+          "TestRouters(IsolatedAsyncioTestCase)",
+          "TestParseRouterArgs(TestCase)",
+          "TestTree(TestCase)"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "测试使用 unittest 框架。test_router.py 测试路由策略(round_robin/random/cache_aware)，test_server.py 测试参数解析，test_tree.py 测试前缀缓存树。online_test1/2.py 是模拟 vLLM 服务端",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:14"
+    },
+    {
+      "action": "读取 router/protocol.py 分析数据模型和依赖",
+      "command": "读取 /tmp/opencode/vllm_router/router/protocol.py",
+      "details": {
+        "file": "router/protocol.py",
+        "imports": [
+          "pydantic",
+          "pydantic_core",
+          "utils.logger"
+        ],
+        "models": [
+          "CompletionRequest",
+          "WorkUrls",
+          "RouterArgs",
+          "LogitsProcessorConstructor"
+        ],
+        "port_validation": "7000~9000"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "protocol.py 定义 CompletionRequest/WorkUrls/RouterArgs 等数据模型，使用 pydantic 和 pydantic_core。端口校验范围 7000~9000",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:14"
+    },
+    {
+      "action": "扫描仓库根目录查找 Dockerfile、.devcontainer、CI 配置文件（.github/workflows、.gitee）、构建脚本",
+      "command": "find /tmp/opencode/vllm_router -name 'Dockerfile*' -o -name '.devcontainer' -o -name '*.yml' -o -name '*.yaml' -o -name 'setup.py' -o -name 'pyproject.toml' -o -name 'Makefile' -o -name 'build.sh'",
+      "details": {
+        "found_build_script": false,
+        "found_ci_config": false,
+        "found_devcontainer": false,
+        "found_dockerfile": false,
+        "found_files": [
+          ".pre-commit-config.yaml"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "仅找到 .pre-commit-config.yaml，无 Dockerfile、无 .devcontainer、无 CI 配置、无构建脚本",
+      "result": "未找到",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:14"
+    },
+    {
+      "action": "镜像策略决策：基于文档闭包结果分析 Tier 1/2/3 信号",
+      "command": "",
+      "details": {
+        "base_image": "hub.oepkgs.net/openeuler/openeuler:22.03-lts-sp2",
+        "reason": "无预构建镜像、无 Dockerfile、无 .devcontainer。release_notes.md 指定 openEuler 22.03 LTS SP2 + Python \u003e= 3.10",
+        "selected_os": "openEuler 22.03 LTS SP2",
+        "tier1_signal": false,
+        "tier2_signal": false,
+        "tier3_signal": true
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "Tier 1/2 信号均未命中，选择 Tier 3 基础 OS 从零安装。release_notes.md 指定 openEuler 22.03 LTS SP2，使用 hub.oepkgs.net/openeuler/openeuler:22.03-lts-sp2 基础镜像",
+      "result": "Tier 3 基础 OS 从零安装",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:14"
+    },
+    {
+      "action": "检查仓库 pre-commit 配置（.pre-commit-config.yaml）",
+      "command": "读取 /tmp/opencode/vllm_router/.pre-commit-config.yaml",
+      "details": {
+        "config_file": ".pre-commit-config.yaml",
+        "executed": false,
+        "hooks": [
+          "trailing-whitespace",
+          "end-of-file-fixer",
+          "check-yaml",
+          "check-added-large-files",
+          "check-merge-conflict",
+          "detect-private-key",
+          "check-json",
+          "clang-format"
+        ],
+        "hooks_count": 8,
+        "minimum_pre_commit_version": "4.0.0"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "检测到 .pre-commit-config.yaml，minimum_pre_commit_version 4.0.0，8 个 hooks（含 pre-commit 基础检查 7 个 + clang-format C/C++ 格式化 1 个）",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:51"
+    },
+    {
+      "action": "检查仓库 lint-runner 配置（.lint-runner.yaml / .lintrunner.toml）",
+      "command": "find /tmp/opencode/vllm_router -name '.lint-runner.yaml' -o -name '.lintrunner.toml' -o -name '.lintrunner'",
+      "details": {
+        "found": false
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "未找到 lint-runner 相关配置文件",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:51"
+    },
+    {
+      "action": "检查 .devcontainer 目录是否存在",
+      "command": "ls -la /tmp/opencode/vllm_router/.devcontainer",
+      "details": {
+        "found": false,
+        "path": ".devcontainer/"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": ".devcontainer 目录不存在",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-08-24T11:09:51"
+    },
+    {
+      "action": "检查仓库 pre-commit 配置（.pre-commit-config.yaml）",
+      "command": "读取 /tmp/opencode/vllm_router/.pre-commit-config.yaml",
+      "details": {
+        "config_file": ".pre-commit-config.yaml",
+        "executed": false,
+        "hooks": [
+          "trailing-whitespace",
+          "end-of-file-fixer",
+          "check-yaml",
+          "check-added-large-files",
+          "check-merge-conflict",
+          "detect-private-key",
+          "check-json",
+          "clang-format"
+        ],
+        "hooks_count": 8,
+        "minimum_pre_commit_version": "4.0.0"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "检测到 .pre-commit-config.yaml，minimum_pre_commit_version 4.0.0，8 个 hooks（含 pre-commit 基础检查 7 个 + clang-format C/C++ 格式化 1 个）",
+      "result": "已配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-24T11:10:17"
+    },
+    {
+      "action": "检查仓库 lint-runner 配置（.lint-runner.yaml / .lintrunner.toml）",
+      "command": "find /tmp/opencode/vllm_router -name '.lint-runner.yaml' -o -name '.lintrunner.toml' -o -name '.lintrunner'",
+      "details": {
+        "found": false
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "未找到 lint-runner 相关配置文件",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-08-24T11:10:17"
+    },
+    {
+      "action": "检查 .devcontainer 目录是否存在",
+      "command": "ls -la /tmp/opencode/vllm_router/.devcontainer",
+      "details": {
+        "found": false,
+        "path": ".devcontainer/"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": ".devcontainer 目录不存在",
+      "result": "未配置",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-08-24T11:10:17"
+    },
+    {
+      "action": "Tier 3 镜像选择：release_notes.md 指定 openEuler 22.03 LTS SP2，但默认 Python 3.9.9 不满足 Python \u003e= 3.10 要求，升级到 openEuler 24.03 LTS",
+      "command": "docker pull openeuler/openeuler:24.03-lts",
+      "details": {
+        "actual_os": "openEuler 24.03 LTS",
+        "documented_os": "openEuler 22.03 LTS SP2",
+        "reason": "openEuler 22.03 LTS SP2 默认 Python 3.9.9，不满足 Python \u003e= 3.10 要求（代码使用 PEP 604 union 语法），升级到 24.03 LTS（Python 3.11.6）",
+        "tier": "Tier 3"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "24.03-lts: Pulling from openeuler/openeuler, Python 3.11.6",
+      "result": "Tier 3 基础 OS 从零安装，选择 openeuler/openeuler:24.03-lts",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-24T11:31:37"
+    },
+    {
+      "action": "SSH 远程机器创建工作目录并 clone 仓库到 /home/workspace/vllm_router-verify",
+      "command": "ssh root@123.60.114.33 -p 33430 \"mkdir -p /home/workspace \u0026\u0026 git clone --depth 1 --branch master https://gitcode.com/boostkit/vllm_router.git /home/workspace/vllm_router-verify\"",
+      "details": {
+        "branch": "master",
+        "port": 33430,
+        "remote_ip": "123.60.114.33",
+        "repo_url": "https://gitcode.com/boostkit/vllm_router.git",
+        "work_dir": "/home/workspace/vllm_router-verify"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "克隆成功，仓库包含 README.md、requirements.txt、launch_server.py、router/、src/、test/、utils/、docs/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-24T11:31:37"
+    },
+    {
+      "action": "拉取 openeuler/openeuler:24.03-lts 镜像并启动容器 vllm_router-ttfhw",
+      "command": "docker run -d --privileged --name vllm_router-ttfhw -v /home/workspace/vllm_router-verify:/workspace -w /workspace openeuler/openeuler:24.03-lts sleep infinity",
+      "details": {
+        "container_name": "vllm_router-ttfhw",
+        "image": "openeuler/openeuler:24.03-lts",
+        "mount": "/home/workspace/vllm_router-verify:/workspace",
+        "startup_command_source": "default"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "容器已启动，ID: f9c5086386e6，openEuler 24.03 LTS, Python 3.11.6, aarch64, 608 核, 1.0Ti 内存",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-24T11:31:37"
+    },
+    {
+      "action": "安装 pip（通过 python3 -m ensurepip）",
+      "command": "docker exec vllm_router-ttfhw python3 -m ensurepip",
+      "details": {
+        "method": "python3 -m ensurepip",
+        "pip_version": "23.3.1",
+        "setuptools_version": "68.0.0"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Installing collected packages: setuptools, pip. Successfully installed pip-23.3.1 setuptools-68.0.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-24T11:31:37"
+    },
+    {
+      "action": "安装 requirements.txt 中的 Python 依赖（pydantic\u003e=2.5.3, aiohttp\u003e=3.9.5, fastapi\u003e=0.115.12）",
+      "command": "pip3 install -i https://mirrors.aliyun.com/pypi/simple/ -r /workspace/requirements.txt",
+      "details": {
+        "mirror": "https://mirrors.aliyun.com/pypi/simple/",
+        "packages_installed": [
+          "aiohttp-3.14.3",
+          "fastapi-0.141.1",
+          "pydantic-2.13.4",
+          "starlette-1.6.0",
+          "pydantic-core-2.46.4",
+          "anyio-4.14.2",
+          "multidict-6.7.1",
+          "yarl-1.24.5",
+          "idna-3.19",
+          "attrs-26.1.0",
+          "typing-extensions-4.16.0",
+          "typing-inspection-0.4.4",
+          "propcache-0.5.2",
+          "frozenlist-1.8.0",
+          "aiohappyeyeballs-2.7.1",
+          "aiosignal-1.4.0",
+          "annotated-types-0.8.0",
+          "annotated-doc-0.0.5"
+        ],
+        "source": "requirements.txt"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "Successfully installed aiohttp-3.14.3 fastapi-0.141.1 pydantic-2.13.4 starlette-1.6.0 pydantic-core-2.46.4 等 18 个包",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-24T11:31:37"
+    },
+    {
+      "action": "安装隐式运行时依赖 uvicorn（launch_server.py 中 import uvicorn）",
+      "command": "pip3 install -i https://mirrors.aliyun.com/pypi/simple/ uvicorn",
+      "details": {
+        "dependencies": [
+          "click-8.4.2",
+          "h11-0.16.0"
+        ],
+        "package": "uvicorn",
+        "source": "launch_server.py import 分析",
+        "version": "0.52.4"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "Successfully installed click-8.4.2 h11-0.16.0 uvicorn-0.52.4",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-24T11:31:37"
+    },
+    {
+      "action": "安装测试运行器 pytest（test/ 目录测试使用 unittest 框架，可用 pytest 执行）",
+      "command": "pip3 install -i https://mirrors.aliyun.com/pypi/simple/ pytest",
+      "details": {
+        "dependencies": [
+          "pluggy-1.6.0",
+          "pygments-2.21.0",
+          "packaging-26.3",
+          "iniconfig-2.3.0"
+        ],
+        "package": "pytest",
+        "source": "测试执行需要",
+        "version": "9.1.1"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "Successfully installed pygments-2.21.0 pluggy-1.6.0 packaging-26.3 iniconfig-2.3.0 pytest-9.1.1",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-24T11:31:37"
+    },
+    {
+      "action": "验证所有 Python 依赖可正常导入",
+      "command": "python3 -c \"import uvicorn; import pytest; import pydantic; import aiohttp; import fastapi; print('所有依赖验证通过')\"",
+      "details": {
+        "verified_imports": [
+          "uvicorn",
+          "pytest",
+          "pydantic",
+          "aiohttp",
+          "fastapi",
+          "starlette"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "所有依赖验证通过",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-24T11:31:37"
+    },
+    {
+      "action": "Python 项目构建验证：安装依赖后验证所有模块可成功导入（router.protocol, src.router, src.tree, utils, launch_server）",
+      "command": "cd /workspace \u0026\u0026 python3 -c \"from router.protocol import CompletionRequest, WorkUrls, RouterArgs; from src.router import RandomConfig, RoundRobinConfig, CacheAwareConfig, RouteSelector, PolicyConfig, CacheAwareRouter, RoundRobinRouter, RandomRouter; from src.tree import Tree; from utils.error import NoAvailableWorkerError; from utils.logger import logger; from launch_server import parse_router_args, Router, create_app, BackendService; print('构建验证通过')\"",
+      "details": {
+        "build_type": "Python 项目无编译",
+        "concurrency": 121,
+        "concurrency_ratio": "20%",
+        "no_build_script": true,
+        "no_pyproject_toml": true,
+        "no_setup_py": true,
+        "verified_imports": [
+          "router.protocol (CompletionRequest, WorkUrls, RouterArgs)",
+          "src.router (RandomConfig, RoundRobinConfig, CacheAwareConfig, RouteSelector, PolicyConfig, CacheAwareRouter, RoundRobinRouter, RandomRouter)",
+          "src.tree (Tree)",
+          "utils.error (NoAvailableWorkerError)",
+          "utils.logger (logger)",
+          "launch_server (parse_router_args, Router, create_app, BackendService)"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "构建验证通过: 所有模块成功导入。Python 3.11.6 (main, May 6 2026, 18:05:15) [GCC 12.3.1 (openEuler 12.3.1-38.oe2403)]。耗时 1.668 秒",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-24T11:32:22"
+    },
+    {
+      "action": "执行单元测试：cd /workspace \u0026\u0026 python3 -m pytest test/ -v --tb=short",
+      "command": "cd /workspace \u0026\u0026 PYTHONPATH=/workspace python3 -m pytest test/ -v --tb=short",
+      "details": {
+        "duration_seconds": 14.65,
+        "failed": 0,
+        "framework": "unittest（通过 pytest 执行）",
+        "no_prerequisite_script": true,
+        "no_ut_script": true,
+        "passed": 35,
+        "subtests_passed": 2,
+        "test_files": [
+          "test/test_router.py (14 tests)",
+          "test/test_server.py (6 tests, 2 subtests)",
+          "test/test_tree.py (15 tests)"
+        ],
+        "total": 35
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "35 passed, 2 subtests passed in 14.65s。test_router.py: 14 passed (RoundRobin/Random/CacheAware 路由策略测试)。test_server.py: 6 passed (参数解析测试)。test_tree.py: 15 passed (前缀缓存树测试)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-24T11:33:32"
+    },
+    {
+      "action": "启动模拟 vLLM 服务端（online_test1.py:8001, online_test2.py:8002）和路由器（launch_server.py:8008, round_robin 策略）",
+      "command": "cd /workspace \u0026\u0026 nohup python3 test/online_test1.py \u0026 nohup python3 test/online_test2.py \u0026 nohup python3 launch_server.py --host 127.0.0.1 --port 8008 --worker_urls http://127.0.0.1:8001 http://127.0.0.1:8002 --policy round_robin \u0026",
+      "details": {
+        "router": "launch_server.py port 8008 policy round_robin",
+        "server1": "online_test1.py port 8001",
+        "server2": "online_test2.py port 8002",
+        "workers_healthy": true
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "两个模拟服务端和路由器均成功启动。路由器日志显示两个 worker 健康检查通过，路由器初始化成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-24T11:36:51"
+    },
+    {
+      "action": "发送 6 个 completion 请求验证 round_robin 路由策略",
+      "command": "python3 -c \"import urllib.request, json; ... # 发送 6 个 POST /v1/completions 请求\"",
+      "details": {
+        "round_robin_verified": true,
+        "server1_ok1_count": 3,
+        "server2_422_count": 3,
+        "server2_bug": "online_test2.py body 参数缺少类型注解",
+        "total_requests": 6
+      },
+      "duration_seconds": 10,
+      "error": "请求 2/4/6 转发到 server2 返回 422，原因为 online_test2.py 第 7 行 body 参数缺少 CompletionRequest 类型注解",
+      "output": "请求1: 200 - OK1 (server1). 请求2: 422 (server2 bug). 请求3: 200 - OK1 (server1). 请求4: 422 (server2 bug). 请求5: 200 - OK1 (server1). 请求6: 422 (server2 bug). Round-robin 路由验证通过",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-24T11:36:51"
+    },
+    {
+      "action": "验证路由器 API 接口（健康检查、Worker 列表、前缀缓存树打印）",
+      "command": "curl http://127.0.0.1:8008/health \u0026\u0026 curl http://127.0.0.1:8008/list_workers \u0026\u0026 curl http://127.0.0.1:8008/pretty_print_tree",
+      "details": {
+        "health": "200 OK",
+        "list_workers": "两个 worker: http://127.0.0.1:8001, http://127.0.0.1:8002",
+        "pretty_print_tree": "Non-cache-aware router does not use a multi tenant radix tree (round_robin 策略预期行为)"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "健康检查: OK. Workers: {http://127.0.0.1:8002, http://127.0.0.1:8001}. 前缀缓存树: Non-cache-aware router does not use a multi tenant radix tree",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-24T11:36:51"
+    },
+    {
+      "action": "清理样例执行进程（kill 模拟服务端和路由器进程）",
+      "command": "kill $(pgrep -f online_test) $(pgrep -f launch_server)",
+      "details": {},
+      "duration_seconds": 2,
+      "error": "",
+      "output": "所有 Python 进程已清理",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-08-24T11:36:51"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [],
+      "compiler": "Python 3.11.6 (GCC 12.3.1 openEuler 12.3.1-38.oe2403)",
+      "concurrency": 121,
+      "concurrency_ratio": "20%（608核 × 20% = 121，Python 项目无编译步骤，并发不适用）",
+      "duration_seconds": 1.668,
+      "notes": "Python 项目无需编译。仓库无 build.sh/compile.sh/Makefile/setup.py/pyproject.toml，构建步骤为 pip install -r requirements.txt（步骤 4 已完成）+ 验证所有模块可成功导入（router.protocol, src.router, src.tree, utils.error, utils.logger, launch_server）。无编译产物。",
+      "status": "success"
+    },
+    "devcontainer": {
+      "config_dir": "无",
+      "config_files": [],
+      "enabled": false,
+      "original_base_image": "无",
+      "summary": "仓库未配置 .devcontainer 目录，无 devcontainer.json 或关联 Dockerfile",
+      "used_image": "无"
+    },
+    "sample": {
+      "duration_seconds": 30,
+      "reason": "路由器 round_robin 路由策略验证成功，但 online_test2.py 的 body 参数缺少类型注解导致转发到 server2 的请求返回 422 错误（非路由器问题，是测试 mock 服务的 bug）",
+      "results": [
+        {
+          "execution_status": "部分成功",
+          "execution_time": "30秒",
+          "output_summary": "路由器成功启动并验证 round_robin 路由策略。启动两个模拟 vLLM 服务端（online_test1.py:8001, online_test2.py:8002）和路由器（launch_server.py:8008, round_robin 策略）。路由器健康检查返回 OK，Workers 列表显示两个服务端。发送 6 个 completion 请求：请求 1/3/5 成功转发到 server1（返回 OK1），请求 2/4/6 转发到 server2 但返回 422 错误（online_test2.py 第 7 行 body 参数缺少 CompletionRequest 类型注解）。Round-robin 路由策略验证通过（请求在两个服务端间轮询）。前缀缓存树打印返回预期消息（round_robin 策略不使用缓存树）。",
+          "sample_name": "vLLM-Router round_robin 路由验证"
+        }
+      ],
+      "status": "partial_success"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 0,
+        "hooks": [
+          {
+            "id": "trailing-whitespace",
+            "repo": "https://gitcode.com/pre-commit/pre-commit-hooks",
+            "rev": "v6.0.0"
+          },
+          {
+            "id": "end-of-file-fixer",
+            "repo": "https://gitcode.com/pre-commit/pre-commit-hooks",
+            "rev": "v6.0.0"
+          },
+          {
+            "args": [
+              "--allow-multiple-documents"
+            ],
+            "id": "check-yaml",
+            "repo": "https://gitcode.com/pre-commit/pre-commit-hooks",
+            "rev": "v6.0.0"
+          },
+          {
+            "id": "check-added-large-files",
+            "repo": "https://gitcode.com/pre-commit/pre-commit-hooks",
+            "rev": "v6.0.0"
+          },
+          {
+            "id": "check-merge-conflict",
+            "repo": "https://gitcode.com/pre-commit/pre-commit-hooks",
+            "rev": "v6.0.0"
+          },
+          {
+            "id": "detect-private-key",
+            "repo": "https://gitcode.com/pre-commit/pre-commit-hooks",
+            "rev": "v6.0.0"
+          },
+          {
+            "id": "check-json",
+            "repo": "https://gitcode.com/pre-commit/pre-commit-hooks",
+            "rev": "v6.0.0"
+          },
+          {
+            "id": "clang-format",
+            "repo": "https://gitcode.com/pre-commit-clang/mirrors-clang-format",
+            "rev": "v22.1.5",
+            "types_or": [
+              "c",
+              "c++"
+            ]
+          }
+        ],
+        "note": "仅检查配置，未安装 pre-commit，未执行 pre-commit run",
+        "status": "未执行（仅检查配置）",
+        "total_hooks": 8
+      },
+      "summary": "检测到 pre-commit 配置（.pre-commit-config.yaml，minimum_pre_commit_version 4.0.0，8 个 hooks：trailing-whitespace, end-of-file-fixer, check-yaml, check-added-large-files, check-merge-conflict, detect-private-key, check-json, clang-format），未检测到 lint-runner 配置。仅检查配置存在性，未执行 pre-commit run"
+    },
+    "ut": {
+      "duration_seconds": 14.65,
+      "failed": 0,
+      "failures": [],
+      "passed": 35,
+      "python": {
+        "failed": 0,
+        "modules": [
+          {
+            "class": "TestRouters",
+            "failed": 0,
+            "name": "test_router.py",
+            "passed": 14,
+            "tests": [
+              "test_round_robin_select",
+              "test_round_robin_empty_workers",
+              "test_random_select",
+              "test_random_empty_workers",
+              "test_cache_aware_balanced_route_by_cache",
+              "test_cache_aware_balanced_route_by_tree_size",
+              "test_cache_aware_imbalanced_route_by_load",
+              "test_cache_aware_empty_workers",
+              "test_create_random_router",
+              "test_create_round_robin_router",
+              "test_create_cache_aware_router",
+              "test_update_router_add_remove",
+              "test_add_remove_worker_cache_aware",
+              "test_get_worker_urls_thread_safe"
+            ],
+            "total": 14
+          },
+          {
+            "class": "TestParseRouterArgs",
+            "failed": 0,
+            "name": "test_server.py",
+            "passed": 6,
+            "tests": [
+              "test_default_values",
+              "test_custom_values",
+              "test_worker_urls_single_value",
+              "test_invalid_cache_threshold",
+              "test_missing_required_args"
+            ],
+            "total": 6
+          },
+          {
+            "class": "TestTree",
+            "failed": 0,
+            "name": "test_tree.py",
+            "passed": 15,
+            "tests": [
+              "test_get_smallest_tenant",
+              "test_tenant_char_count",
+              "test_cold_start",
+              "test_exact_match_seq",
+              "test_exact_match_concurrent",
+              "test_partial_match_concurrent",
+              "test_group_prefix_insert_match_concurrent",
+              "test_mixed_concurrent_insert_match",
+              "test_simple_eviction",
+              "test_advanced_eviction",
+              "test_concurrent_operations_with_eviction",
+              "test_leaf_of",
+              "test_get_used_size_per_tenant",
+              "test_prefix_match_tenant",
+              "test_simple_tenant_eviction",
+              "test_complex_tenant_eviction"
+            ],
+            "total": 15
+          }
+        ],
+        "passed": 35,
+        "status": "success",
+        "total": 35
+      },
+      "skipped": 0,
+      "status": "success",
+      "total": 35
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "vllm_router-ttfhw",
+      "cpu_cores": 608,
+      "memory": "1.0Ti",
+      "os": "openEuler 24.03 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 608,
+      "cpu_model": "Kunpeng 920 (CPU part 0xd22)",
+      "disk": "492G 总计 / 401G 可用",
+      "docker_version": "Docker version 18.09.0, build 4fc3a92",
+      "memory": "1.0Ti",
+      "npu": {
+        "available": false,
+        "card_count": 0,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_dockerfile": "无 Dockerfile",
+        "from_readme": "requirements.txt: pydantic\u003e=2.5.3, aiohttp\u003e=3.9.5, fastapi\u003e=0.115.12; launch_server.py 隐式依赖: uvicorn, starlette (fastapi 自动安装); 测试需要: pytest",
+        "mappings": []
+      },
+      "image_name": "openeuler/openeuler:24.03-lts",
+      "selection_reason": "release_notes.md 指定 openEuler 22.03 LTS SP2 + Python \u003e= 3.10，但 openEuler 22.03 LTS SP2 默认 Python 3.9.9 不满足 Python \u003e= 3.10 要求（代码使用 PEP 604 union 语法 str | List[str]）。升级使用 openEuler 24.03 LTS（Python 3.11.6）满足 Python \u003e= 3.10 要求，保持 openEuler 体系。属 Tier 3 基础 OS 从零安装。",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "",
+    "duration_seconds": 1781,
+    "end_time": "2026-08-24T11:36:51",
+    "environment": "",
+    "repo_url": "https://gitcode.com/boostkit/vllm_router.git",
+    "start_time": "2026-08-24T11:07:10",
+    "total_steps": 34,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "openEuler 22.03 LTS SP2 基础镜像默认 Python 3.9.9，不满足代码 Python \u003e= 3.10 要求（PEP 604 union 语法）",
+      "solution": "升级使用 openEuler 24.03 LTS 基础镜像（Python 3.11.6），满足 Python \u003e= 3.10 要求，保持 openEuler 体系",
+      "source": "docs/zh/release_notes.md Python \u003e= 3.10 要求 + launch_server.py PEP 604 语法",
+      "timestamp": "2026-08-24T11:36:51"
+    },
+    {
+      "problem": "Python 源码从 python.org 下载极其缓慢（5分钟仅下载 3.4MB/25MB），无法在合理时间内编译安装 Python 3.10",
+      "solution": "放弃编译 Python 3.10 from source，改用 openEuler 24.03 LTS 镜像自带的 Python 3.11.6",
+      "source": "python.org 下载速度测试",
+      "timestamp": "2026-08-24T11:36:51"
+    },
+    {
+      "problem": "pip install 从 Tsinghua PyPI 镜像下载返回 403 Forbidden 错误",
+      "solution": "切换到 Aliyun PyPI 镜像（https://mirrors.aliyun.com/pypi/simple/）成功安装所有依赖",
+      "source": "pip install -i https://pypi.tuna.tsinghua.edu.cn/simple 返回 403",
+      "timestamp": "2026-08-24T11:36:51"
+    },
+    {
+      "problem": "样例执行中转发到 server2 的请求返回 422 Unprocessable Entity 错误",
+      "solution": "定位为 online_test2.py 第 7 行 body 参数缺少 CompletionRequest 类型注解（对比 online_test1.py 有正确注解）。非路由器问题，路由器 round_robin 路由策略工作正常（请求在 server1 和 server2 间正确轮询）",
+      "source": "test/online_test2.py 第 7 行: async def generate(body): 缺少类型注解",
+      "timestamp": "2026-08-24T11:36:51"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}
