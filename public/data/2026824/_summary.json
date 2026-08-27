@@ -3209,26 +3209,60 @@
   {
     "name": "RecSDK",
     "displayName": "RecSDK",
-    "result": "failed",
-    "buildStatus": "unknown",
-    "utStatus": "unknown",
-    "sampleStatus": "unknown",
-    "totalDuration": 0,
-    "buildDuration": 0,
-    "utDuration": 0,
-    "sampleDuration": 0,
-    "testPassed": 0,
-    "testFailed": 0,
-    "testTotal": 0,
-    "generatedAt": "2026-08-24T15:47:55",
+    "result": "partial_success",
+    "buildStatus": "success",
+    "utStatus": "partial_success",
+    "sampleStatus": "failed",
+    "totalDuration": 6696,
+    "environmentDuration": 6342,
+    "buildDuration": 113,
+    "utDuration": 151,
+    "sampleDuration": 90,
+    "testPassed": 23,
+    "testFailed": 10,
+    "testTotal": 33,
+    "testSkipped": 0,
+    "generatedAt": "2026-08-26T16:58:26",
     "environment": "unknown",
     "url": "https://gitcode.com/Ascend/RecSDK.git",
     "category": "MindSDK",
     "hasStaticAnalysis": true,
     "hasDevcontainer": true,
-    "file": "verification_report_RecSDK_20260824.json",
-    "issues": [],
-    "documentationGaps": []
+    "file": "verification_report_RecSDK_20260826.json",
+    "issues": [
+      {
+        "problem": "分布式单元测试失败：10 个使用 mp.spawn(world_size=2) 的测试需要 2 张 NPU 卡，但 card0 状态 Critical 导致双卡 HCCL 通信挂起（>15min 无响应），仅使用 card1 时 device 1 不存在导致 SetDevice 失败（error code 107001）",
+        "solution": "使用 ASCEND_RT_VISIBLE_DEVICES=1（仅 card1，OK 状态）执行单卡测试，23 个单卡测试全部通过；10 个分布式测试因硬件限制（card0 Critical）无法执行，记录为 partial_success。card0 单卡简单操作（torch.npu.set_device(0) + tensor 创建）可用，但分布式 HCCL 通信挂起。",
+        "source": "training/torch_rec_v1/hybrid_torchrec/test/st/test_all.sh + npu-smi info（card0 Critical）",
+        "timestamp": "2026-08-26T18:22:35"
+      },
+      {
+        "problem": "quick_start 样例 pipeline.progress() 训练步骤挂起：模型创建和 DDP 设置均成功，但 HybridTrainPipelineSparseDist.progress() 调用时挂起（>90s 无响应）",
+        "solution": "逐步调试确认挂起在 pipeline.progress() 调用，而非模型创建或 DDP 设置。尝试简化 DataLoader（num_workers=0）和直接传 batch 均未解决。疑似 NPU HCCL allreduce 或自定义算子在训练循环中执行时挂起，可能与 card0 Critical 状态或 CANN 8.2 版本兼容性有关。未完全解决，但验证了 RecSDK 安装功能正常（模型创建、DDP 均通过）。",
+        "source": "docs/zh/torch/torch_rec_v1/03_quick_start/quick_start.md + HybridTrainPipelineSparseDist",
+        "timestamp": "2026-08-26T18:50:02"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "body": "quick_start.md 中的 main.py 使用 DataLoader(num_workers=4, pin_memory=True, pin_memory_device=\"npu\", prefetch_factor=32) 配置，该配置在 26.0.0 镜像中导致挂起。简化为 num_workers=0 后 pipeline.progress() 仍挂起，说明问题不仅在 DataLoader。建议文档补充说明不同镜像版本的兼容性注意事项。",
+        "source": "docs/zh/torch/torch_rec_v1/03_quick_start/quick_start.md",
+        "time": "2026-08-26T18:50:02",
+        "title": "quick_start 样例 DataLoader 配置可能导致挂起"
+      },
+      {
+        "body": "test/st/test_adapter_integration.py 导入 IS_TORCH_REC_150 from hybrid_torchrec，该符号仅在 torchrec 1.5.0+（PyTorch 2.10.0）版本中存在。当前 develop 分支同时支持多个 PyTorch 版本，但该测试文件未做版本兼容处理，导致 torchrec 1.1.0 环境下 pytest 收集失败。",
+        "source": "training/torch_rec_v1/hybrid_torchrec/test/st/test_adapter_integration.py",
+        "time": "2026-08-26T18:50:02",
+        "title": "test_adapter_integration.py 与 torchrec 1.1.0 不兼容"
+      },
+      {
+        "body": "远程机器 NPU card0 状态为 Critical，单卡简单操作（tensor 创建、矩阵乘法）可用，但双卡分布式 HCCL 通信挂起。文档中未说明 Critical 状态对分布式训练的影响及排查方法。",
+        "source": "npu-smi info + docker/OVERVIEW.zh.md 常见问题章节",
+        "time": "2026-08-26T18:50:02",
+        "title": "NPU card0 Critical 状态未在文档中说明影响"
+      }
+    ]
   },
   {
     "name": "snappy",
