@@ -4203,66 +4203,65 @@
     "buildStatus": "success",
     "utStatus": "partial_success",
     "sampleStatus": "failed",
-    "totalDuration": 8781,
-    "environmentDuration": 6831,
-    "buildDuration": 1800,
-    "utDuration": 90,
-    "sampleDuration": 60,
-    "testPassed": 2916,
-    "testFailed": 192,
-    "testTotal": 3123,
-    "testSkipped": 37,
-    "generatedAt": "2026-08-22T05:35:43",
+    "totalDuration": 7200,
+    "environmentDuration": 5715,
+    "buildDuration": 1020,
+    "utDuration": 345,
+    "sampleDuration": 120,
+    "testPassed": 2545,
+    "testFailed": 156,
+    "testTotal": 2701,
+    "testSkipped": 36,
+    "generatedAt": "2026-08-27T18:42:17",
     "environment": "unknown",
     "url": "https://github.com/vllm-project/vllm-ascend.git",
     "category": "MindIE",
-    "hasStaticAnalysis": true,
-    "hasDevcontainer": false,
-    "file": "verification_report_vllm-ascend_20260822.json",
+    "hasStaticAnalysis": false,
+    "file": "verification_report_vllm-ascend_20260827.json",
     "issues": [
       {
-        "problem": "Tier 1 镜像 quay.io/ascend/vllm-ascend:main 内置 vLLM 0.22.1（非 main 分支验证版本），torch_npu 2.10.0（非 2.10.0.post4），triton-ascend 3.2.1（非 3.2.2），vllm-ascend 0.19.1rc2（非当前 main 分支代码）",
-        "solution": "按 Dockerfile 和 .github/vllm-main-verified.commit 升级：git fetch 验证 commit 58d3918e + pip install --no-build-isolation -e .[audio]；从华为昇腾镜像安装 torch-npu 2.10.0.post4；卸载旧 triton/triton-ascend 后安装 triton-ascend 3.2.2；卸载旧 vllm-ascend 后从 /workspace 源码安装",
-        "source": "Dockerfile + installation.md + .github/vllm-main-verified.commit",
-        "timestamp": "2026-08-22T07:23:50"
+        "problem": "vLLM 版本不兼容：main 分支 vllm-ascend 代码依赖未发布的 vLLM main 分支 API（vllm.v1.attention.ops.pcp 模块），该模块在 vLLM v0.27.1（Dockerfile 指定版本）和 v0.28.0 中均不存在",
+        "solution": "1) 从华为云 PyPI 镜像安装 vLLM v0.27.1（Dockerfile 指定版本）；2) 使用 --noconftest 跳过 conftest.py 的 adapt_patch() 调用，运行可独立执行的 UT；3) 2545 个 UT 通过（94.2%），但 NPU 精度测试和需要 conftest.py 初始化的测试失败",
+        "source": "conftest.py:128 adapt_patch() → vllm_ascend/attention/attention_v1.py:70 import vllm.v1.attention.ops.pcp",
+        "timestamp": "2026-08-27T20:48:39"
       },
       {
-        "problem": "pip 构建隔离从清华镜像下载 cmake/torch-npu 失败（HTTP 403 Forbidden）",
-        "solution": "使用 --no-build-isolation 复用容器已安装的构建依赖（cmake 4.3.4/ninja/setuptools_rust 等）；torch-npu 从华为昇腾镜像下载；通用包切换阿里云镜像或 pypi.org",
-        "source": "pip install 日志",
-        "timestamp": "2026-08-22T07:23:50"
+        "problem": "预构建镜像 quay.io/ascend/vllm-ascend:main 已 2 个月未更新，内置 vLLM 0.22.1 与 main 分支代码不兼容（缺少 is_weak_contiguous 函数）",
+        "solution": "从华为云 PyPI 镜像（https://mirrors.huaweicloud.com/repository/pypi/simple/）下载 vLLM v0.27.1 wheel（307.2MB），以 --no-deps 安装避免覆盖 torch/torch_npu",
+        "source": "Dockerfile ARG VLLM_TAG=v0.27.1 vs 镜像内 vLLM 0.22.1",
+        "timestamp": "2026-08-27T20:48:39"
       },
       {
-        "problem": "卸载 triton 3.5.0 后残留空 triton/ 目录，导致 torch._dynamo.utils 访问 triton.language.dtype 时 AttributeError",
-        "solution": "删除残留 triton/ 目录 + 设置 TORCH_DEVICE_BACKEND_AUTOLOAD=0 阻止 torch_npu 自动加载",
-        "source": "build_vllm_ascend.log 错误日志",
-        "timestamp": "2026-08-22T07:23:50"
+        "problem": "GitHub 不可达：容器内 git fetch 和主机 git clone 均无法连接 github.com（443 端口超时），无法从源码安装 vLLM v0.27.1",
+        "solution": "改用华为云 PyPI 镜像下载 vLLM v0.27.1 预构建 wheel（aarch64），绕过 GitHub 访问问题",
+        "source": "git fetch --depth 1 origin tag v0.27.1 → Failed to connect to github.com port 443",
+        "timestamp": "2026-08-27T20:48:39"
       },
       {
-        "problem": "C++ 扩展 vllm_ascend_C 编译失败：容器 CANN 版本为 9.0.0，torch_npu 2.10.0.post4 的 acl_rt.h 引用 aclmdlRITask 类型（CANN 9.1.0 才有）",
-        "solution": "按 installation.md CPU-only 构建方式设置 COMPILE_CUSTOM_KERNELS=0 跳过 C++ 扩展编译。ACLNN 自定义算子已独立编译完成。Python 包和 ACLNN 算子可用，UT 可在 CPU 运行。",
-        "source": "build_vllm_ascend3.log CMake 编译错误",
-        "timestamp": "2026-08-22T07:23:50"
+        "problem": "样例执行失败：vLLM 引擎核心初始化失败，因 adapt_patch() 无法正确 patch vLLM v0.27.1 的 worker 代码",
+        "solution": "记录失败原因，根因与 UT 失败相同：main 分支代码依赖未发布的 vLLM main 分支 API",
+        "source": "examples/offline_inference_npu.py → RuntimeError: Engine core initialization failed",
+        "timestamp": "2026-08-27T20:48:39"
       }
     ],
     "documentationGaps": [
       {
-        "body": "quay.io/ascend/vllm-ascend:main 镜像内置 vLLM 0.22.1（main 分支需验证 commit 58d3918e）、torch_npu 2.10.0（需 2.10.0.post4）、triton-ascend 3.2.1（需 3.2.2）、vllm-ascend 0.19.1rc2（非当前 main 分支代码）。使用前需手动升级多个组件，与文档声称的'开箱即用'不符。",
-        "source": "installation.md + testing.md + 容器内 pip show 输出",
-        "time": "2026-08-22T08:02:04",
-        "title": "Tier 1 预构建镜像 :main 版本滞后"
+        "body": "main 分支 vllm-ascend 的 attention_v1.py:70 导入 vllm.v1.attention.ops.pcp 模块，但该模块在 vLLM v0.27.1（Dockerfile 指定版本）和 v0.28.0（最新 PyPI 发布版）中均不存在。README 声称 main 分支对应 vLLM v0.27.1 tag，但实际代码已超前使用 vLLM main 分支的未发布 API。建议在 README 或贡献指南中明确 main 分支所需的 vLLM 版本（可能需要 vLLM main 分支而非 v0.27.1 release）。",
+        "source": "vllm_ascend/attention/attention_v1.py:70 + README.md Branch 章节",
+        "time": "2026-08-27T20:48:39",
+        "title": "main 分支 vllm-ascend 代码依赖未发布的 vLLM API"
       },
       {
-        "body": "镜像 tag 为 vllm-ascend:main，但内置 CANN 9.0.0（非 README 要求的 9.1.0）。Dockerfile FROM 指定 quay.io/ascend/cann:9.1.0-910b-ubuntu22.04-py3.12，但实际 :main 镜像的 CANN 版本为 9.0.0，导致 torch_npu 2.10.0.post4 的 ACL 头文件引用 aclmdlRITask 类型时编译失败。",
-        "source": "Dockerfile + 容器内 ASCEND_HOME_PATH=/usr/local/Ascend/cann-9.0.0",
-        "time": "2026-08-22T08:02:04",
-        "title": "CANN 版本未在镜像 tag 中体现"
+        "body": "quay.io/ascend/vllm-ascend:main 镜像已 2 个月未更新（内置 vLLM 0.22.1），但测试文档仍推荐使用该镜像运行 main 分支测试。文档未说明镜像版本与 main 分支代码版本可能不同步的风险，可能导致用户按文档操作后遇到版本不兼容问题。",
+        "source": "测试文档 https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/contribution/testing.html",
+        "time": "2026-08-27T20:48:39",
+        "title": "预构建镜像版本滞后未提示"
       },
       {
-        "body": "Dockerfile 指定 VLLM_TAG=v0.27.1，但 vllm v0.27.1 的 pyproject.toml build-system 要求 torch==2.13.0，而 vllm-ascend requirements.txt 要求 torch==2.10.0。需使用 .github/vllm-main-verified.commit 的验证 commit 而非 v0.27.1 tag，installation.md 有提及但 Dockerfile 未更新。",
-        "source": "Dockerfile VLLM_TAG + vllm pyproject.toml + installation.md",
-        "time": "2026-08-22T08:02:04",
-        "title": "vllm v0.27.1 tag 与 vllm-ascend main 分支 torch 版本冲突"
+        "body": "Dockerfile 指定 VLLM_TAG=v0.27.1，但 main 分支代码已使用 vLLM main 分支的未发布 API（vllm.v1.attention.ops.pcp）。这意味着按 Dockerfile 构建的镜像可能无法正常运行 main 分支代码的 UT 和样例。建议 Dockerfile 的 VLLM_TAG 更新为与 main 分支代码实际兼容的版本。",
+        "source": "Dockerfile ARG VLLM_TAG=v0.27.1 vs vllm_ascend/attention/attention_v1.py:70",
+        "time": "2026-08-27T20:48:39",
+        "title": "Dockerfile VLLM_TAG 与实际代码依赖不一致"
       }
     ]
   },
