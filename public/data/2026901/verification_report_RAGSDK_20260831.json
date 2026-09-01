@@ -1,0 +1,672 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "docs/zh/02-prerequisites.md 硬件与环境要求 + docs/zh/03-quickstart.md 镜像Tag说明（区分 CPU 架构 x86_64/aarch64）",
+      "value": "aarch64（远程机器为 Kunpeng aarch64，NPU 为 910B3）"
+    },
+    "build_commands": {
+      "source": "CONTRIBUTING.md 开发构建验证章节",
+      "value": "cd build \u0026\u0026 bash build.sh（CI 一键构建脚本，使用 python3.11 编译 C 扩展 .so 并打包 wheel）；构建完成后: cd output \u0026\u0026 pip3 uninstall mx_rag \u0026\u0026 pip3 install mx_rag*.whl"
+    },
+    "dependencies": {
+      "source": "requirements.txt + .devcontainer/Dockerfile + docs/zh/04-installation_guide.md 安装依赖说明",
+      "value": [
+        "CANN 9.0.0（昇腾软件栈，镜像内已含）",
+        "IndexSDK 26.0.0（检索软件包，镜像内已含）",
+        "faiss 1.10.0 + ascendfaiss（向量检索，镜像内已含）",
+        "OpenBLAS（线性代数库，镜像内已含）",
+        "Python 3.11",
+        "gcc/g++/cmake/make/swig（构建工具链，镜像内已含）",
+        "torch==2.10.0 + torch-npu==2.10.0 + torchvision==0.25.0",
+        "transformers/sentence_transformers/accelerate（模型推理）",
+        "pymilvus/milvus-lite（向量数据库）",
+        "paddleocr/paddlepaddle（OCR文档解析）",
+        "langchain/langchain_community（RAG框架）",
+        "scikit-learn/umap-learn（降维聚类）",
+        "PyMuPDF/python-docx/python-pptx/openpyxl（多格式文档解析）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "docker/Dockerfile.910b.ubuntu + .devcontainer/Dockerfile",
+      "value": [
+        {
+          "original": "FROM swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-ubuntu22.04-py3.11（CANN 基础镜像）",
+          "target_equivalent": "Tier 1 预构建镜像已含 CANN，无需重复安装"
+        },
+        {
+          "original": "apt-get install vim tar zip unzip git curl wget make gcc g++ gfortran libssl-dev libpq-dev swig ffmpeg patch",
+          "target_equivalent": "Tier 1 镜像已含构建工具链"
+        },
+        {
+          "original": "pip3 install -r requirements.txt（46个Python依赖）",
+          "target_equivalent": "Tier 1 镜像已预装 RAG SDK 依赖"
+        },
+        {
+          "original": "编译安装 faiss v1.10.0 + ascendfaiss + OpenBLAS + IndexSDK 26.0.0",
+          "target_equivalent": "Tier 1 镜像已预装 faiss/ascendfaiss/OpenBLAS/IndexSDK"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "docs/zh/03-quickstart.md 步骤1拉取镜像 + docker/OVERVIEW.zh.md 快速开始",
+      "value": "Tier 1 业务预构建镜像: swr.cn-south-1.myhuaweicloud.com/ascendhub/ragsdk:26.0.0-910b-ubuntu22.04-py3.11（Tag格式: \u003cragsdk版本\u003e-\u003c芯片系列\u003e-\u003c操作系统\u003e-\u003cpython版本\u003e；26.1.0 tag 不存在，26.0.0 拉取成功）"
+    },
+    "sample_commands": {
+      "source": "docs/zh/03-quickstart.md 步骤5执行测试样例",
+      "value": "cd /workspace/example/parse_document \u0026\u0026 python3 parse_document.py --file_path ./agent.md（quickstart 注明当前样例未使用NPU卡）"
+    },
+    "special_dependencies": {
+      "source": "docs/zh/04-installation_guide.md 安装依赖说明 + .devcontainer/Dockerfile",
+      "value": [
+        "CANN 9.0.0 软件栈（需 source /usr/local/Ascend/ascend-toolkit/set_env.sh）",
+        "IndexSDK Ascend-mindxsdk-mxindex_26.0.0_linux-aarch64.run",
+        "faiss 1.10.0（源码编译，含 sed patch 修改）",
+        "ascendfaiss（从 gitee.com/ascend/mindsdk-referenceapps 编译）",
+        "OpenBLAS v0.3.10（源码编译）",
+        "cmake 3.24.3（源码编译）",
+        "RAG SDK 离线包 Ascend-mindxsdk-mxrag_26.0.0_linux-aarch64.run"
+      ]
+    },
+    "ut_commands": {
+      "source": "tests/README.md 全量测试章节 + tests/run_py_test.sh",
+      "value": "cd tests \u0026\u0026 bash run_py_test.sh（设置 PYTHONPATH，安装 pytest 依赖，pip uninstall torch_npu/torchvision 后用 CPU torch 隔离运行 tests/unit_tests/ 下全部 UT，排除 tests/presmoke/）"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "tests/run_py_test.sh 第42行 wget 下载 torch-2.10.0+cpu-cp311-cp311-manylinux_2_28_x86_64.whl，该 wheel 仅含 x86_64 平台标签，在 aarch64 机器上 pip install 报 'not a supported wheel on this platform'，导致 set -e 脚本直接退出。文档(tests/README.md)未说明仅支持 x86_64，也未提供 aarch64 适配方案。docker/OVERVIEW.zh.md 声明支持 ARM64 架构，但 UT 脚本不支持",
+      "source": "tests/run_py_test.sh + tests/README.md + docker/OVERVIEW.zh.md",
+      "time": "2026-08-31T18:01:51",
+      "title": "run_py_test.sh 仅支持 x86_64 架构"
+    },
+    {
+      "body": "tests/unit_tests/graphrag/test_graphrag_pipeline.py 的 setUp 方法第72行 os.makedirs(self.temp_dir) 未加 exist_ok=True，且类中无 tearDown 方法清理 data/tmp 目录。当同一测试类中多个测试方法依次执行时，首个方法创建 data/tmp 后，后续方法的 setUp 均报 FileExistsError 失败",
+      "source": "tests/unit_tests/graphrag/test_graphrag_pipeline.py:72",
+      "time": "2026-08-31T18:01:51",
+      "title": "test_graphrag_pipeline 测试未做目录清理"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "git clone RAGSDK 仓库到本地读取 README.md",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/Ascend/RAGSDK.git /tmp/opencode/RAGSDK-read",
+      "details": {
+        "file": "README.md",
+        "key_links": [
+          "docs/zh/03-quickstart.md",
+          "docs/zh/04-installation_guide.md",
+          "docs/zh/05-user_guide.md",
+          "CONTRIBUTING.md"
+        ]
+      },
+      "duration_seconds": 8,
+      "error": "",
+      "output": "RAG SDK 是昇腾面向大语言模型的知识检索增强开发套件，提供多模态文档解析、知识库管理、垂域调优、生成增强等能力。README 含快速入门/安装指南/使用指南/贡献指南链接",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:50:09"
+    },
+    {
+      "action": "阅读 docs/zh/02-prerequisites.md 前置知识",
+      "command": "WebFetch/本地读取 docs/zh/02-prerequisites.md",
+      "details": {
+        "cann_signal": true,
+        "file": "docs/zh/02-prerequisites.md",
+        "npu_signal": true
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "硬件: Atlas 300I Duo/800I A2/A3 推理服务器; OS: Ubuntu/openEuler/KylinOS; 依赖 CANN 软件栈; 推荐 Docker 容器化部署",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:50:09"
+    },
+    {
+      "action": "阅读 docs/zh/03-quickstart.md 快速入门",
+      "command": "本地读取 docs/zh/03-quickstart.md",
+      "details": {
+        "docker_pull": "swr.cn-south-1.myhuaweicloud.com/ascendhub/ragsdk:26.0.0-910b-ubuntu22.04-py3.11",
+        "file": "docs/zh/03-quickstart.md",
+        "tier1_signal": true
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "提供 docker pull swr.cn-south-1.myhuaweicloud.com/ascendhub/ragsdk:${TAG} 命令，Tag格式 {version}-{chip}-{os}-{python}，示例 26.0.0-910b-ubuntu22.04-py3.11。容器启动挂载 davinci0/manager/devmm_svm/hisi_hdc + driver。样例",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:50:09"
+    },
+    {
+      "action": "阅读 docs/zh/04-installation_guide.md 安装部署指南",
+      "command": "本地读取 docs/zh/04-installation_guide.md",
+      "details": {
+        "file": "docs/zh/04-installation_guide.md",
+        "image_install_link": "docker/OVERVIEW.zh.md"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "三种安装方式: 离线run包/Wheel包/镜像安装。需 CANN+IndexSDK+Python3.11。镜像安装指向 docker/OVERVIEW.zh.md。物理机部署需手动配置环境变量(LD_LIBRARY_PATH/MX_INDEX_INSTALL_PATH等)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:50:09"
+    },
+    {
+      "action": "阅读 CONTRIBUTING.md 贡献指南",
+      "command": "本地读取 CONTRIBUTING.md",
+      "details": {
+        "build_command": "cd build \u0026\u0026 bash build.sh",
+        "file": "CONTRIBUTING.md",
+        "ut_link": "tests/README.md"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "开发构建验证: 从 AscendHub 下载 RAGSDK 镜像运行容器，cd build \u0026\u0026 bash build.sh 构建，cd output \u0026\u0026 pip3 install mx_rag*.whl 安装。UT 参考 tests/README.md",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:50:09"
+    },
+    {
+      "action": "阅读 docker/OVERVIEW.zh.md 镜像说明",
+      "command": "本地读取 docker/OVERVIEW.zh.md",
+      "details": {
+        "file": "docker/OVERVIEW.zh.md",
+        "registry": "swr.cn-south-1.myhuaweicloud.com/ascendhub/ragsdk"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "确认 Tier 1 镜像源: swr.cn-south-1.myhuaweicloud.com/ascendhub/ragsdk，Tag格式 \u003cragsdk版本\u003e-\u003c芯片系列\u003e-\u003c操作系统\u003e-\u003cpython版本\u003e。镜像版本配套表: 26.0.0-\u003eCANN 9.0.0。docker run 命令挂载 davinci0/manager/devmm_svm/hisi_hdc + driver",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:50:09"
+    },
+    {
+      "action": "分析 docker/Dockerfile.910b.ubuntu + .devcontainer/Dockerfile + devcontainer.json",
+      "command": "本地读取 docker/Dockerfile.910b.ubuntu + .devcontainer/Dockerfile + .devcontainer/devcontainer.json",
+      "details": {
+        "base_image": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-ubuntu22.04-py3.11",
+        "dockerfiles": [
+          "docker/Dockerfile.910b.ubuntu",
+          ".devcontainer/Dockerfile"
+        ],
+        "npu_required": true
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "Dockerfile FROM swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-ubuntu22.04-py3.11(CANN基础镜像)。构建内容: 安装工具链-\u003e编译OpenBLAS-\u003e安装mxrag run包-\u003epip install requirements-\u003e编译faiss1.10.0-\u003e安装IndexSDK-\u003e编译as",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-31T17:50:09"
+    },
+    {
+      "action": "分析 build/build.sh + tests/run_py_test.sh + setup.py + requirements.txt",
+      "command": "本地读取 build/build.sh + tests/run_py_test.sh + setup.py + requirements.txt",
+      "details": {
+        "build_entry": "build/build.sh",
+        "package_name": "mx_rag",
+        "ut_entry": "tests/run_py_test.sh"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "build.sh: CI构建脚本，python3.11 编译C扩展.so(CFLAGS安全编译选项)，setup.py bdist_wheel 打包。run_py_test.sh: 设置PYTHONPATH，pip install pytest，uninstall torch_npu/torchvision，pytest tests/unit_tests/ 排除presmoke。requireme",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-31T17:50:09"
+    },
+    {
+      "action": "Tier 1 拉取候选镜像 26.1.0-910b-ubuntu22.04-py3.11",
+      "command": "ssh root@192.168.9.114 'docker pull swr.cn-south-1.myhuaweicloud.com/ascendhub/ragsdk:26.1.0-910b-ubuntu22.04-py3.11'",
+      "details": {
+        "reason": "README 最新消息提到 26.1.0 Release 但镜像仓库未发布该 tag",
+        "tried_tag": "26.1.0-910b-ubuntu22.04-py3.11"
+      },
+      "duration_seconds": 12,
+      "error": "manifest not found: 26.1.0 tag 不存在",
+      "output": "Error: manifest for swr.cn-south-1.myhuaweicloud.com/ascendhub/ragsdk:26.1.0-910b-ubuntu22.04-py3.11 not found",
+      "result": "失败",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": false,
+      "timestamp": "2026-08-31T17:50:09"
+    },
+    {
+      "action": "Tier 1 拉取候选镜像 26.0.0-910b-ubuntu22.04-py3.11（文档示例版本）",
+      "command": "ssh root@192.168.9.114 'docker pull swr.cn-south-1.myhuaweicloud.com/ascendhub/ragsdk:26.0.0-910b-ubuntu22.04-py3.11'",
+      "details": {
+        "image_pulled": true,
+        "tier": "Tier 1 业务预构建镜像",
+        "tried_tag": "26.0.0-910b-ubuntu22.04-py3.11"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "Status: Downloaded newer image for swr.cn-south-1.myhuaweicloud.com/ascendhub/ragsdk:26.0.0-910b-ubuntu22.04-py3.11",
+      "result": "成功",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-31T17:50:09"
+    },
+    {
+      "action": "远程机器 NPU 状态检查 npu-smi info",
+      "command": "ssh root@192.168.9.114 'npu-smi info'",
+      "details": {
+        "abnormal_cards": [
+          0,
+          1
+        ],
+        "card_count": 8,
+        "chip": "910B3",
+        "npu_required": true
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "8张 910B3 卡: 卡0 Critical, 卡1 Alarm, 卡2-7 OK。npu-smi 25.5.0。每卡 HBM 65536MB",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:50:09"
+    },
+    {
+      "action": "远程机器 clone RAGSDK 仓库到 /home/workspace/RAGSDK-verify",
+      "command": "ssh root@192.168.9.114 'git clone --depth 1 --branch master https://gitcode.com/Ascend/RAGSDK.git /home/workspace/RAGSDK-verify'",
+      "details": {
+        "branch": "master",
+        "clone_path": "/home/workspace/RAGSDK-verify"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "Cloning into '/home/workspace/RAGSDK-verify'... clone 成功，build/build.sh 存在",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-31T17:53:43"
+    },
+    {
+      "action": "验证远程设备/目录存在性",
+      "command": "ssh root@192.168.9.114 'ls -la /dev/davinci0 /dev/davinci_manager /dev/devmm_svm /dev/hisi_hdc; ls /usr/local/sbin/npu-smi; ls -d /usr/local/Ascend/driver /usr/local/Ascend/firmware'",
+      "details": {
+        "devices": [
+          "davinci0",
+          "davinci_manager",
+          "devmm_svm",
+          "hisi_hdc"
+        ],
+        "mounts": [
+          "npu-smi",
+          "driver",
+          "firmware"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "davinci0(238,0), davinci_manager(239,0), devmm_svm(237,0), hisi_hdc(236,0) 均存在; npu-smi 存在于 /usr/local/sbin/ 和 /usr/local/bin/; driver/firmware 目录存在",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-31T17:53:43"
+    },
+    {
+      "action": "启动 Tier 1 容器 RAGSDK-ttfhw（挂载 NPU 设备+工作目录）",
+      "command": "docker run -d --name RAGSDK-ttfhw --network host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/Ascend/driver:/usr/local/Ascend/driver -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware -v /home/workspace/RAGSDK-verify:/workspace \u003c镜像\u003e sleep infinity",
+      "details": {
+        "container_name": "RAGSDK-ttfhw",
+        "image": "ragsdk:26.0.0-910b-ubuntu22.04-py3.11",
+        "startup_command_source": "用户指定挂卡+quickstart镜像"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "容器 ID f58b268b5413, 状态 Up。启动命令来源: 用户指定 NPU 挂载参数 + quickstart 镜像",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-31T17:53:43"
+    },
+    {
+      "action": "验证 Tier 1 镜像预装依赖完整性",
+      "command": "docker exec RAGSDK-ttfhw bash -lc 'python3.11 --version; gcc --version; cmake --version; ls /usr/local/Ascend/ascend-toolkit/set_env.sh; ls -d /usr/local/Ascend/mxIndex /usr/local/Ascend/mxRag /usr/local/Ascend/OpenBLAS /usr/local/faiss/faiss1.10.0'",
+      "details": {
+        "skip_installation": true,
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Python 3.11.15, GCC 11.4.0, CMake 3.24.3, CANN set_env.sh 存在, mxIndex/mxRag/OpenBLAS/faiss1.10.0 全部存在",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-31T17:53:43"
+    },
+    {
+      "action": "验证 Python 包可导入（faiss/torch/torch_npu/mx_rag）",
+      "command": "docker exec RAGSDK-ttfhw bash -lc 'source set_env.sh; python3.11 -c \"import faiss; import torch; import torch_npu; import mx_rag\"'",
+      "details": {
+        "packages": {
+          "faiss": "1.10.0",
+          "mx_rag": "OK",
+          "torch": "2.1.0",
+          "torch_npu": "2.1.0.post13"
+        }
+      },
+      "duration_seconds": 8,
+      "error": "",
+      "output": "faiss 1.10.0, torch 2.1.0, torch_npu 2.1.0.post13, mx_rag 导入成功。npu-smi 容器内可用",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-31T17:53:43"
+    },
+    {
+      "action": "使用仓库构建脚本 build/build.sh 执行构建（source CANN 环境+mxRag 环境）",
+      "command": "docker exec RAGSDK-ttfhw bash -lc 'source set_env.sh; cd /workspace/build \u0026\u0026 MAX_JOBS=51 bash build.sh'",
+      "details": {
+        "build_script": "build/build.sh",
+        "c_compilation": false,
+        "concurrency": 51,
+        "makeself_cloned": true,
+        "version": "26.0.0"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "build.sh: clean→build_wheel_package(python3.11 setup.py bdist_wheel)→package.sh(复制产物+makeself创建.run包)。输出: mx_rag-26.0.0-py311-none-any.whl(373K) + Ascend-mindxsdk-mxrag_26.0.0_linux-aarch64.run(385K)。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-31T17:55:43"
+    },
+    {
+      "action": "验证构建产物: wheel 安装 + import 测试",
+      "command": "docker exec RAGSDK-ttfhw bash -lc 'pip3.11 install --force-reinstall --no-deps dist/mx_rag-26.0.0-py311-none-any.whl; python3.11 -c \"import mx_rag\"'",
+      "details": {
+        "import_test": "pass",
+        "wheel": "mx_rag-26.0.0-py311-none-any.whl"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "pip install 成功(无依赖冲突)，python3.11 -c 'import mx_rag' 输出 /workspace/mx_rag/__init__.py，导入正常",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-31T17:55:43"
+    },
+    {
+      "action": "首次执行 run_py_test.sh 脚本",
+      "command": "docker exec RAGSDK-ttfhw bash -lc 'cd /workspace/tests \u0026\u0026 bash run_py_test.sh'",
+      "details": {
+        "failure_point": "wget x86_64 torch wheel + pip install",
+        "platform_mismatch": "x86_64 wheel on aarch64"
+      },
+      "duration_seconds": 5,
+      "error": "x86_64 CPU torch wheel 在 aarch64 不可安装",
+      "output": "ERROR: torch-2.10.0+cpu-cp311-cp311-manylinux_2_28_x86_64.whl is not a supported wheel on this platform. 脚本 set -e 退出",
+      "result": "失败",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-08-31T18:01:51"
+    },
+    {
+      "action": "适配执行 UT: 跳过 x86_64 torch wheel，复用镜像 aarch64 torch 2.1.0，卸载 torch_npu/torchvision，执行等效 pytest 命令",
+      "command": "docker exec RAGSDK-ttfhw bash -lc 'source set_env.sh; pip3 install pytest pytest-cov pytest-html; pip3 uninstall -y torch_npu torchvision; export PYTHONPATH=/workspace:/workspace/tests/fake_package; python3 -m pytest --cov=/workspace/mx_rag ... /workspace/tests/unit_tests/'",
+      "details": {
+        "adaptation": "跳过 x86_64 torch wheel，复用镜像 torch 2.1.0",
+        "failed": 10,
+        "passed": 870,
+        "skipped": 1,
+        "total": 881
+      },
+      "duration_seconds": 110,
+      "error": "",
+      "output": "870 passed, 10 failed, 1 skipped in 106.74s。10个失败: 1个 sparse_embedding(torch matmul)+9个 graphrag(FileExistsError 测试代码缺陷)",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-31T18:01:51"
+    },
+    {
+      "action": "首次执行样例 parse_document.py --file_path ./agent.md",
+      "command": "docker exec RAGSDK-ttfhw bash -lc 'cd /workspace/example/parse_document \u0026\u0026 python3 parse_document.py --file_path ./agent.md'",
+      "details": {
+        "missing_resource": "punkt_tab",
+        "sample": "parse_document"
+      },
+      "duration_seconds": 12,
+      "error": "nltk_data punkt_tab 缺失",
+      "output": "LookupError: Resource 'punkt_tab' not found. NLTK 数据未预装在镜像中",
+      "result": "失败",
+      "returncode": 1,
+      "step": "sample_execution",
+      "success": false,
+      "timestamp": "2026-08-31T18:16:23"
+    },
+    {
+      "action": "下载 NLTK 数据(punkt_tab/averaged_perceptron_tagger_eng/stopwords等) via jsdelivr CDN",
+      "command": "curl -sL https://cdn.jsdelivr.net/gh/nltk/nltk_data@gh-pages/packages/... -\u003e docker cp -\u003e unzip to /root/nltk_data/",
+      "details": {
+        "resources": [
+          "punkt_tab",
+          "averaged_perceptron_tagger_eng",
+          "averaged_perceptron_tagger",
+          "stopwords",
+          "wordnet",
+          "omw-1.4"
+        ],
+        "source": "jsdelivr CDN mirror of nltk/nltk_data GitHub repo"
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "punkt_tab(部分提取 english 可用), averaged_perceptron_tagger_eng(完整), averaged_perceptron_tagger, stopwords 完整。wordnet/omw-1.4 部分下载(超时但足够)。NLTK sent_tokenize 和 pos_tag 验证通过",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-31T18:16:23"
+    },
+    {
+      "action": "重试执行样例 parse_document.py --file_path ./agent.md（安装NLTK数据后）",
+      "command": "docker exec RAGSDK-ttfhw bash -lc 'cd /workspace/example/parse_document \u0026\u0026 python3 parse_document.py --file_path ./agent.md'",
+      "details": {
+        "expected_format": "total docs:xxxx",
+        "output": "total docs:8",
+        "sample": "parse_document"
+      },
+      "duration_seconds": 12,
+      "error": "",
+      "output": "Total markdown elements count: 23, Processing markdown table 0-3, total docs:8。与 quickstart.md 预期输出格式 'total docs:xxxx' 一致",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-31T18:16:23"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "mx_rag-26.0.0-py311-none-any.whl",
+          "path": "/workspace/dist/mx_rag-26.0.0-py311-none-any.whl",
+          "size": "373K",
+          "type": "wheel"
+        },
+        {
+          "name": "Ascend-mindxsdk-mxrag_26.0.0_linux-aarch64.run",
+          "path": "/workspace/output/Ascend-mindxsdk-mxrag_26.0.0_linux-aarch64.run",
+          "size": "385K",
+          "type": "run_package"
+        }
+      ],
+      "cmake": "cmake 3.24.3（镜像预装，本次构建未使用 C 编译）",
+      "compiler": "gcc 11.4.0（镜像预装，本次构建为纯 Python wheel 打包无 C 编译）",
+      "concurrency": 51,
+      "concurrency_ratio": "容器核数 256 × 20% = 51（向下取整）",
+      "duration_seconds": 2,
+      "notes": "build.sh 流程: clean → update_install_requires(从 requirements.txt 更新 setup.py) → python3.11 setup.py bdist_wheel → package.sh(复制产物+克隆 makeself+创建 .run 自解压包)。构建无 C 扩展编译，纯 Python wheel 打包，耗时 2.1 秒。wheel 安装验证: pip install 成功，import mx_rag 正常",
+      "status": "success"
+    },
+    "sample": {
+      "duration_seconds": 12,
+      "results": [
+        {
+          "execution_status": "success",
+          "execution_time": "12秒",
+          "output_summary": "MarkdownLoader 加载 agent.md，识别 23 个 markdown 元素(含 4 个表格)，MarkdownTextSplitter(chunk_size=200, chunk_overlap=30) 切分后输出 total docs:8。与 quickstart.md 预期输出格式一致",
+          "sample_name": "parse_document"
+        }
+      ],
+      "status": "success"
+    },
+    "ut": {
+      "duration_seconds": 107,
+      "failed": 10,
+      "failures": [
+        {
+          "error": "RuntimeError: could not create a primitive descriptor for a matmul primitive (torch 2.1.0 aarch64 环境兼容性问题，requirements.txt 要求 torch==2.10.0)",
+          "test_name": "unit_tests/embedding/local/test_sparse_embedding.py::TestSparseEmbedding::test_encode_success"
+        },
+        {
+          "error": "FileExistsError: [Errno 17] File exists: '/workspace/tests/data/tmp' (setUp 中 os.makedirs 未加 exist_ok=True)",
+          "test_name": "unit_tests/graphrag/test_graphrag_pipeline.py::TestGraphRAGPipeline::test_as_retriever_invalid_parameters"
+        },
+        {
+          "error": "FileExistsError: [Errno 17] File exists: '/workspace/tests/data/tmp'",
+          "test_name": "unit_tests/graphrag/test_graphrag_pipeline.py::TestGraphRAGPipeline::test_as_retriever_success"
+        },
+        {
+          "error": "FileExistsError: [Errno 17] File exists: '/workspace/tests/data/tmp'",
+          "test_name": "unit_tests/graphrag/test_graphrag_pipeline.py::TestGraphRAGPipeline::test_as_retriever_text_mode_requires_document_store"
+        },
+        {
+          "error": "FileExistsError: [Errno 17] File exists: '/workspace/tests/data/tmp'",
+          "test_name": "unit_tests/graphrag/test_graphrag_pipeline.py::TestGraphRAGPipeline::test_build_graph_keeps_accumulated_nodes_in_document_store"
+        },
+        {
+          "error": "FileExistsError: [Errno 17] File exists: '/workspace/tests/data/tmp'",
+          "test_name": "unit_tests/graphrag/test_graphrag_pipeline.py::TestGraphRAGPipeline::test_build_graph_success"
+        },
+        {
+          "error": "FileExistsError: [Errno 17] File exists: '/workspace/tests/data/tmp'",
+          "test_name": "unit_tests/graphrag/test_graphrag_pipeline.py::TestGraphRAGPipeline::test_init_insufficient_disk_space"
+        },
+        {
+          "error": "FileExistsError: [Errno 17] File exists: '/workspace/tests/data/tmp'",
+          "test_name": "unit_tests/graphrag/test_graphrag_pipeline.py::TestGraphRAGPipeline::test_init_success_networkx"
+        },
+        {
+          "error": "FileExistsError: [Errno 17] File exists: '/workspace/tests/data/tmp'",
+          "test_name": "unit_tests/graphrag/test_graphrag_pipeline.py::TestGraphRAGPipeline::test_setup_save_path"
+        },
+        {
+          "error": "FileExistsError: [Errno 17] File exists: '/workspace/tests/data/tmp'",
+          "test_name": "unit_tests/graphrag/test_graphrag_pipeline.py::TestGraphRAGPipeline::test_upload_files_success"
+        }
+      ],
+      "passed": 870,
+      "python": {
+        "failed": 10,
+        "passed": 870,
+        "status": "partial_success",
+        "total": 881
+      },
+      "skipped": 1,
+      "status": "partial_success",
+      "total": 881
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "RAGSDK-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "Ubuntu 22.04.5 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "root 69G (6.6G 可用), /home 6.9T (6.0T 可用)",
+      "docker_version": "18.09.0",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 0
+      }
+    },
+    "image_source": {
+      "image_name": "swr.cn-south-1.myhuaweicloud.com/ascendhub/ragsdk:26.0.0-910b-ubuntu22.04-py3.11",
+      "selection_reason": "Tier 1 业务预构建镜像。docs/zh/03-quickstart.md 步骤1提供 docker pull 命令，docker/OVERVIEW.zh.md 确认镜像仓库 swr.cn-south-1.myhuaweicloud.com/ascendhub/ragsdk。Tag格式 \u003c版本\u003e-\u003c芯片\u003e-\u003cOS\u003e-\u003cPython\u003e。26.1.0 tag 不存在，26.0.0(配套 CANN 9.0.0) 拉取成功。镜像内已预装 CANN/IndexSDK/faiss/ascendfaiss/OpenBLAS/mxRag 全部依赖",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "master 分支 shallow clone",
+    "duration_seconds": 1966,
+    "end_time": "2026-08-31T18:16:23",
+    "environment": "Tier 1 预构建镜像 swr.cn-south-1.myhuaweicloud.com/ascendhub/ragsdk:26.0.0-910b-ubuntu22.04-py3.11 | 远程机器 192.168.9.114 aarch64 Kunpeng-920 256核 2.0Ti 8x910B3 NPU",
+    "repo_url": "https://gitcode.com/Ascend/RAGSDK.git",
+    "start_time": "2026-08-31T17:43:37",
+    "total_steps": 23,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "run_py_test.sh 脚本下载 x86_64 CPU torch wheel (torch-2.10.0+cpu-cp311-cp311-manylinux_2_28_x86_64.whl) 在 aarch64 平台不可安装，导致 UT 脚本直接退出",
+      "solution": "适配执行: 跳过 x86_64 torch wheel 下载，复用 Tier 1 镜像已预装的 aarch64 torch 2.1.0 作为 CPU torch，保留脚本其余逻辑(安装 pytest/卸载 torch_npu/torchvision/设置 PYTHONPATH+LD_PRELOAD)，执行等效 pytest 命令",
+      "source": "tests/run_py_test.sh 第42行 wget x86_64 wheel",
+      "timestamp": "2026-08-31T18:01:51"
+    },
+    {
+      "problem": "test_graphrag_pipeline.py 9个测试方法全部失败，setUp 中 os.makedirs(self.temp_dir) 未加 exist_ok=True 参数，首个测试创建 data/tmp 后后续测试 setUp 报 FileExistsError",
+      "solution": "测试代码缺陷，非环境问题。建议 setUp 使用 os.makedirs(path, exist_ok=True) 或在 tearDown 中清理 data/tmp。本次验证不修改源码，记录为 partial_success",
+      "source": "tests/unit_tests/graphrag/test_graphrag_pipeline.py:72",
+      "timestamp": "2026-08-31T18:01:51"
+    },
+    {
+      "problem": "test_sparse_embedding.py test_encode_success 失败，torch.relu(sparse_linear(last_hidden_state)) 报 RuntimeError: could not create a primitive descriptor for a matmul primitive",
+      "solution": "环境兼容性问题: 镜像 26.0.0 含 torch 2.1.0，requirements.txt 要求 torch==2.10.0。torch 2.1.0 aarch64 的 matmul 原语创建存在兼容性问题。属版本不配套，记录为环境限制",
+      "source": "tests/unit_tests/embedding/local/test_sparse_embedding.py + mx_rag/embedding/local/sparse_embedding.py:146",
+      "timestamp": "2026-08-31T18:01:51"
+    },
+    {
+      "problem": "样例 parse_document.py 首次执行报 LookupError: Resource 'punkt_tab' not found 和 averaged_perceptron_tagger_eng not found。NLTK 数据未预装在 Tier 1 镜像中，且 nltk.download() 因网络超时无法直接下载(raw.githubusercontent.com 不可达)",
+      "solution": "通过 jsdelivr CDN 镜像下载 NLTK 数据包(punkt_tab/averaged_perceptron_tagger_eng/averaged_perceptron_tagger/stopwords)，docker cp 到容器并解压到 /root/nltk_data/。验证 sent_tokenize 和 pos_tag 通过后重试样例成功",
+      "source": "example/parse_document/parse_document.py + mx_rag/document/splitter + NLTK 依赖",
+      "timestamp": "2026-08-31T18:16:23"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "火山AI网关/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

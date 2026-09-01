@@ -1,0 +1,850 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md + contributing.md + .devcontainer/devcontainer.json + docker/aura/OVERVIEW.zh.md",
+      "value": "aarch64 (ARM64)，支持 Ascend A2/A3/910B3 芯片系列，CI 镜像名含 _arm 后缀"
+    },
+    "build_commands": {
+      "source": "script/compile.sh + build.sh",
+      "value": "bash script/compile.sh（执行 python3 aura/setup.py bdist_wheel 生成 wheel 包并打包为 Ascend-agentsdk__linux-aarch64.tar.gz）；bash build.sh make（打包 aura 为 aura-linux.tar.gz）"
+    },
+    "dependencies": {
+      "source": "contributing.md + aura/requirements.txt + script/aura_ut.sh (pre_install) + script/openclaw_ut.sh (pre_install) + aura/setup.py",
+      "value": [
+        "CI 镜像 mindx_arm:SDK_20260112_1 已预装基础环境（CANN、torch_npu、pytest、pytest-html、pytest-cov 等），无需 pip install -e .",
+        "aura 依赖: torch\u003e=2.9.0, torch-npu\u003e=2.9.0, megatron-core\u003e=0.12.1, mindspeed\u003e=0.12.1, rllm, transformers\u003e=5.3.0, ray\u003e=2.55.1, verl==0.8.0, vllm==0.16.0, vllm-ascend==0.16.0",
+        "aura_ut.sh pre_install pip 包: transformers==4.52.3, sympy, pylatexenc, openai==1.99.6, torch==2.5.1, vertexai, sentence_transformers, hydra-core, ray==2.55.1, datasets, tensorboard, pytest-asyncio, pydantic, httpx, pyyaml 等",
+        "openclaw_ut.sh pre_install pip 包: pydantic==2.0.0, pydantic-settings, httpx[http2], typer, click, rich, keyring, diskcache, platformdirs, pyyaml",
+        "第三方源码: MindSpeed-RL, Megatron-LM(core_r0.8.0), MindSpeed, MindSpeed-LLM, rllm（通过 download_third_party.sh 下载）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "docker/aura/Dockerfile.910b.openeuler + Dockerfile.910b.ubuntu + Dockerfile.a3.* + openclaw/docker/Dockerfile.openclaw-*",
+      "value": [
+        {
+          "original": "FROM CANN toolkit 基础镜像（非纯基础 OS）",
+          "target_equivalent": "Tier 1 信号：Dockerfile FROM 指向昇腾 CANN toolkit 镜像，但 CI 验证应使用 contributing.md 指定的 CI 镜像 mindx_arm:SDK_20260112_1"
+        },
+        {
+          "original": "docker/aura/Dockerfile.910b.openeuler 构建含 CANN+torch_npu+vllm 等完整环境",
+          "target_equivalent": "Tier 2 候选：docker build -f Dockerfile.910b.openeuler（生产部署用，非 CI 验证用）"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "contributing.md (docker pull 命令) + .devcontainer/devcontainer.json (image 字段)",
+      "value": "Tier 1 业务预构建镜像: swr.cn-north-4.myhuaweicloud.com/ascend-mindx/mindx_arm:SDK_20260112_1（CI 流水线镜像，已具备构建验证的所有基础环境）"
+    },
+    "sample_commands": {
+      "source": "contributing.md + run_presmoke_aura.sh + run_presmoke_openclaw.sh + presmoke/aura/presmoke.sh + presmoke/openclaw/presmoke.sh",
+      "value": "cd AgentSDK \u0026\u0026 bash run_presmoke_aura.sh（aura 预冒烟测试，pytest presmoke/aura/cases/test_endtoend.py）；bash run_presmoke_openclaw.sh（openclaw 预冒烟测试，pytest presmoke/openclaw/cases/test_deploy.py）"
+    },
+    "special_dependencies": {
+      "source": "contributing.md + aura/download_third_party.sh + presmoke/aura/presmoke.sh",
+      "value": [
+        "第三方源码下载脚本: cd aura \u0026\u0026 bash download_third_party.sh（下载 MindSpeed-RL/Megatron-LM/MindSpeed/MindSpeed-LLM/rllm 到 aura/third_party/）",
+        "aura presmoke 需额外: pip install mlflow, ray==2.55.1, apt install net-tools iproute2",
+        "openclaw presmoke 需额外: envsubst(gettext-base), openssl, pip3 install pytest",
+        "NPU 驱动挂载: /dev/davinci*, /dev/davinci_manager, /dev/devmm_svm, /dev/hisi_hdc + driver/dcmi/npu-smi 目录"
+      ]
+    },
+    "ut_commands": {
+      "source": "contributing.md + script/aura_ut.sh + script/openclaw_ut.sh",
+      "value": "cd AgentSDK \u0026\u0026 bash script/aura_ut.sh（aura 单元测试，pre_install + pytest aura/tests/）；bash script/openclaw_ut.sh（openclaw 单元测试，pre_install + pytest openclaw/tests/）。UT 前需先执行 cd aura \u0026\u0026 bash download_third_party.sh 下载第三方源码"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "presmoke/aura/presmoke.sh 使用 set -euo pipefail 但在 export PYTHONPATH=\"$PROJECT_ROOT/aura\":$PYTHONPATH 时 PYTHONPATH 未设置，导致 unbound variable 错误。应使用 ${PYTHONPATH:-} 防御性写法。",
+      "source": "presmoke/aura/presmoke.sh:58",
+      "time": "2026-08-31T17:41:59",
+      "title": "aura presmoke 脚本 PYTHONPATH 未初始化"
+    },
+    {
+      "body": "script/aura_ut.sh 中 LD_PRELOAD 引用 libgomp-947d5fa1.so.1.0.0，但 CI 镜像 mindx_arm:SDK_20260112_1 中实际为 libgomp-a49a47f9.so.1.0.0，哈希不匹配导致 LD_PRELOAD 加载失败（仅告警不影响测试）。",
+      "source": "script/aura_ut.sh:87 + CI 镜像 scikit_learn.libs 目录",
+      "time": "2026-08-31T17:41:59",
+      "title": "aura_ut.sh LD_PRELOAD 哈希与 CI 镜像不匹配"
+    },
+    {
+      "body": "CI 镜像 mindx_arm:SDK_20260112_1 预装了 pytest/pip 作为 python3 模块，但未在 /usr/local/bin 创建 pytest/pip/python 命令符号链接。presmoke 脚本使用 pytest/pip 命令而非 python3 -m pytest/pip3，导致执行失败需手动补齐。",
+      "source": "CI 镜像 mindx_arm:SDK_20260112_1 + presmoke/aura/presmoke.sh:48,53",
+      "time": "2026-08-31T17:41:59",
+      "title": "CI 镜像未创建 pytest/pip/python 命令行符号链接"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "git clone 仓库到本地 /tmp/opencode/AgentSDK 以阅读文档",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/Ascend/AgentSDK.git /tmp/opencode/AgentSDK",
+      "details": {
+        "branch": "master",
+        "commit": "426b93cf",
+        "repo": "AgentSDK"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "note": "",
+      "output": "Cloning into '/tmp/opencode/AgentSDK'... 完成，commit 426b93c",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:17:17"
+    },
+    {
+      "action": "阅读 README.md 提取仓库定位与核心产品",
+      "command": "cat README.md",
+      "details": {
+        "file": "README.md",
+        "key_findings": [
+          "Agent SDK 昇腾亲和 Agent 生态仓库",
+          "Aura 训推调框架",
+          "OpenClaw Agent 应用框架"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "note": "",
+      "output": "Agent SDK 是昇腾亲和的 Agent 生态仓库... Aura 聚焦 Agentic RL 训推调一体化，OpenClaw 面向多领域 Agent 应用开发",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:17:17"
+    },
+    {
+      "action": "阅读 contributing.md 贡献指南（文档闭包关键节点）",
+      "command": "cat contributing.md",
+      "details": {
+        "file": "contributing.md",
+        "key_findings": [
+          "CI 镜像 docker pull 命令",
+          "UT 脚本 aura_ut.sh/openclaw_ut.sh",
+          "预冒烟脚本 run_presmoke_*.sh",
+          "第三方源码下载 download_third_party.sh"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "note": "贡献指南明确写出 CI 镜像已具备构建验证的所有基础环境，开发者无需安装任何额外模块，也无需执行 pip install -e .",
+      "output": "docker pull swr.cn-north-4.myhuaweicloud.com/ascend-mindx/mindx_arm:SDK_20260112_1；bash script/aura_ut.sh；bash script/openclaw_ut.sh；bash run_presmoke_aura.sh；cd aura \u0026\u0026 bash download_third_party.sh",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:17:17"
+    },
+    {
+      "action": "阅读 .devcontainer/devcontainer.json 确认 Tier 1 镜像与 NPU 挂载",
+      "command": "cat .devcontainer/devcontainer.json",
+      "details": {
+        "devices": [
+          "davinci_manager",
+          "devmm_svm",
+          "hisi_hdc"
+        ],
+        "file": ".devcontainer/devcontainer.json",
+        "image": "swr.cn-north-4.myhuaweicloud.com/ascend-mindx/mindx_arm:SDK_20260112_1"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "image 字段确认与 contributing.md 一致；runArgs 挂载 davinci_manager/devmm_svm/hisi_hdc；mounts 挂载 driver/dcmi/npu-smi 等目录",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:17:17"
+    },
+    {
+      "action": "阅读 aura/README.md 理解 Aura 框架与硬件要求",
+      "command": "cat aura/README.md",
+      "details": {
+        "engines": [
+          "verl",
+          "vllm",
+          "rLLM"
+        ],
+        "file": "aura/README.md",
+        "hardware": "Ascend A2/A3"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "硬件支持 Ascend A2/A3 架构服务器；支持 verl 训练引擎、vllm 推理引擎、rLLM agent 引擎",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:17:17"
+    },
+    {
+      "action": "阅读 openclaw/README.md 理解 OpenClaw 框架",
+      "command": "cat openclaw/README.md",
+      "details": {
+        "file": "openclaw/README.md",
+        "key_findings": [
+          "三层镜像架构 base/app/overlay",
+          "deploy.sh 部署脚本",
+          "SkillHub 技能仓库"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "OpenClaw 基于 OpenClaw 构建，集成代码生成、研究分析等垂直领域能力，三层镜像架构",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:17:17"
+    },
+    {
+      "action": "阅读 docker/aura/OVERVIEW.zh.md 理解镜像 Tag 规范与设备挂载",
+      "command": "cat docker/aura/OVERVIEW.zh.md",
+      "details": {
+        "devices": "davinci0-15 + davinci_manager + hisi_hdc + devmm_svm",
+        "file": "docker/aura/OVERVIEW.zh.md",
+        "tags": [
+          "26.1.0-cann9.0.0-torch_npu2.9.0-910b-openeuler24.03-py3.11",
+          "...-910b-ubuntu22.04-py3.11",
+          "...-a3-openeuler24.03-py3.11",
+          "...-a3-ubuntu22.04-py3.11"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "Tag 格式: \u003cAgentSDK版本\u003e-\u003cCANN版本\u003e-\u003cpytorch版本\u003e-\u003c芯片系列\u003e-\u003c操作系统\u003e-\u003cpython版本\u003e；设备挂载 davinci*/manager/hdc/svm + driver/dcmi/npu-smi",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-31T17:17:17"
+    },
+    {
+      "action": "检查 docker/aura/Dockerfile.* 文件（Tier 2 候选）",
+      "command": "ls docker/aura/Dockerfile.*",
+      "details": {
+        "files": [
+          "Dockerfile.910b.openeuler",
+          "Dockerfile.910b.ubuntu",
+          "Dockerfile.a3.openeuler",
+          "Dockerfile.a3.ubuntu"
+        ],
+        "tier": "Tier 2 候选（生产部署用，CI 验证优先用 Tier 1 CI 镜像）"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "4 个 Dockerfile 存在，为生产部署镜像构建文件，FROM 指向 CANN toolkit（非纯基础 OS，属 Tier 1 信号但用于生产部署）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-31T17:17:17"
+    },
+    {
+      "action": "阅读 script/aura_ut.sh 理解 aura UT 流程",
+      "command": "cat script/aura_ut.sh",
+      "details": {
+        "file": "script/aura_ut.sh",
+        "pre_install": "pip3 install transformers/torch/ray 等 + git clone rllm",
+        "run_test": "python3 -m pytest --cov=aura -vs tests/"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "pre_install 安装 python 包并克隆 rllm；run_test 在 aura 目录执行 pytest tests/ 并生成覆盖率报告",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:17:17"
+    },
+    {
+      "action": "阅读 script/openclaw_ut.sh 理解 openclaw UT 流程",
+      "command": "cat script/openclaw_ut.sh",
+      "details": {
+        "file": "script/openclaw_ut.sh",
+        "pre_install": "pip3 install pydantic/httpx/typer 等",
+        "run_test": "python3 -m pytest --cov=skillhub -vs tests/"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "pre_install 安装 python 包；run_test 在 openclaw 目录执行 pytest tests/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:17:17"
+    },
+    {
+      "action": "阅读 script/compile.sh 与 build.sh 理解构建流程",
+      "command": "cat script/compile.sh \u0026\u0026 cat build.sh",
+      "details": {
+        "build_cmd": "python3 aura/setup.py bdist_wheel",
+        "file": "script/compile.sh",
+        "output": "Ascend-agentsdk__linux-aarch64.tar.gz"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "compile.sh 执行 setup.py bdist_wheel 生成 wheel 包并打包；build.sh make 打包 aura 源码",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:17:17"
+    },
+    {
+      "action": "阅读 aura/download_third_party.sh 理解第三方源码下载",
+      "command": "cat aura/download_third_party.sh",
+      "details": {
+        "file": "aura/download_third_party.sh",
+        "repos": [
+          "MindSpeed-RL",
+          "Megatron-LM(core_r0.8.0)",
+          "MindSpeed",
+          "MindSpeed-LLM",
+          "rllm"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "下载 MindSpeed-RL/Megatron-LM/MindSpeed/MindSpeed-LLM/rllm 到 aura/third_party/，CI 镜像仅提供基础环境，第三方源码需单独下载",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:17:17"
+    },
+    {
+      "action": "阅读 run_presmoke_*.sh 与 presmoke/*/presmoke.sh 理解预冒烟测试",
+      "command": "cat run_presmoke_*.sh presmoke/*/presmoke.sh",
+      "details": {
+        "aura_test": "pytest presmoke/aura/cases/test_endtoend.py",
+        "files": [
+          "run_presmoke_aura.sh",
+          "run_presmoke_openclaw.sh",
+          "presmoke/aura/presmoke.sh",
+          "presmoke/openclaw/presmoke.sh"
+        ],
+        "openclaw_test": "pytest presmoke/openclaw/cases/test_deploy.py"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "aura presmoke 需 pip install mlflow/ray + apt install net-tools/iproute2；openclaw presmoke 需 envsubst/openssl + pip install pytest",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:17:17"
+    },
+    {
+      "action": "阅读 docs/zh/aura/02_installation_guide.md 安装指南完成文档闭包",
+      "command": "cat docs/zh/aura/02_installation_guide.md",
+      "details": {
+        "file": "docs/zh/aura/02_installation_guide.md",
+        "methods": [
+          "方式一: 拉取预构建镜像或 Dockerfile 构建",
+          "方式二: build_env.sh 一键脚本"
+        ],
+        "production_image": "swr.cn-south-1.myhuaweicloud.com/ascendhub/agentsdk:26.1.0-cann9.0.0-torch_npu2.9.0-910b-ubuntu22.04-py3.11"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "安装指南提供生产部署镜像（昇腾 Hub）和 Dockerfile 构建两种方式；CI 验证使用 contributing.md 的 CI 镜像",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T17:17:17"
+    },
+    {
+      "action": "汇总文档闭包结果，确定镜像 Tier 策略",
+      "command": "（文档闭包汇总）",
+      "details": {
+        "image": "swr.cn-north-4.myhuaweicloud.com/ascend-mindx/mindx_arm:SDK_20260112_1",
+        "npu_required": true,
+        "npu_type": "Ascend 910B3",
+        "reason": "contributing.md + devcontainer.json 双重确认 CI 镜像，已预装基础环境",
+        "tier": 1
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "note": "架构匹配：镜像名 _arm 对应 aarch64 远程机器；NPU 挂载需 davinci2（card 0/1 Critical/Alarm 跳过）",
+      "output": "Tier 1: CI 镜像 mindx_arm:SDK_20260112_1；NPU required=True（Ascend 910B3/CANN/torch_npu）",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-31T17:17:17"
+    },
+    {
+      "action": "拉取 Tier 1 CI 镜像 mindx_arm:SDK_20260112_1",
+      "command": "ssh root@192.168.9.114 'docker pull swr.cn-north-4.myhuaweicloud.com/ascend-mindx/mindx_arm:SDK_20260112_1'",
+      "details": {
+        "digest": "sha256:ba5830ab05245ebbe571d58af373683da844f6f87b143a48a1423d1ee318f759",
+        "image": "swr.cn-north-4.myhuaweicloud.com/ascend-mindx/mindx_arm:SDK_20260112_1",
+        "tier": 1
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "note": "镜像名 _arm 后缀匹配 aarch64 远程机器，无需架构 tag 探测",
+      "output": "Digest: sha256:ba5830ab... Status: Downloaded newer image",
+      "result": "成功",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-31T17:27:00"
+    },
+    {
+      "action": "在远程机器 clone 仓库到 /home/workspace/AgentSDK-verify",
+      "command": "ssh root@192.168.9.114 'git clone --depth 1 --branch master https://gitcode.com/Ascend/AgentSDK.git /home/workspace/AgentSDK-verify'",
+      "details": {
+        "commit": "426b93cf43dc8974555dc0c761aa03eb17107014",
+        "path": "/home/workspace/AgentSDK-verify"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "note": "",
+      "output": "Cloning into /home/workspace/AgentSDK-verify... commit 426b93c",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-31T17:27:00"
+    },
+    {
+      "action": "启动容器 AgentSDK-ttfhw（NPU 挂载 davinci2 跳过异常卡 0/1）",
+      "command": "docker run -d --name AgentSDK-ttfhw --device /dev/davinci2 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:... -v /usr/local/Ascend/driver:... -v /home/workspace/AgentSDK-verify:/workspace --shm-size=500g mindx_arm:SDK_20260112_1 sleep infinity",
+      "details": {
+        "container": "AgentSDK-ttfhw",
+        "image": "mindx_arm:SDK_20260112_1",
+        "mounted_card": 2,
+        "skipped_cards": [
+          0,
+          1
+        ],
+        "startup_command_source": "default_挂卡"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "note": "npu-smi 显示 card 0 Critical、card 1 Alarm，按 skill 规则跳过，挂载健康的 card 2（OK 状态）",
+      "output": "容器启动成功，状态 Up",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-31T17:27:00"
+    },
+    {
+      "action": "验证容器内 NPU 可用性（设置 LD_LIBRARY_PATH 后 npu-smi 可用）",
+      "command": "docker exec AgentSDK-ttfhw 'export LD_LIBRARY_PATH=...driver/lib64; npu-smi info'",
+      "details": {
+        "card": "2 910B3 OK",
+        "ld_library_path": "/usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64/common:/usr/local/Ascend/driver/lib64/driver",
+        "npu_available": true
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "note": "需设置 LD_LIBRARY_PATH 包含 driver/lib64 目录，否则 npu-smi 报 libc_sec.so 找不到",
+      "output": "NPU 2 910B3 Health OK Power 88.8W HBM 3436/65536MB",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-31T17:27:00"
+    },
+    {
+      "action": "验证 CI 镜像预装依赖（torch/torch_npu/pytest 等）",
+      "command": "docker exec AgentSDK-ttfhw 'pip3 list | grep -E torch|transformers|pytest'",
+      "details": {
+        "issue": "transformers 4.57.3 与 torch 2.1.0 不兼容（register_pytree_node）",
+        "numpy": "2.2.6",
+        "pytest": "9.0.2",
+        "pytest-cov": "7.0.0",
+        "pytest-html": "4.1.1",
+        "torch": "2.1.0",
+        "torch_npu": "2.1.0.post11",
+        "transformers": "4.57.3"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "note": "CI 镜像预装基础环境；transformers 4.57.3 与 torch 2.1.0 不兼容，UT 脚本 pre_install 会安装正确版本（transformers==4.52.3, torch==2.5.1）",
+      "output": "torch 2.1.0, torch-npu 2.1.0.post11, transformers 4.57.3, pytest 9.0.2 均已预装",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-31T17:27:00"
+    },
+    {
+      "action": "执行 download_third_party.sh 下载第三方源码（UT 前置依赖）",
+      "command": "docker exec AgentSDK-ttfhw 'cd /workspace/aura \u0026\u0026 bash download_third_party.sh'",
+      "details": {
+        "repos_downloaded": [
+          "MindSpeed-RL",
+          "Megatron-LM",
+          "MindSpeed",
+          "MindSpeed-LLM",
+          "rllm"
+        ],
+        "target_dir": "/workspace/aura/third_party/"
+      },
+      "duration_seconds": 180,
+      "error": "",
+      "note": "contributing.md 明确要求：CI 镜像仅提供基础环境，第三方源码需单独下载。下载到 aura/third_party/rl/ 和 agent_engine/",
+      "output": "download mindspeed_rl/megatron/mindspeed/mindspeed_llm/rllm src code succeed; Download third party source code succeed",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-31T17:27:00"
+    },
+    {
+      "action": "验证构建前置依赖（setuptools/wheel）",
+      "command": "docker exec AgentSDK-ttfhw 'python3 -c \"import setuptools, wheel; print(setuptools.__version__, wheel.__version__)\"'",
+      "details": {
+        "python": "3.11.4",
+        "setuptools": "70.3.0",
+        "wheel": "0.42.0"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "note": "",
+      "output": "70.3.0 0.42.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-31T17:28:35"
+    },
+    {
+      "action": "执行仓库构建脚本 script/compile.sh（python3 aura/setup.py bdist_wheel）",
+      "command": "docker exec AgentSDK-ttfhw 'cd /workspace \u0026\u0026 time bash script/compile.sh'",
+      "details": {
+        "build_cmd": "python3 aura/setup.py bdist_wheel",
+        "concurrency": 51,
+        "script": "script/compile.sh",
+        "version": "7.0.0"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "构建极快（0.374s），Aura 是纯 Python 包，setup.py bdist_wheel 无 C/C++ 编译。并发 51 不直接影响 Python wheel 构建。",
+      "output": "compile AgentSDK... packaging output to Ascend-agentsdk__linux-aarch64.tar.gz... real 0m0.374s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-31T17:28:35"
+    },
+    {
+      "action": "验证构建产物（wheel 包 + tar.gz 包）",
+      "command": "docker exec AgentSDK-ttfhw 'ls -la /workspace/output/'",
+      "details": {
+        "artifacts": [
+          "aura-5.0.0-py3-none-any.whl (9.5K)",
+          "Ascend-agentsdk__linux-aarch64.tar.gz (26K)",
+          "version.info (16B)"
+        ],
+        "version": "AgentSDK: 7.0.0"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "note": "",
+      "output": "aura-5.0.0-py3-none-any.whl 9467 bytes; Ascend-agentsdk__linux-aarch64.tar.gz 25987 bytes; version.info: AgentSDK: 7.0.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-31T17:28:35"
+    },
+    {
+      "action": "执行 openclaw 单元测试 script/openclaw_ut.sh（pre_install + pytest openclaw/tests/）",
+      "command": "docker exec AgentSDK-ttfhw 'cd /workspace \u0026\u0026 time bash script/openclaw_ut.sh'",
+      "details": {
+        "branch_coverage": "62.87%",
+        "duration": "19.54s",
+        "failed": 0,
+        "line_coverage": "80.38%",
+        "passed": 508,
+        "total": 508
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "note": "openclaw_ut.sh pre_install 安装 pydantic/httpx/typer 等；run_test 执行 pytest openclaw/tests/ 全部通过",
+      "output": "508 passed in 19.54s; Openclaw line coverage 80.38% branch coverage 62.87%; real 0m29.667s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-31T17:35:12"
+    },
+    {
+      "action": "执行 aura 单元测试 script/aura_ut.sh（pre_install pip install + clone rllm + pytest aura/tests/）",
+      "command": "docker exec AgentSDK-ttfhw 'cd /workspace \u0026\u0026 time bash script/aura_ut.sh'",
+      "details": {
+        "branch_coverage": "74.23%",
+        "duration": "137.90s",
+        "failed": 0,
+        "line_coverage": "85.79%",
+        "passed": 2943,
+        "subtests_passed": 2,
+        "total": 2943,
+        "warnings": 74
+      },
+      "duration_seconds": 236,
+      "error": "",
+      "note": "aura_ut.sh pre_install 安装 transformers==4.52.3/torch==2.5.1/ray==2.55.1 等 + clone rllm；LD_PRELOAD 哈希不匹配（947d5fa1 vs a49a47f9）仅告警不影响测试；ray shutdown atexit 异常在测试全部通过后发生，不影响结果",
+      "output": "2943 passed, 74 warnings, 2 subtests passed in 137.90s; Aura line coverage 85.79% branch coverage 74.23%; real 3m56.006s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-31T17:35:12"
+    },
+    {
+      "action": "执行 openclaw 预冒烟测试 run_presmoke_openclaw.sh",
+      "command": "docker exec AgentSDK-ttfhw 'cd /workspace \u0026\u0026 time bash run_presmoke_openclaw.sh'",
+      "details": {
+        "duration": "0.62s",
+        "failed": 0,
+        "passed": 25,
+        "tests": [
+          "单实例配置生成/目录/JSON/端口/SSH/SFTP/healthcheck",
+          "多实例配置/端口计算/health monitor"
+        ],
+        "total": 25
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "note": "前置：安装 gettext-base(envsubst) + openssl；测试部署配置生成与校验",
+      "output": "25 passed in 0.62s; OpenClaw smoke tests PASSED",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-31T17:41:59"
+    },
+    {
+      "action": "安装 aura presmoke 缺失依赖（pytest 命令/pip 命令/python 符号链接）",
+      "command": "docker exec AgentSDK-ttfhw 'apt-get install -y gettext-base openssl; ln -sf .../pytest /usr/local/bin/pytest; ln -sf .../pip /usr/local/bin/pip; ln -sf python3 /usr/local/bin/python'",
+      "details": {
+        "installed": [
+          "gettext-base",
+          "openssl",
+          "pytest-\u003e/opt/buildtools/.../pytest",
+          "pip-\u003e/opt/buildtools/.../pip",
+          "python-\u003epython3"
+        ]
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "note": "CI 镜像预装 pytest/pip 为 python3 模块但未创建命令行符号链接，presmoke 脚本使用 pytest/pip/python 命令需补齐",
+      "output": "pytest 9.0.2, pip 25.3, python 3.11.4 命令均可用",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-31T17:41:59"
+    },
+    {
+      "action": "执行 aura 预冒烟测试 run_presmoke_aura.sh（需设置 PYTHONPATH 避免 set -u 报错）",
+      "command": "docker exec AgentSDK-ttfhw 'cd /workspace \u0026\u0026 export PYTHONPATH=\"\" \u0026\u0026 time bash run_presmoke_aura.sh'",
+      "details": {
+        "duration": "40.34s",
+        "failed": 0,
+        "passed": 10,
+        "tests": [
+          "Test01 import aura",
+          "Test02-09 配置校验（缺/无效/空/不存在配置）",
+          "Test10 有效 direct mode"
+        ],
+        "total": 10
+      },
+      "duration_seconds": 51,
+      "error": "",
+      "note": "前置：pip install mlflow/ray==2.55.1 + apt install net-tools/iproute2；需 export PYTHONPATH=\"\" 避免 set -u 触发 unbound variable",
+      "output": "10 passed in 40.34s; All smoke tests PASSED; Aura pre-smoke PASSED",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-31T17:41:59"
+    },
+    {
+      "action": "验证完成，保留容器供检查（后端统一清理）",
+      "command": "docker ps | grep AgentSDK",
+      "details": {
+        "action": "保留运行状态",
+        "container": "AgentSDK-ttfhw"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "AgentSDK-ttfhw Up",
+      "result": "跳过",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-08-31T17:41:59"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "aura-5.0.0-py3-none-any.whl",
+          "path": "/workspace/output/aura-5.0.0-py3-none-any.whl",
+          "size": "9.5K",
+          "type": "wheel"
+        },
+        {
+          "name": "Ascend-agentsdk__linux-aarch64.tar.gz",
+          "path": "/workspace/output/Ascend-agentsdk__linux-aarch64.tar.gz",
+          "size": "26K",
+          "type": "package"
+        },
+        {
+          "name": "version.info",
+          "path": "/workspace/output/version.info",
+          "size": "16B",
+          "type": "info"
+        }
+      ],
+      "compiler": "Python 3.11.4 + setuptools 70.3.0 + wheel 0.42.0",
+      "concurrency": 51,
+      "concurrency_ratio": "CPU核数 × 20% = 256 × 0.2 = 51（Python wheel 构建，非 C/C++ 编译，并发数不直接影响）",
+      "duration_seconds": 1,
+      "notes": "使用仓库提供的 script/compile.sh 脚本执行构建，脚本内部执行 python3 aura/setup.py bdist_wheel 生成 wheel 包并打包为 tar.gz。构建极快（0.374s）因为 Aura 是纯 Python 包，无 C/C++ 编译步骤。",
+      "status": "success"
+    },
+    "sample": {
+      "duration_seconds": 54,
+      "results": [
+        {
+          "execution_status": "success",
+          "execution_time": "2.835s（含环境准备）",
+          "output_summary": "25 passed in 0.62s — 测试 OpenClaw 部署配置生成（单实例/多实例 docker-compose、healthcheck、SSH/SFTP、gateway token 等配置验证）",
+          "sample_name": "openclaw 预冒烟测试 (run_presmoke_openclaw.sh)"
+        },
+        {
+          "execution_status": "success",
+          "execution_time": "50.710s（含 pip install mlflow/ray + apt install net-tools/iproute2）",
+          "output_summary": "10 passed in 40.34s — 测试 Aura 模块导入、配置校验（缺 base_conf/无效 work_mode/空 train_config/不存在配置/缺 hosts/非本地 IP/有效 direct mode 等 10 个端到端场景）",
+          "sample_name": "aura 预冒烟测试 (run_presmoke_aura.sh)"
+        }
+      ],
+      "status": "success"
+    },
+    "ut": {
+      "duration_seconds": 266,
+      "failed": 0,
+      "failures": [],
+      "passed": 3451,
+      "python": {
+        "failed": 0,
+        "modules": [
+          {
+            "branch_coverage": "74.23%",
+            "duration_seconds": 137.9,
+            "failed": 0,
+            "line_coverage": "85.79%",
+            "name": "aura",
+            "passed": 2943,
+            "total": 2943
+          },
+          {
+            "branch_coverage": "62.87%",
+            "duration_seconds": 19.54,
+            "failed": 0,
+            "line_coverage": "80.38%",
+            "name": "openclaw",
+            "passed": 508,
+            "total": 508
+          }
+        ],
+        "passed": 3451,
+        "status": "success",
+        "total": 3451
+      },
+      "skipped": 0,
+      "status": "success",
+      "total": 3451
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "AgentSDK-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "Ubuntu 22.04.5 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "69G (6.6G 可用)",
+      "docker_version": "18.09.0",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 2
+      }
+    },
+    "image_source": {
+      "image_name": "swr.cn-north-4.myhuaweicloud.com/ascend-mindx/mindx_arm:SDK_20260112_1",
+      "selection_reason": "Tier 1 业务预构建镜像：contributing.md 提供 docker pull 命令 + .devcontainer/devcontainer.json image 字段双重确认。CI 流水线镜像，已预装 CANN/torch_npu/pytest 等基础环境，无需 pip install -e .。架构 _arm 匹配远程 aarch64 机器。",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "426b93cf43dc8974555dc0c761aa03eb17107014",
+    "duration_seconds": 1680,
+    "end_time": "2026-08-31T17:41:59",
+    "environment": "远程容器验证 (openEuler 20.03 LTS-SP4 / aarch64 / 8*Ascend 910B3 NPU)",
+    "repo_url": "https://gitcode.com/Ascend/AgentSDK.git",
+    "start_time": "2026-08-31T17:13:59",
+    "total_steps": 30,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "aura_ut.sh 中 LD_PRELOAD 引用的 libgomp-947d5fa1.so.1.0.0 在 CI 镜像中实际为 libgomp-a49a47f9.so.1.0.0（哈希不匹配）",
+      "solution": "LD_PRELOAD 加载失败仅产生告警（ld.so: object... cannot be preloaded: ignored），不影响 pytest 执行，2943 个测试全部通过",
+      "source": "script/aura_ut.sh LD_PRELOAD 行 + CI 镜像 scikit_learn.libs 目录",
+      "timestamp": "2026-08-31T17:35:12"
+    },
+    {
+      "problem": "aura UT 测试完成后 ray shutdown atexit 回调抛出 AttributeError: module 'ray' has no attribute 'actor'",
+      "solution": "该异常在所有测试通过后的 atexit 清理阶段发生，不影响测试结果。2943 passed 0 failed 已确认",
+      "source": "ray 2.55.1 atexit 清理 + aura_ut.sh",
+      "timestamp": "2026-08-31T17:35:12"
+    },
+    {
+      "problem": "CI 镜像预装的 transformers 4.57.3 与 torch 2.1.0 不兼容（register_pytree_node AttributeError）",
+      "solution": "aura_ut.sh pre_install 安装正确版本（transformers==4.52.3, torch==2.5.1）解决版本冲突，UT 顺利通过",
+      "source": "CI 镜像 mindx_arm:SDK_20260112_1 预装版本 + script/aura_ut.sh pre_install",
+      "timestamp": "2026-08-31T17:35:12"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "火山AI网关/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

@@ -58,6 +58,9 @@ const REPO_COMMUNITY_MAP = {
   'msmodelslim': 'MindStudio', 'msopgen': 'MindStudio', 'msopprof': 'MindStudio',
   'msprobe': 'MindStudio', 'msprof': 'MindStudio', 'msprof-analyze': 'MindStudio',
   'mssanitizer': 'MindStudio', 'msserviceprofiler': 'MindStudio',
+  'flash-engram': 'BoostKit', 'hyperscan': 'BoostKit', 'kvecturbo': 'BoostKit',
+  'lmcache': 'BoostKit', 'numpy': 'BoostKit', 'omnioperator': 'BoostKit',
+  'rapidjson': 'BoostKit', 'sonic': 'BoostKit', 'sonic-cpp': 'BoostKit',
 }
 
 const REPO_NAME_NORMALIZE = {

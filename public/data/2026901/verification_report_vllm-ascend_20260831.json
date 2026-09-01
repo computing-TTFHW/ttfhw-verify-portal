@@ -1,0 +1,941 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md Prerequisites 章节 + npu-smi info 输出",
+      "value": "aarch64 (Atlas A2 Training 系列, NPU 910B3)"
+    },
+    "build_commands": {
+      "source": "Dockerfile.openEuler + docs/source/getting_started/installation/install_vllm_ascend.inc.md (源码安装) + setup.py",
+      "value": "source /usr/local/Ascend/ascend-toolkit/set_env.sh \u0026\u0026 source /usr/local/Ascend/nnal/atb/set_env.sh \u0026\u0026 export PIP_EXTRA_INDEX_URL=https://mirrors.huaweicloud.com/ascend/repos/pypi \u0026\u0026 export VLLM_BATCH_INVARIANT=1 \u0026\u0026 export SOC_VERSION=ascend910b1 \u0026\u0026 python3 -m pip install -e . --extra-index-url https://download.pytorch.org/whl/cpu/ (setup.py 使用 CMake 构建 C++ 扩展, 先执行 csrc/build_aclnn.sh 构建 ACLNN 自定义算子)"
+    },
+    "dependencies": {
+      "source": "requirements.txt + pyproject.toml + Dockerfile.openEuler",
+      "value": [
+        "CANN == 9.1.0 (镜像预装)",
+        "NNAL/libatb.so (镜像预装)",
+        "PyTorch == 2.10.0 (镜像预装)",
+        "torch-npu == 2.10.0.post4 (镜像预装)",
+        "vLLM v0.27.1 (镜像预装, .github/vllm-main-verified.commit: ba07e4a4)",
+        "cmake \u003e= 3.26",
+        "pybind11",
+        "setuptools \u003e= 64, setuptools-scm \u003e= 8",
+        "triton-ascend == 3.2.2 (镜像预装)",
+        "transformers == 5.14.1",
+        "xgrammar \u003e= 0.1.30",
+        "numba, msgpack, quart (功能依赖)",
+        "memfabric_hybrid == 1.2.0, memcache_hybrid == 1.2.0",
+        "arctic-inference == 0.1.1",
+        "catlass submodule (csrc/third_party/catlass, build_aclnn.sh 需要)",
+        "gcc/g++ \u003e 8, C++17+, clang-15 (triton-ascend 编译)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "Dockerfile.openEuler RUN 指令",
+      "value": [
+        {
+          "original": "yum install -y git vim wget net-tools gcc gcc-c++ make cmake numactl numactl-devel libibverbs-devel jemalloc hiredis-devel clang patch",
+          "target_equivalent": "镜像已预装, 无需重复安装 (Tier 1)"
+        },
+        {
+          "original": "python3 -m pip install mooncake-transfer-engine-npu==0.3.11.post1 --extra-index-url https://mirrors.aliyun.com/pypi/web/simple",
+          "target_equivalent": "镜像已预装 (Tier 1)"
+        },
+        {
+          "original": "python3 -m pip install modelscope 'ray\u003e=2.47.1,\u003c=2.48.0' 'protobuf\u003e3.20.0'",
+          "target_equivalent": "镜像已预装 (Tier 1)"
+        },
+        {
+          "original": "git clone --depth 1 -b v0.27.1 https://github.com/vllm-project/vllm.git /vllm-workspace/vllm",
+          "target_equivalent": "镜像已预装 vLLM v0.27.1 (Tier 1)"
+        },
+        {
+          "original": "VLLM_TARGET_DEVICE=empty python3 -m pip install -e /vllm-workspace/vllm/[audio] --extra-index-url https://download.pytorch.org/whl/cpu/",
+          "target_equivalent": "镜像已预装 (Tier 1)"
+        },
+        {
+          "original": "python3 -m pip install -e /vllm-workspace/vllm-ascend/ --extra-index-url https://download.pytorch.org/whl/cpu/",
+          "target_equivalent": "需从 main 分支源码重新构建 (pip install -e .)"
+        },
+        {
+          "original": "python3 -m pip install triton-ascend==3.2.2 --extra-index-url https://mirrors.huaweicloud.com/ascend/repos/pypi",
+          "target_equivalent": "镜像已预装 (Tier 1)"
+        },
+        {
+          "original": "python3 -m pip install concurrent-log-handler",
+          "target_equivalent": "镜像已预装 (Tier 1)"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "Dockerfile.openEuler FROM + docs/source/getting_started/quick_start/ascend_image/atlas-a2.inc.md + quay.io registry API 查询",
+      "value": "Tier 1 业务预构建镜像: quay.io/ascend/vllm-ascend:nightly-main-openeuler (main 分支 nightly 构建, A2, openEuler, 含 CANN/NNAL/PyTorch/TorchNPU/vLLM/vLLM Ascend 全套); 备选: quay.io/ascend/cann:9.1.0-910b-openeuler24.03-py3.12 (CANN 基础镜像); Tier 2: docker build -f Dockerfile.openEuler ."
+    },
+    "sample_commands": {
+      "source": "docs/source/getting_started/quick_start/offline/qwen3-0.6b.inc.md + examples/offline_inference_npu.py",
+      "value": "python3 example.py (Qwen3-0.6B 离线推理: from vllm import LLM, SamplingParams; llm = LLM(model='Qwen/Qwen3-0.6B'); 可设 VLLM_USE_MODELSCOPE=True) 或 python3 examples/offline_inference_npu.py"
+    },
+    "special_dependencies": {
+      "source": "README.md Prerequisites + Dockerfile.openEuler FROM + .gitmodules",
+      "value": [
+        "CANN == 9.1.0 ( quay.io/ascend/cann:9.1.0-910b-openeuler24.03-py3.12 )",
+        "NNAL (libatb.so, /usr/local/Ascend/nnal/atb/set_env.sh)",
+        "vLLM v0.27.1 (需先于 vllm-ascend 安装, commit ba07e4a4)",
+        "catlass git submodule (build_aclnn.sh 依赖, gitcode.com/cann/catlass.git)",
+        "Ascend HDK 26.0.RC1 (宿主机驱动/固件)",
+        "NPU 910B3 (aarch64, 需挂载 davinci 设备)"
+      ]
+    },
+    "ut_commands": {
+      "source": "AGENTS.md Testing 章节 + .github/workflows/scripts/run_selected_tests.sh",
+      "value": "pytest -sv tests/ut/ (CI 使用: pytest -sv --color=yes \u003ctarget\u003e, 如 pytest -sv tests/ut/ops/test_prepare_finalize.py; 无设备测试用 TORCH_DEVICE_BACKEND_AUTOLOAD=0)"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "quay.io/ascend/vllm-ascend:nightly-main-openeuler 镜像 (2 weeks ago) 包含 vLLM 0.26.0, 但 main 分支 vllm-ascend 代码已更新至需要 vLLM v0.27.1 (SituAndMul 类)。Dockerfile 指定 VLLM_TAG=v0.27.1, 但 nightly 镜像未同步更新, 导致 ImportError。",
+      "source": "pip install -e . 后 pytest collect-only 触发 ImportError",
+      "time": "2026-09-01T00:20:16",
+      "title": "nightly-main 镜像 vLLM 版本与 main 分支代码不同步"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "读取 README.md 提取 Prerequisites/Getting Started/Contributing 信息",
+      "command": "ssh root@192.168.9.114 \"cat /home/workspace/vllm-ascend-verify/README.md\"",
+      "details": {
+        "key_findings": "提取到 CANN==9.1.0, PyTorch==2.10.0, TorchNPU==2.10.0.post4, vLLM 同版本; 硬件 Atlas A2; 链接到 Installation/QuickStart/CONTRIBUTING 文档",
+        "source": "README.md"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "提取到 CANN==9.1.0, PyTorch==2.10.0, TorchNPU==2.10.0.post4, vLLM 同版本; 硬件 Atlas A2; 链接到 Installation/QuickStart/CONTRIBUTING 文档",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T23:11:44"
+    },
+    {
+      "action": "读取 CONTRIBUTING.md 跟进贡献指南",
+      "command": "ssh root@192.168.9.114 \"cat /home/workspace/vllm-ascend-verify/CONTRIBUTING.md\"",
+      "details": {
+        "key_findings": "指向在线开发者指南 https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/contribution/index.html",
+        "source": "CONTRIBUTING.md"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "指向在线开发者指南 https://docs.vllm.ai/projects/ascend/en/latest/developer_guide/contribution/index.html",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T23:11:44"
+    },
+    {
+      "action": "读取 AGENTS.md 提取 Testing 章节和构建说明",
+      "command": "ssh root@192.168.9.114 \"cat /home/workspace/vllm-ascend-verify/AGENTS.md\"",
+      "details": {
+        "key_findings": "UT 位于 tests/ut/, 命令 pytest -sv tests/ut/ops/test_prepare_finalize.py; ST 位于 tests/e2e/",
+        "source": "AGENTS.md"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "UT 位于 tests/ut/, 命令 pytest -sv tests/ut/ops/test_prepare_finalize.py; ST 位于 tests/e2e/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T23:11:44"
+    },
+    {
+      "action": "读取 Dockerfile 和 Dockerfile.openEuler 提取 FROM 和构建流程",
+      "command": "ssh root@192.168.9.114 \"cat /home/workspace/vllm-ascend-verify/Dockerfile + Dockerfile.openEuler\"",
+      "details": {
+        "key_findings": "FROM quay.io/ascend/cann:9.1.0-910b-openeuler24.03-py3.12 (Tier 1 信号); VLLM_TAG=v0.27.1; SOC_VERSION=ascend910b1; pip install -e . 构建 vllm-ascend",
+        "source": "Dockerfile + Dockerfile.openEuler"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "FROM quay.io/ascend/cann:9.1.0-910b-openeuler24.03-py3.12 (Tier 1 信号); VLLM_TAG=v0.27.1; SOC_VERSION=ascend910b1; pip install -e . 构建 vllm-ascend",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T23:11:44"
+    },
+    {
+      "action": "读取 requirements.txt 和 pyproject.toml 提取依赖列表",
+      "command": "ssh root@192.168.9.114 \"cat /home/workspace/vllm-ascend-verify/requirements.txt + pyproject.toml\"",
+      "details": {
+        "key_findings": "torch==2.10.0, torch-npu==2.10.0.post4, triton-ascend==3.2.2, transformers==5.14.1 等",
+        "source": "requirements.txt + pyproject.toml"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "torch==2.10.0, torch-npu==2.10.0.post4, triton-ascend==3.2.2, transformers==5.14.1 等",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T23:11:44"
+    },
+    {
+      "action": "读取 setup.py 提取 CMake 构建系统和 SOC 自动检测",
+      "command": "ssh root@192.168.9.114 \"cat /home/workspace/vllm-ascend-verify/setup.py\"",
+      "details": {
+        "key_findings": "cmake_build_ext 构建 C++ 扩展; build_aclnn.sh 构建 ACLNN 算子; npu-smi 自动检测 SOC; MAX_JOBS 控制并发",
+        "source": "setup.py"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "cmake_build_ext 构建 C++ 扩展; build_aclnn.sh 构建 ACLNN 算子; npu-smi 自动检测 SOC; MAX_JOBS 控制并发",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T23:11:44"
+    },
+    {
+      "action": "读取安装指南 installation.md 和 install_vllm_ascend.inc.md",
+      "command": "ssh root@192.168.9.114 \"cat /home/workspace/vllm-ascend-verify/docs/source/getting_started/installation/\"",
+      "details": {
+        "key_findings": "三种安装路径: 预构建镜像/CANN 环境/基础环境; 源码安装: git clone vllm -\u003e VLLM_TARGET_DEVICE=empty pip install -e . -\u003e pip install -e . for vllm-ascend",
+        "source": "docs/source/getting_started/installation/"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "三种安装路径: 预构建镜像/CANN 环境/基础环境; 源码安装: git clone vllm -\u003e VLLM_TARGET_DEVICE=empty pip install -e . -\u003e pip install -e . for vllm-ascend",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T23:11:44"
+    },
+    {
+      "action": "读取 prebuilt_image.inc.md 和 cann_image/atlas-a2.inc.md 提取 docker pull 命令",
+      "command": "ssh root@192.168.9.114 \"cat /home/workspace/vllm-ascend-verify/docs/source/getting_started/\"",
+      "details": {
+        "key_findings": "docker pull quay.io/ascend/vllm-ascend:v0.23.0-openeuler (A2 openEuler); docker pull quay.io/ascend/cann:9.1.0-910b-openeuler24.03-py3.12; 容器启动含 NPU 设备挂载",
+        "source": "docs/source/getting_started/"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "docker pull quay.io/ascend/vllm-ascend:v0.23.0-openeuler (A2 openEuler); docker pull quay.io/ascend/cann:9.1.0-910b-openeuler24.03-py3.12; 容器启动含 NPU 设备挂载",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T23:11:44"
+    },
+    {
+      "action": "读取 quick_start.md 和 offline/qwen3-0.6b.inc.md 提取样例命令",
+      "command": "ssh root@192.168.9.114 \"cat /home/workspace/vllm-ascend-verify/docs/source/getting_started/quick_start/\"",
+      "details": {
+        "key_findings": "离线推理样例: LLM(model='Qwen/Qwen3-0.6B'), python3 example.py; 验证命令 torch.npu.is_available()",
+        "source": "docs/source/getting_started/quick_start/"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "离线推理样例: LLM(model='Qwen/Qwen3-0.6B'), python3 example.py; 验证命令 torch.npu.is_available()",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T23:11:44"
+    },
+    {
+      "action": "读取 .github/workflows/scripts/run_selected_tests.sh 提取 CI 测试执行方式",
+      "command": "ssh root@192.168.9.114 \"cat /home/workspace/vllm-ascend-verify/.github/workflows/scripts/run_selected_tests.sh\"",
+      "details": {
+        "key_findings": "CI 使用 pytest -sv --color=yes \u003ctarget\u003e; 区分 with-device/without-device; CPU 测试设 TORCH_DEVICE_BACKEND_AUTOLOAD=0",
+        "source": ".github/workflows/scripts/run_selected_tests.sh"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "CI 使用 pytest -sv --color=yes \u003ctarget\u003e; 区分 with-device/without-device; CPU 测试设 TORCH_DEVICE_BACKEND_AUTOLOAD=0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T23:11:44"
+    },
+    {
+      "action": "读取 .gitmodules 和 .github/vllm-main-verified.commit 提取子模块和 vLLM 版本",
+      "command": "ssh root@192.168.9.114 \"cat /home/workspace/vllm-ascend-verify/.gitmodules + .github/vllm-main-verified.commit\"",
+      "details": {
+        "key_findings": "catlass 子模块 (gitcode.com/cann/catlass.git); vLLM main 验证 commit: ba07e4a4; VLLM_TAG=v0.27.1",
+        "source": ".gitmodules + .github/vllm-main-verified.commit"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "catlass 子模块 (gitcode.com/cann/catlass.git); vLLM main 验证 commit: ba07e4a4; VLLM_TAG=v0.27.1",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T23:11:44"
+    },
+    {
+      "action": "查询 quay.io registry API 确认可用镜像 tag",
+      "command": "ssh root@192.168.9.114 \"cat /home/workspace/vllm-ascend-verify/quay.io/api/v1/repository/ascend/\"",
+      "details": {
+        "key_findings": "vllm-ascend: nightly-main-openeuler (main 分支 A2 openEuler); cann: 9.1.0-910b-openeuler24.03-py3.12 均存在",
+        "source": "quay.io/api/v1/repository/ascend/"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "vllm-ascend: nightly-main-openeuler (main 分支 A2 openEuler); cann: 9.1.0-910b-openeuler24.03-py3.12 均存在",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T23:11:44"
+    },
+    {
+      "action": "读取 nightly_config.yaml 提取 A2 测试配置",
+      "command": "ssh root@192.168.9.114 \"cat /home/workspace/vllm-ascend-verify/.github/workflows/configs/nightly_config.yaml\"",
+      "details": {
+        "key_findings": "A2 单卡/多卡 E2E 测试配置; os: linux-aarch64-a2b3-N",
+        "source": ".github/workflows/configs/nightly_config.yaml"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "A2 单卡/多卡 E2E 测试配置; os: linux-aarch64-a2b3-N",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T23:11:44"
+    },
+    {
+      "action": "探测 npu-smi info 确认 NPU 硬件状态",
+      "command": "ssh root@192.168.9.114 \"cat /home/workspace/vllm-ascend-verify/npu-smi info\"",
+      "details": {
+        "key_findings": "8 张 910B3 卡 (0-7); 卡 0 Critical, 卡 1 Alarm, 卡 2-7 OK; 驱动 25.5.0",
+        "source": "npu-smi info"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "8 张 910B3 卡 (0-7); 卡 0 Critical, 卡 1 Alarm, 卡 2-7 OK; 驱动 25.5.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T23:11:44"
+    },
+    {
+      "action": "查询 quay.io registry API 确认 vllm-ascend 镜像可用 tag",
+      "command": "curl -s 'https://quay.io/api/v1/repository/ascend/vllm-ascend/tag/?limit=50\u0026onlyActiveTags=true'",
+      "details": {
+        "image_size": "17.9GB",
+        "reason": "main 分支 nightly 构建, A2, openEuler, 含全套依赖",
+        "registry": "quay.io/api/v1/repository/ascend/vllm-ascend/tag/",
+        "selected_tag": "nightly-main-openeuler"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "nightly-main-openeuler tag 存在, 2 weeks ago, 17.9GB。备选 cann:9.1.0-910b-openeuler24.03-py3.12 也存在",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-31T23:32:07"
+    },
+    {
+      "action": "docker pull quay.io/ascend/vllm-ascend:nightly-main-openeuler",
+      "command": "docker pull quay.io/ascend/vllm-ascend:nightly-main-openeuler",
+      "details": {
+        "digest": "sha256:933b77f733a69f7b4adb79c8e1d52f22549b8c3553e828ca9d790a7f62b2e2e1",
+        "image": "quay.io/ascend/vllm-ascend:nightly-main-openeuler",
+        "size": "17.9GB"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Status: Image is up to date for quay.io/ascend/vllm-ascend:nightly-main-openeuler",
+      "result": "成功 (镜像已存在, 确认为 up to date)",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-31T23:32:07"
+    },
+    {
+      "action": "启动容器 vllm-ascend-ttfhw, 挂载 NPU 设备和工作目录",
+      "command": "docker run -d --name vllm-ascend-ttfhw --device /dev/davinci2 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi -v /usr/local/Ascend/driver:/usr/local/Ascend/driver -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware -v /usr/local/dcmi:/usr/local/dcmi -v /etc/ascend_install.info:/etc/ascend_install.info -v /home/workspace/vllm-ascend-verify:/workspace --shm-size=1g quay.io/ascend/vllm-ascend:nightly-main-openeuler sleep infinity",
+      "details": {
+        "container_name": "vllm-ascend-ttfhw",
+        "image": "quay.io/ascend/vllm-ascend:nightly-main-openeuler",
+        "mounted_device": "/dev/davinci2 (卡 0 Critical/卡 1 Alarm 跳过, 使用卡 2 OK 状态)",
+        "mounts": [
+          "/usr/local/sbin/npu-smi",
+          "/usr/local/bin/npu-smi",
+          "/usr/local/Ascend/driver",
+          "/usr/local/Ascend/firmware",
+          "/usr/local/dcmi",
+          "/etc/ascend_install.info",
+          "/home/workspace/vllm-ascend-verify:/workspace"
+        ],
+        "npu_devices": [
+          "/dev/davinci2",
+          "/dev/davinci_manager",
+          "/dev/devmm_svm",
+          "/dev/hisi_hdc"
+        ],
+        "shm_size": "1g",
+        "startup_command_source": "readme (atlas-a2.inc.md docker run 命令 + prompt NPU 挂载参数合并)"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "0578135d6a82a366534ea07ef89c92f25e19cd3c8d021077e66dbc9a2c97ee18",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-31T23:32:07"
+    },
+    {
+      "action": "验证 npu-smi info 可用性",
+      "command": "docker exec vllm-ascend-ttfhw bash -c 'source /usr/local/Ascend/ascend-toolkit/set_env.sh; npu-smi info'",
+      "details": {
+        "pre_installed": true,
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "NPU 25.5.0, 卡 2 910B3 OK, HBM 3436/65536 MB",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-31T23:32:07"
+    },
+    {
+      "action": "验证 torch.npu.is_available()",
+      "command": "docker exec vllm-ascend-ttfhw bash -c 'source /usr/local/Ascend/ascend-toolkit/set_env.sh; python3 -c 'import torch; print(torch.npu.is_available())''",
+      "details": {
+        "pre_installed": true,
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "NPU available: True, count: 1, name: Ascend910B3",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-31T23:32:07"
+    },
+    {
+      "action": "验证 PyTorch 版本",
+      "command": "docker exec vllm-ascend-ttfhw bash -c 'source /usr/local/Ascend/ascend-toolkit/set_env.sh; python3 -c 'import torch; print(torch.__version__)''",
+      "details": {
+        "pre_installed": true,
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "torch: 2.10.0+cpu",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-31T23:32:07"
+    },
+    {
+      "action": "验证 TorchNPU 版本",
+      "command": "docker exec vllm-ascend-ttfhw bash -c 'source /usr/local/Ascend/ascend-toolkit/set_env.sh; python3 -c 'import torch_npu; print(torch_npu.__version__)''",
+      "details": {
+        "pre_installed": true,
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "torch_npu: 2.10.0.post4",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-31T23:32:07"
+    },
+    {
+      "action": "验证 vLLM 版本",
+      "command": "docker exec vllm-ascend-ttfhw bash -c 'source /usr/local/Ascend/ascend-toolkit/set_env.sh; python3 -c 'import vllm; print(vllm.__version__)''",
+      "details": {
+        "pre_installed": true,
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "vllm: 0.26.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-31T23:32:07"
+    },
+    {
+      "action": "验证 vllm-ascend 已安装 (editable)",
+      "command": "docker exec vllm-ascend-ttfhw bash -c 'source /usr/local/Ascend/ascend-toolkit/set_env.sh; pip show vllm-ascend'",
+      "details": {
+        "pre_installed": true,
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "vllm_ascend 0.19.1rc2.dev1475+gaf337dfa8, editable from /vllm-workspace/vllm-ascend, import resolves to /workspace/vllm_ascend (our source)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-31T23:32:07"
+    },
+    {
+      "action": "验证 CANN 环境",
+      "command": "docker exec vllm-ascend-ttfhw bash -c 'source /usr/local/Ascend/ascend-toolkit/set_env.sh; ls /usr/local/Ascend/ascend-toolkit/latest/set_env.sh'",
+      "details": {
+        "pre_installed": true,
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "CANN set_env.sh 存在",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-31T23:32:07"
+    },
+    {
+      "action": "验证 NNAL/libatb 环境",
+      "command": "docker exec vllm-ascend-ttfhw bash -c 'source /usr/local/Ascend/ascend-toolkit/set_env.sh; ls /usr/local/Ascend/nnal/atb/set_env.sh'",
+      "details": {
+        "pre_installed": true,
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "NNAL set_env.sh 存在",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-31T23:32:07"
+    },
+    {
+      "action": "验证容器 CPU 可用性",
+      "command": "docker exec vllm-ascend-ttfhw bash -c 'source /usr/local/Ascend/ascend-toolkit/set_env.sh; lscpu + os.sched_getaffinity'",
+      "details": {
+        "pre_installed": true,
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "256 核可用 (cpuset 0-255), 编译并发将使用 256×30%=76",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-31T23:32:07"
+    },
+    {
+      "action": "Tier 1 预构建镜像依赖检查 - 跳过依赖安装 (CANN/PyTorch/TorchNPU/vLLM/triton-ascend 均已预装)",
+      "command": "docker exec vllm-ascend-ttfhw pip show vllm-ascend",
+      "details": {
+        "pre_installed": [
+          "CANN 9.1.0",
+          "PyTorch 2.10.0",
+          "TorchNPU 2.10.0.post4",
+          "vLLM 0.26.0",
+          "triton-ascend 3.2.2",
+          "mooncake",
+          "modelscope",
+          "ray"
+        ],
+        "reason": "镜像已含全套依赖, 仅需从 main 分支源码重新构建 vllm-ascend (步骤 3)",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "vllm_ascend 0.19.1rc2.dev1475+gaf337dfa8 已安装 (editable), 需从 main 分支源码重新构建",
+      "result": "跳过",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-31T23:32:07"
+    },
+    {
+      "action": "初始化 catlass git 子模块 (build_aclnn.sh 依赖)",
+      "command": "docker exec vllm-ascend-ttfhw bash -c 'cd /workspace \u0026\u0026 git submodule sync \u0026\u0026 git submodule update --init --recursive'",
+      "details": {
+        "commit": "41bf90da655bba3c66d0acd7e00abe33960ecfd6",
+        "submodule": "csrc/third_party/catlass",
+        "url": "https://gitcode.com/cann/catlass.git"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "Submodule path 'csrc/third_party/catlass': checked out '41bf90da655bba3c66d0acd7e00abe33960ecfd6'",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-31T23:59:46"
+    },
+    {
+      "action": "执行 pip install -e . 构建 vllm-ascend (CMake 编译 C++ 扩展 + ACLNN 自定义算子)",
+      "command": "docker exec vllm-ascend-ttfhw bash -c 'cd /workspace \u0026\u0026 source /usr/local/Ascend/ascend-toolkit/set_env.sh \u0026\u0026 source /usr/local/Ascend/nnal/atb/set_env.sh \u0026\u0026 export SOC_VERSION=ascend910b1 MAX_JOBS=76 VLLM_BATCH_INVARIANT=1 \u0026\u0026 pip install --no-build-isolation --no-deps -e . --extra-index-url https://download.pytorch.org/whl/cpu/'",
+      "details": {
+        "build_phases": [
+          "(1) build_aclnn.sh: 编译 82 个 ACLNN 自定义算子二进制",
+          "(2) cmake_build_ext: CMake 配置 + -j=76 编译 vllm_ascend_C target"
+        ],
+        "command": "pip install --no-build-isolation --no-deps -e . --extra-index-url https://download.pytorch.org/whl/cpu/",
+        "device_type": "A2",
+        "duration_seconds": 1230,
+        "end_time": "2026-08-31T15:57:35Z",
+        "env": {
+          "MAX_JOBS": "76",
+          "OMP_NUM_THREADS": "1",
+          "PIP_EXTRA_INDEX_URL": "https://mirrors.huaweicloud.com/ascend/repos/pypi",
+          "SOC_VERSION": "ascend910b1",
+          "TASK_QUEUE_ENABLE": "1",
+          "VLLM_BATCH_INVARIANT": "1"
+        },
+        "installed_version": "0.1.dev1+g218644dc9",
+        "start_time": "2026-08-31T15:37:05Z"
+      },
+      "duration_seconds": 1230,
+      "error": "",
+      "output": "Successfully installed vllm_ascend-0.1.dev1+g218644dc9; 8 个 .so 产物; __device_type__=A2; import vllm_ascend 成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-31T23:59:46"
+    },
+    {
+      "action": "验证构建产物和 import 可用性",
+      "command": "docker exec vllm-ascend-ttfhw python3 -c 'import vllm_ascend; print(vllm_ascend.__file__)'",
+      "details": {
+        "device_type": "A2",
+        "import_path": "/workspace/vllm_ascend/__init__.py",
+        "so_files_count": 8
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "import vllm_ascend 成功, Platform plugin ascend is activated",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-31T23:59:46"
+    },
+    {
+      "action": "更新 vLLM 从 0.26.0 到 0.27.1 (nightly 镜像版本过旧, 缺少 SituAndMul 类)",
+      "command": "docker exec vllm-ascend-ttfhw bash -c 'cd /vllm-workspace/vllm \u0026\u0026 git fetch --depth 1 origin tag v0.27.1 \u0026\u0026 git checkout v0.27.1 \u0026\u0026 pip install setuptools-rust \u0026\u0026 VLLM_TARGET_DEVICE=empty pip install --no-build-isolation --no-deps -e .'",
+      "details": {
+        "extra_step": "安装 setuptools-rust (vLLM 0.27.1 setup.py 依赖)",
+        "new_version": "0.27.1+empty",
+        "old_version": "0.26.0+empty",
+        "reason": "vllm-ascend main 分支代码需要 vLLM v0.27.1 的 SituAndMul 类"
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "Successfully installed vllm-0.27.1+empty; SituAndMul import OK; vllm_ascend import OK",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-09-01T00:09:55"
+    },
+    {
+      "action": "执行第一批 UT: 12 个独立测试文件 (tests/ut/test_*.py)",
+      "command": "docker exec vllm-ascend-ttfhw bash -c 'cd /workspace \u0026\u0026 export VLLM_WORKER_MULTIPROC_METHOD=spawn TORCH_DEVICE_BACKEND_AUTOLOAD=0 \u0026\u0026 python3 -m pytest -sv tests/ut/test_envs.py tests/ut/test_platform.py tests/ut/test_utils.py tests/ut/test_ascend_config.py tests/ut/test_logger.py tests/ut/test_dependency_documentation.py tests/ut/test_meta_registration.py tests/ut/test_profiling_config.py tests/ut/test_batch_invariant.py tests/ut/test_ascend_forward_context.py tests/ut/test_compressed_prefix_cache.py tests/ut/test_cpu_binding.py'",
+      "details": {
+        "duration": "9.25s",
+        "env": {
+          "TORCH_DEVICE_BACKEND_AUTOLOAD": "0",
+          "VLLM_WORKER_MULTIPROC_METHOD": "spawn"
+        },
+        "failed": 0,
+        "passed": 269,
+        "skipped": 2,
+        "test_files": [
+          "test_envs.py",
+          "test_platform.py",
+          "test_utils.py",
+          "test_ascend_config.py",
+          "test_logger.py",
+          "test_dependency_documentation.py",
+          "test_meta_registration.py",
+          "test_profiling_config.py",
+          "test_batch_invariant.py",
+          "test_ascend_forward_context.py",
+          "test_compressed_prefix_cache.py",
+          "test_cpu_binding.py"
+        ]
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "269 passed, 2 skipped, 15 warnings in 9.25s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-09-01T00:09:55"
+    },
+    {
+      "action": "执行第二批 UT: 16 个子目录测试文件 (attention/compilation/core/device/quantization/sample/spec_decode/worker)",
+      "command": "docker exec vllm-ascend-ttfhw bash -c 'cd /workspace \u0026\u0026 export VLLM_WORKER_MULTIPROC_METHOD=spawn TORCH_DEVICE_BACKEND_AUTOLOAD=0 \u0026\u0026 python3 -m pytest -sv tests/ut/attention/test_attention_mask.py tests/ut/attention/test_attention_utils.py tests/ut/attention/test_indexer.py tests/ut/compilation/test_graph_fusion_pass_manager.py tests/ut/compilation/test_npugraph_ex_utils_check.py tests/ut/core/test_batch_job_aware_scheduler.py tests/ut/core/test_recompute_scheduler.py tests/ut/core/test_score_encoder_cache_manager.py tests/ut/device/test_device_config.py tests/ut/device/test_hardware_profile.py tests/ut/quantization/test_utils.py tests/ut/quantization/test_quant_parser.py tests/ut/sample/test_sampler.py tests/ut/sample/test_rejection_sampler.py tests/ut/spec_decode/test_utils.py tests/ut/worker/test_attn_utils_v2.py'",
+      "details": {
+        "duration": "1.92s",
+        "env": {
+          "TORCH_DEVICE_BACKEND_AUTOLOAD": "0",
+          "VLLM_WORKER_MULTIPROC_METHOD": "spawn"
+        },
+        "failed": 0,
+        "passed": 215,
+        "skipped": 2,
+        "test_files": [
+          "attention/test_attention_mask.py",
+          "attention/test_attention_utils.py",
+          "attention/test_indexer.py",
+          "compilation/test_graph_fusion_pass_manager.py",
+          "compilation/test_npugraph_ex_utils_check.py",
+          "core/test_batch_job_aware_scheduler.py",
+          "core/test_recompute_scheduler.py",
+          "core/test_score_encoder_cache_manager.py",
+          "device/test_device_config.py",
+          "device/test_hardware_profile.py",
+          "quantization/test_utils.py",
+          "quantization/test_quant_parser.py",
+          "sample/test_sampler.py",
+          "sample/test_rejection_sampler.py",
+          "spec_decode/test_utils.py",
+          "worker/test_attn_utils_v2.py"
+        ]
+      },
+      "duration_seconds": 20,
+      "error": "",
+      "output": "215 passed, 2 skipped, 14 warnings in 1.92s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-09-01T00:09:55"
+    },
+    {
+      "action": "从 ModelScope 下载 Qwen3-0.6B 模型 (1.5GB)",
+      "command": "docker exec vllm-ascend-ttfhw python3 -c 'from modelscope import snapshot_download; snapshot_download(\"Qwen/Qwen3-0.6B\", cache_dir=\"/workspace/.cache/modelscope\")'",
+      "details": {
+        "cache_dir": "/workspace/.cache/modelscope",
+        "download_time": "30s",
+        "model": "Qwen/Qwen3-0.6B",
+        "size": "1.5GB"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "MODEL_DIR: /workspace/.cache/modelscope/models/Qwen--Qwen3-0.6B/snapshots/master",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-09-01T00:20:16"
+    },
+    {
+      "action": "执行 Qwen3-0.6B 离线推理样例 (vLLM LLM.generate)",
+      "command": "docker exec vllm-ascend-ttfhw python3 -c 'from vllm import LLM, SamplingParams; llm = LLM(model=\"/workspace/.cache/modelscope/models/Qwen--Qwen3-0.6B/snapshots/master\"); outputs = llm.generate([\"Hello, my name is\", \"The future of AI is\"], SamplingParams(temperature=0.0, max_tokens=32))'",
+      "details": {
+        "device": "npu (Ascend910B3, davinci2)",
+        "engine_init_time": "60.42s",
+        "generated_texts": [
+          "Lina. I'm a 22-year-old student from China...",
+          "not just a technological frontier but a profound transformation..."
+        ],
+        "inference_time": "5.04s",
+        "kv_cache": "54.69 GiB, 512000 tokens",
+        "model_path": "/workspace/.cache/modelscope/models/Qwen--Qwen3-0.6B/snapshots/master",
+        "prompts": [
+          "Hello, my name is",
+          "The future of AI is"
+        ],
+        "sampling_params": "temperature=0.0, max_tokens=32",
+        "torch_compile_time": "20.69s"
+      },
+      "duration_seconds": 132,
+      "error": "",
+      "output": "Prompt: 'Hello, my name is', Generated text: \" Lina. I'm a 22-year-old student from China. I'm interested in studying in the US...\"; Prompt: 'The future of AI is', Generated text: ' not just a technological frontier but a profound transformation...'",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-09-01T00:20:16"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "vllm_ascend_C.cpython-312-aarch64-linux-gnu.so",
+          "path": "vllm_ascend/vllm_ascend_C.cpython-312-aarch64-linux-gnu.so",
+          "size": "848K",
+          "type": "library"
+        },
+        {
+          "name": "libvllm_ascend_kernels.so",
+          "path": "vllm_ascend/libvllm_ascend_kernels.so",
+          "size": "876K",
+          "type": "library"
+        },
+        {
+          "name": "libcust_opsproto_rt2.0.so",
+          "path": "vllm_ascend/_cann_ops_custom/vendors/custom_transformer/op_proto/lib/linux/aarch64/libcust_opsproto_rt2.0.so",
+          "size": "1.1M",
+          "type": "library"
+        },
+        {
+          "name": "libcust_opapi.so",
+          "path": "vllm_ascend/_cann_ops_custom/vendors/custom_transformer/op_api/lib/libcust_opapi.so",
+          "size": "1.2M",
+          "type": "library"
+        },
+        {
+          "name": "libcust_opmaster_rt2.0.so",
+          "path": "vllm_ascend/_cann_ops_custom/vendors/custom_transformer/op_impl/ai_core/tbe/op_tiling/lib/linux/aarch64/libcust_opmaster_rt2.0.so",
+          "size": "3.4M",
+          "type": "library"
+        },
+        {
+          "name": "libtransformer_aicpu_kernels.so",
+          "path": "vllm_ascend/_cann_ops_custom/vendors/custom_transformer/op_impl/cpu/aicpu_kernel/impl/libtransformer_aicpu_kernels.so",
+          "size": "5.2M",
+          "type": "library"
+        }
+      ],
+      "cmake": "CMake 4.4.2 (CMAKE_BUILD_TYPE=Release, FETCHCONTENT_BASE_DIR=/workspace/.deps)",
+      "compiler": "GCC 12.3.1 (openEuler 12.3.1-105.oe2403sp3), C++17, Clang 17.0.6",
+      "concurrency": 76,
+      "concurrency_ratio": "30% (256 核 × 30% = 76.8, 向下取整 76)",
+      "duration_seconds": 1230,
+      "notes": "使用 Tier 1 预构建镜像 quay.io/ascend/vllm-ascend:nightly-main-openeuler, --no-build-isolation --no-deps 避免重复安装依赖。构建分两阶段: (1) build_aclnn.sh 编译 ACLNN 自定义算子 (82 个算子二进制), (2) CMake 编译 C++ 扩展 (vllm_ascend_C target, -j=76)。构建产物 __device_type__=A2。",
+      "status": "success"
+    },
+    "sample": {
+      "duration_seconds": 132,
+      "results": [
+        {
+          "execution_status": "success",
+          "execution_time": "132s (引擎初始化 60s + 推理 5s + 编译/图捕获 67s)",
+          "output_summary": "Prompt: 'Hello, my name is' → \" Lina. I'm a 22-year-old student from China...\"; Prompt: 'The future of AI is' → ' not just a technological frontier but a profound transformation...'",
+          "sample_name": "Qwen3-0.6B 离线推理 (quick_start 样例)"
+        }
+      ],
+      "status": "success"
+    },
+    "ut": {
+      "duration_seconds": 50,
+      "failed": 0,
+      "failures": [],
+      "passed": 484,
+      "python": {
+        "failed": 0,
+        "modules": [
+          {
+            "failed": 0,
+            "name": "standalone (test_envs, test_platform, test_utils, test_ascend_config, test_logger, test_dependency_documentation, test_meta_registration, test_profiling_config, test_batch_invariant, test_ascend_forward_context, test_compressed_prefix_cache, test_cpu_binding)",
+            "passed": 269,
+            "skipped": 2
+          },
+          {
+            "failed": 0,
+            "name": "subdirectory (attention, compilation, core, device, quantization, sample, spec_decode, worker)",
+            "passed": 215,
+            "skipped": 2
+          }
+        ],
+        "passed": 484,
+        "status": "success",
+        "total": 488
+      },
+      "skipped": 4,
+      "status": "success",
+      "total": 488
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "vllm-ascend-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "openEuler 24.03 (LTS-SP3)"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920 (256 核, 4 Socket × 64 核)",
+      "disk": "/home 分区 6.0T 可用 (Docker Root: /home/docker-images)",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 2
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_dockerfile": "Dockerfile.openEuler: FROM quay.io/ascend/cann:9.1.0-910b-openeuler24.03-py3.12, yum install gcc gcc-c++ make cmake clang 等, pip install mooncake/modelscope/ray/vllm/vllm-ascend/triton-ascend",
+        "from_readme": "README: CANN==9.1.0, PyTorch==2.10.0, TorchNPU==2.10.0.post4, Python\u003e=3.10\u003c3.13",
+        "mappings": [
+          {
+            "original": "Dockerfile FROM quay.io/ascend/cann:9.1.0-910b-openeuler24.03-py3.12",
+            "source": "Dockerfile.openEuler + quay.io registry",
+            "target": "直接使用 quay.io/ascend/vllm-ascend:nightly-main-openeuler (含 CANN 基础镜像 + 全部依赖)"
+          }
+        ]
+      },
+      "image_name": "quay.io/ascend/vllm-ascend:nightly-main-openeuler",
+      "selection_reason": "Tier 1 业务预构建镜像: quay.io registry API 查询到 nightly-main-openeuler tag, 为 main 分支 nightly 构建 (A2/openEuler), 含 CANN 9.1.0/NNAL/PyTorch 2.10.0/TorchNPU 2.10.0.post4/vLLM 0.26.0/vllm-ascend 全套依赖。Dockerfile.openEuler FROM quay.io/ascend/cann:9.1.0-910b-openeuler24.03-py3.12 亦为 Tier 1 信号。宿主机 910B3 卡匹配 910b tag。",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "main",
+    "commit": "main 分支 (depth 1 clone, vllm-ascend 0.1.dev1+g218644dc9, vLLM v0.27.1)",
+    "duration_seconds": 5012,
+    "end_time": "2026-09-01T00:20:16",
+    "environment": "远程容器: quay.io/ascend/vllm-ascend:nightly-main-openeuler (openEuler 24.03, aarch64, 256 核 Kunpeng-920, 2.0Ti 内存, NPU 910B3)",
+    "repo_url": "https://github.com/vllm-project/vllm-ascend.git",
+    "start_time": "2026-08-31T22:56:44",
+    "total_steps": 35,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "nightly-main 镜像的 vLLM 版本 (0.26.0) 与 main 分支 vllm-ascend 代码不匹配, 缺少 SituAndMul 类导致 ImportError",
+      "solution": "按 Dockerfile 指定的 VLLM_TAG=v0.27.1 更新 vLLM: git fetch + checkout v0.27.1 + VLLM_TARGET_DEVICE=empty pip install -e . (需额外安装 setuptools-rust 依赖)",
+      "source": "tests/ut/ pytest collect-only 触发 ImportError: cannot import name 'SituAndMul'",
+      "timestamp": "2026-09-01T00:09:55"
+    },
+    {
+      "problem": "VLLM_USE_MODELSCOPE=True 设置后 vLLM 仍无法自动从 ModelScope 下载 Qwen/Qwen3-0.6B 模型 (报 Invalid repository ID)",
+      "solution": "手动使用 modelscope.snapshot_download 下载模型到本地, 然后在 LLM(model=...) 中使用本地路径",
+      "source": "sample_execution 第一次尝试失败",
+      "timestamp": "2026-09-01T00:20:16"
+    },
+    {
+      "problem": "NPU 卡 0 状态 Critical, 卡 1 状态 Alarm, 无法正常使用",
+      "solution": "使用卡 2 (OK 状态) 挂载 /dev/davinci2, torch.npu.is_available() 返回 True",
+      "source": "npu-smi info 检查",
+      "timestamp": "2026-09-01T00:20:16"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

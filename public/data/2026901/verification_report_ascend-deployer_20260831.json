@@ -1,0 +1,678 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md 快速入门 + docs/zh/03_quick_start/quick_start.md + .devcontainer/Dockerfile FROM",
+      "value": "aarch64（quick_start 以 openEuler 22.03 LTS AArch64 / Atlas 800T A2 训练服务器为例；远程机器为 aarch64）；开发镜像基础 OS 为 Ubuntu 22.04"
+    },
+    "build_commands": {
+      "source": "README.md 编译构建章节",
+      "value": "进入第一层目录（含 setup.py），执行：python3 setup.py bdist_wheel"
+    },
+    "build_entry": {
+      "source": "setup.py + README.md",
+      "value": "setup.py（setuptools 打包，name=ascend-deployer，entry_points: ascend-download/ascend-deployer/large-scale-deployer）"
+    },
+    "dependencies": {
+      "source": "README.md 编译构建章节 + setup.py + .devcontainer/Dockerfile + test/requirements.txt",
+      "value": [
+        "wheel\u003e=0.38.0",
+        "setuptools",
+        "pip",
+        "python3\u003e=3.6",
+        "pytest==8.4.1",
+        "pytest-html==4.1.1",
+        "coverage==7.13.5",
+        "pyfakefs==5.9.1",
+        "pyyaml==6.0.2",
+        "git",
+        "ansible-core==2.13.0(开发容器可选)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": ".devcontainer/Dockerfile + .devcontainer/requirements-dev.txt + test/requirements.txt",
+      "value": [
+        {
+          "original": "apt-get install python3 python3-pip python3-venv git openssh-client sshpass curl wget tar unzip bzip2 xz-utils iproute2 net-tools iputils-ping lsb-release sudo less jq",
+          "target_equivalent": "Dockerfile 原样安装（Ubuntu 22.04 apt），无需跨发行版映射"
+        },
+        {
+          "original": "python3 -m pip install --upgrade pip setuptools wheel",
+          "target_equivalent": "Dockerfile 原样执行（构建仅需 pip/setuptools/wheel，wheel\u003e=0.38.0）"
+        },
+        {
+          "original": "test/requirements.txt: pytest==8.4.1 pytest-html==4.1.1 coverage==7.13.5 pyfakefs==5.9.1 pyyaml==6.0.2",
+          "target_equivalent": "由 test/run_dt_tests.sh 自动 pip install -r test/requirements.txt 安装"
+        },
+        {
+          "original": "requirements-dev.txt: ansible-core==2.13.0 pre-commit==4.0.1 yamllint==1.35.1（继承 test/requirements.txt）",
+          "target_equivalent": "devcontainer postCreateCommand.sh 安装；UT 脚本本身不依赖，可选"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": ".devcontainer/devcontainer.json (build.dockerfile) + .devcontainer/Dockerfile (FROM ubuntu:22.04)",
+      "value": "Tier 2 Dockerfile 构建：基于 .devcontainer/Dockerfile 构建（FROM ubuntu:22.04，无业务预构建镜像）。devcontainer.json 使用 build.dockerfile 而非 image 字段；README 无 docker pull 自定义镜像；ascend_deployer/tools/nexus/Dockerfile 为第三方 Nexus 镜像，与本仓构建/测试无关"
+    },
+    "sample_commands": {
+      "source": "docs/zh/03_quick_start/quick_start.md + docs/zh/04_install_ascend_deployer/install_ascend_deployer.md + .devcontainer/readme.md 第8节",
+      "value": "ascend-deployer -h（或 python3 ascend_deployer/start_deploy.py --help、python3 ascend_deployer/ascend_download.py --help）验证入口可用；quick_start 另含 ascend-download/ascend-deployer --install 等命令（需真实 NPU/网络，不适合作冒烟）"
+    },
+    "special_dependencies": {
+      "source": "README.md + .devcontainer/Dockerfile APT_MIRROR/PIP_INDEX_URL 构建参数",
+      "value": [
+        "APT_MIRROR=https://repo.huaweicloud.com/ubuntu（apt 镜像）",
+        "PIP_INDEX_URL=https://repo.huaweicloud.com/repository/pypi/simple/（pip 镜像）",
+        "NPU/CANN/昇腾（仓库为昇腾软件部署工具，自身构建/UT 不直接依赖 NPU 硬件，但 npu_required=true 按关键词判定并按要求挂载）"
+      ]
+    },
+    "ut_commands": {
+      "source": "CONTRIBUTING.md 开发验证章节 + test/run_dt_tests.sh",
+      "value": "bash test/run_dt_tests.sh（脚本内：pip install -r test/requirements.txt；export PYTHONPATH=$PROJECT_DIR；python3 -m pytest test/ --junitxml=final.xml --html=final.html --self-contained-html；coverage xml -i）"
+    },
+    "ut_entry": {
+      "source": ".devcontainer/readme.md 第9节 运行基础测试 + CONTRIBUTING.md",
+      "value": "bash test/run_dt_tests.sh（全量）；亦可单独 python3 -m pytest test/test_utils.py -v 等"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "CONTRIBUTING.md 指定 bash test/run_dt_tests.sh 为本地 UT 入口；.devcontainer/readme.md 第9节声明 'python3 -m pytest test/test_utils.py -v → 9 passed'。但 dev 分支实际执行：test_utils.py 仅 3 passed/7 failed（get_validated_env 签名已变），全量 412 项中 112 passed/275 failed+error。UT 脚本未将 test/ 加入 PYTHONPATH 导致 library_test 不可导入；无 conftest.py；部分测试导入已删除的模块/符号。建议仓库补充 conftest.py 或在 run_dt_tests.sh 中 export PYTHONPATH 含 test/，并同步更新测试以匹配当前 API",
+      "source": "CONTRIBUTING.md + .devcontainer/readme.md + 实际执行结果对比",
+      "time": "2026-08-31T15:55:57",
+      "title": "贡献指南/开发容器文档声明的 UT 结果与 dev 分支实际不符"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "读取 README.md 提取构建命令/依赖/文档链接",
+      "command": "git clone --depth 1 --branch dev https://gitcode.com/Ascend/ascend-deployer.git /tmp/opencode/ascend-deployer-src \u0026\u0026 cat README.md",
+      "details": {
+        "build_cmd": "python3 setup.py bdist_wheel",
+        "file": "README.md",
+        "npu_keywords": "NPU/CANN/昇腾/Atlas"
+      },
+      "duration_seconds": 12,
+      "error": "",
+      "note": "",
+      "output": "README 含构建命令 python3 setup.py bdist_wheel（需 wheel\u003e=0.38.0）；UT 指向 CONTRIBUTING.md；样例指向 quick_start.md；含 NPU/CANN/昇腾关键词",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T15:32:48"
+    },
+    {
+      "action": "读取 CONTRIBUTING.md 提取 UT 执行命令",
+      "command": "cat CONTRIBUTING.md",
+      "details": {
+        "file": "CONTRIBUTING.md",
+        "ut_command": "bash test/run_dt_tests.sh"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "开发验证章节明确：bash test/run_dt_tests.sh；含 PR 流程、分支命名规则；链接社区规范",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T15:32:48"
+    },
+    {
+      "action": "读取 .devcontainer/devcontainer.json 探测镜像信号",
+      "command": "cat .devcontainer/devcontainer.json",
+      "details": {
+        "build_dockerfile": true,
+        "remote_user": "developer",
+        "tier1_signal": false
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "使用 build.dockerfile（非 image 字段指向预构建镜像）→ 无 Tier1 信号；remoteUser=developer；PYTHONPATH 设为工作区；postCreateCommand=bash .devcontainer/postCreateCommand.sh",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T15:32:48"
+    },
+    {
+      "action": "读取 .devcontainer/Dockerfile 提取 FROM 与依赖",
+      "command": "cat .devcontainer/Dockerfile",
+      "details": {
+        "apt_mirrors": true,
+        "from": "ubuntu:22.04",
+        "tier": 2
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "FROM ubuntu:22.04（纯基础 OS）→ Tier2 候选；apt 安装 python3/pip/venv/git/sshpass/curl/wget/jq 等；pip install --upgrade pip setuptools wheel；创建 developer 用户；USER developer, WORKDIR /workspaces/ascend-deployer",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-31T15:32:48"
+    },
+    {
+      "action": "读取 .devcontainer/readme.md 提取环境验证与测试命令",
+      "command": "cat .devcontainer/readme.md",
+      "details": {
+        "sample_help": "start_deploy.py --help",
+        "verified_passed": 9
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "第8节：python3 ascend_deployer/start_deploy.py --help / ascend_download.py --help 验证入口；第9节：python3 -m pytest test/test_utils.py -v（已验证 9 passed）；postCreateCommand 安装 requirements-dev.txt",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T15:32:48"
+    },
+    {
+      "action": "读取 .devcontainer/postCreateCommand.sh + requirements-dev.txt",
+      "command": "cat .devcontainer/postCreateCommand.sh .devcontainer/requirements-dev.txt",
+      "details": {
+        "dev_deps": [
+          "ansible-core==2.13.0",
+          "pre-commit==4.0.1",
+          "yamllint==1.35.1"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "postCreateCommand: pip install --user -r .devcontainer/requirements-dev.txt + pre_commit install；requirements-dev.txt 继承 test/requirements.txt 并加 ansible-core==2.13.0/pre-commit==4.0.1/yamllint==1.35.1",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T15:32:48"
+    },
+    {
+      "action": "读取 setup.py 提取打包配置",
+      "command": "cat setup.py",
+      "details": {
+        "entry_points": [
+          "ascend-download",
+          "ascend-deployer",
+          "large-scale-deployer"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "setuptools 打包 name=ascend-deployer v0.0.3 python_requires\u003e=3.6；entry_points: ascend-download/ascend-deployer/large-scale-deployer；构建前对 install.sh/start_download.sh/large_scale_install.sh 设可执行权限并 CRLF→LF",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T15:32:48"
+    },
+    {
+      "action": "读取 test/run_dt_tests.sh + test/requirements.txt + .coveragerc",
+      "command": "cat test/run_dt_tests.sh test/requirements.txt test/.coveragerc",
+      "details": {
+        "test_dir": "test/",
+        "ut_self_install": true
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "run_dt_tests.sh: pip install -r test/requirements.txt → PYTHONPATH=$PROJECT_DIR → pytest test/ --junitxml --html → coverage xml -i；test/requirements.txt: pytest==8.4.1/pytest-html==4.1.1/coverage==7.13.5/pyfakefs==5.9.1/pyyaml==6.0.2",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T15:32:48"
+    },
+    {
+      "action": "读取 docs/zh/03_quick_start/quick_start.md 提取样例命令",
+      "command": "cat docs/zh/03_quick_start/quick_start.md",
+      "details": {
+        "sample_cmds": [
+          "ascend-deployer -h",
+          "ascend-download ...",
+          "ascend-deployer --install=..."
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "样例：pip3 install ascend-deployer==\u003cversion\u003e；ascend-download --os-list=... --download=... ；ascend-deployer --install=... ；ascend-deployer --test=all；以 openEuler 22.03 LTS AArch64 / Atlas 800T A2 为例",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T15:32:48"
+    },
+    {
+      "action": "读取 docs/zh/04_install_ascend_deployer/install_ascend_deployer.md",
+      "command": "cat docs/zh/04_install_ascend_deployer/install_ascend_deployer.md",
+      "details": {
+        "init_cmd": "ascend-deployer -h",
+        "install_cmd": "pip3 install ascend-deployer=={version}"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "安装方式：pip3 install ascend-deployer=={version} 或下载 zip 解压；初始化命令 ascend-deployer -h；生成 $HOME/ascend-deployer 目录",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T15:32:48"
+    },
+    {
+      "action": "检查 ascend_deployer/tools/nexus/Dockerfile 是否为构建候选",
+      "command": "cat ascend_deployer/tools/nexus/Dockerfile",
+      "details": {
+        "from": "openeuler-20.03-lts-sp3",
+        "relevance": "无关"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "第三方 Nexus Repository Manager 镜像（FROM openeuler-20.03-lts-sp3，COPY rh-docker /，需 nexus tar 包），与本仓 deployer 的构建/测试无关，不作为 Tier2 候选",
+      "result": "跳过",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-31T15:32:48"
+    },
+    {
+      "action": "汇总文档闭包结果，按三级优先级确定镜像 Tier",
+      "command": "（本地分析，无远程命令）",
+      "details": {
+        "base_os": "ubuntu:22.04",
+        "dockerfile": ".devcontainer/Dockerfile",
+        "npu_required": true,
+        "tier": 2,
+        "tier1_hit": false,
+        "tier2_hit": true
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "note": "",
+      "output": "Tier1 无命中（devcontainer 用 build.dockerfile 非 image；README 无 docker pull 自定义镜像；无 harbor/registry 链接）。Tier2 命中：.devcontainer/Dockerfile FROM ubuntu:22.04。决定 Tier2：docker build -f .devcontainer/Dockerfile -t ascend-deployer-ttfhw . 后 docker run，再按 postCreateCommand 安装测试依赖",
+      "result": "Tier 2 Dockerfile 构建",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-31T15:32:48"
+    },
+    {
+      "action": "Tier2 构建 .devcontainer/Dockerfile 镜像 ascend-deployer-ttfhw:latest",
+      "command": "ssh root@192.168.9.114 'cd /home/workspace/ascend-deployer-verify \u0026\u0026 docker build -f .devcontainer/Dockerfile -t ascend-deployer-ttfhw:latest .'",
+      "details": {
+        "build_args": "APT_MIRROR/PIP_INDEX_URL 默认华为云",
+        "from": "ubuntu:22.04",
+        "tier": 2
+      },
+      "duration_seconds": 180,
+      "error": "",
+      "note": "",
+      "output": "Successfully built 19365c7494cb; Successfully tagged ascend-deployer-ttfhw:latest; 镜像含 python3.10.12/pip26.2.1/setuptools84.0.0/wheel0.48.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-31T15:38:50"
+    },
+    {
+      "action": "在远程机器 clone 仓库到 /home/workspace/ascend-deployer-verify",
+      "command": "ssh root@192.168.9.114 'git clone --depth 1 --branch dev https://gitcode.com/Ascend/ascend-deployer.git /home/workspace/ascend-deployer-verify'",
+      "details": {
+        "commit": "4cf66f2",
+        "remote_path": "/home/workspace/ascend-deployer-verify"
+      },
+      "duration_seconds": 20,
+      "error": "",
+      "note": "",
+      "output": "Cloning into ...; commit 4cf66f2 !2354 merge fix/torchnpu_dependencies_displayed_incorecctly into dev",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-31T15:38:50"
+    },
+    {
+      "action": "启动容器 ascend-deployer-ttfhw，挂载工作目录与 NPU 设备",
+      "command": "docker run -d --privileged --name ascend-deployer-ttfhw --device /dev/davinci2 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/Ascend/driver:/usr/local/Ascend/driver -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware -v /home/workspace/ascend-deployer-verify:/workspace -w /workspace --user root ascend-deployer-ttfhw:latest sleep infinity",
+      "details": {
+        "mounted_card_id": 2,
+        "skipped_critical_cards": [
+          0,
+          1
+        ],
+        "startup_command_source": "default_挂卡"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "note": "",
+      "output": "容器 Up；挂载 davinci2（card0 Critical/card1 Alarm 已跳过，选用 OK 状态的 card2）；启动命令来源=default_挂卡（README 未提供 docker run 命令）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-31T15:38:50"
+    },
+    {
+      "action": "收集容器规格与验证关键依赖",
+      "command": "docker exec ascend-deployer-ttfhw bash -c '...os/arch/cpu/mem/python/pip/wheel/npu-smi...'",
+      "details": {
+        "os": "Ubuntu 22.04.5 LTS",
+        "python": "3.10.12",
+        "wheel": "0.48.0"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "note": "",
+      "output": "Ubuntu 22.04.5 aarch64, 256 核, 2.0Ti; Python 3.10.12; wheel 0.48.0(\u003e=0.38.0); setuptools 84.0.0; /workspace 含 setup.py/README.md",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-31T15:38:50"
+    },
+    {
+      "action": "Tier2 跳过依赖安装（镜像已含构建依赖；UT 依赖由 run_dt_tests.sh 自动安装）",
+      "command": "（无远程命令，Tier2 镜像已含 python3/pip/setuptools/wheel）",
+      "details": {
+        "skip_reason": "镜像已含构建依赖",
+        "tier": 2,
+        "ut_self_install": true
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "note": "",
+      "output": "Tier2 规则：docker build 后跳过依赖安装直接进入构建。build 仅需 setuptools/wheel（已含）；UT 依赖 pytest/coverage/pyfakefs/pyyaml 由 test/run_dt_tests.sh 内 pip install -r test/requirements.txt 自动安装",
+      "result": "跳过",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-31T15:38:50"
+    },
+    {
+      "action": "验证 NPU 设备挂载情况（npu_required=true）",
+      "command": "docker exec ascend-deployer-ttfhw 'npu-smi info'",
+      "details": {
+        "impact": "无影响（ascend-deployer 为 Python 部署工具，构建/UT 使用 mock，不直接调用 NPU/DCMI）",
+        "npu_in_container": "二进制缺库"
+      },
+      "duration_seconds": 2,
+      "error": "npu-smi 二进制缺少驱动库 libc_sec.so（仅挂载了 npu-smi 二进制和 driver/firmware 目录，未含完整 lib64）",
+      "note": "",
+      "output": "npu-smi: error while loading shared libraries: libc_sec.so: cannot open shared object file",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-31T15:38:50"
+    },
+    {
+      "action": "在容器内执行 python3 setup.py bdist_wheel 构建 wheel",
+      "command": "docker exec -w /workspace ascend-deployer-ttfhw bash -c 'export PYTHONPATH=/workspace:$PYTHONPATH; time python3 setup.py bdist_wheel'",
+      "details": {
+        "artifact": "dist/ascend_deployer-0.0.3-py3-none-any.whl",
+        "command": "python3 setup.py bdist_wheel",
+        "concurrency": 51,
+        "size_bytes": 817460
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "仓库提供的构建入口（README+setup.py）一次成功，无需重试",
+      "output": "构建成功，real 0m0.683s；产物 dist/ascend_deployer-0.0.3-py3-none-any.whl(799K)；含 entry_points: ascend-deployer/ascend-download/large-scale-deployer",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-31T15:40:00"
+    },
+    {
+      "action": "执行仓库 UT 脚本 bash test/run_dt_tests.sh（首次）",
+      "command": "docker exec -w /workspace ascend-deployer-ttfhw bash -c 'time bash test/run_dt_tests.sh'",
+      "details": {
+        "collected": 412,
+        "collection_errors": 3
+      },
+      "duration_seconds": 6,
+      "error": "3 个 collection error：ascend_deployer.ascend_deployer 模块缺失、CONFIG_INST 缺失、library_test 不可导入（test/ 未加入 PYTHONPATH）",
+      "note": "脚本内仅 export PYTHONPATH=$PROJECT_DIR（=/workspace），未加 test/；且无 conftest.py",
+      "output": "collected 412 items / 3 errors；Interrupted: 3 errors during collection（test_ascend_deployer.py、test/downloader/test_utils.py、test/library/test_scp.py）；0 测试执行",
+      "result": "失败",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-31T15:55:57"
+    },
+    {
+      "action": "分析 collection error 根因：2 项测试漂移 + 1 项路径配置",
+      "command": "grep -n CONFIG_INST ascend_deployer/utils.py; ls ascend_deployer/ascend_deployer.py; find . -name conftest.py",
+      "details": {
+        "path_fixable": "library_test",
+        "test_drift": [
+          "CONFIG_INST",
+          "ascend_deployer.ascend_deployer"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "CONFIG_INST 不存在；ascend_deployer/ascend_deployer.py 不存在（模块已删除）；无 conftest.py/pytest.ini。library_test 路径问题可由加 test/ 到 PYTHONPATH 修复；另两项为测试漂移不可由环境修复",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-08-31T15:55:57"
+    },
+    {
+      "action": "UT 重试：加 test/ 到 PYTHONPATH + --continue-on-collection-errors + 安装 pytest-timeout 防挂起",
+      "command": "docker exec ... 'pip install pytest-timeout; export PYTHONPATH=/workspace:/workspace/test; python3 -m pytest test/ --continue-on-collection-errors --timeout=30 --timeout-method=signal --ignore=test/downloader/test_image_downloader.py'",
+      "details": {
+        "errors": 217,
+        "failed": 58,
+        "ignored_file": "test/downloader/test_image_downloader.py",
+        "passed": 112,
+        "timeout_tool": "pytest-timeout==2.3.1"
+      },
+      "duration_seconds": 15,
+      "error": "217 errors 根因：mock_pwd 未实现 getpwuid；58 failed 为 CLI/API 签名漂移；test_image_downloader.py::test_retries_on_5xx_then_succeeds 因 mock 不完整触发真实 HTTP 重试循环挂起，已排除",
+      "note": "dev 分支测试与代码大面积不同步：mock_pwd 不完整、CLI/API 已重构、部分模块删除，需仓库侧修复测试",
+      "output": "112 passed, 58 failed, 217 errors, 3 warnings in 11.33s（排除挂起文件后）",
+      "result": "失败",
+      "returncode": 1,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-08-31T15:55:57"
+    },
+    {
+      "action": "pip install 构建 wheel 并执行 ascend-deployer -h 冒烟",
+      "command": "docker exec ascend-deployer-ttfhw 'pip install dist/ascend_deployer-0.0.3-py3-none-any.whl \u0026\u0026 ascend-deployer -h'",
+      "details": {
+        "entry": "ascend-deployer",
+        "wheel": "ascend_deployer-0.0.3-py3-none-any.whl"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "note": "",
+      "output": "Successfully installed ascend-deployer-0.0.3；ascend-deployer -h 打印 usage（Manage Ascend Packages...），入口可用",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-31T15:57:09"
+    },
+    {
+      "action": "执行 ascend-download -h 与 start_deploy.py --help 验证全部入口",
+      "command": "docker exec ascend-deployer-ttfhw 'ascend-download -h; python3 ascend_deployer/start_deploy.py --help'",
+      "details": {
+        "entries": [
+          "ascend-deployer",
+          "ascend-download",
+          "start_deploy.py"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "样例命令来源：.devcontainer/readme.md 第8节 + docs/zh/03_quick_start/quick_start.md + docs/zh/04_install_ascend_deployer/install_ascend_deployer.md",
+      "output": "ascend-download -h 打印 usage（Download Ascend Packages...）；start_deploy.py --help 打印 usage，二者均正常",
+      "result": "成功",
+      "returncode": 0,
+      "step": "smoke_test",
+      "success": true,
+      "timestamp": "2026-08-31T15:57:09"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "ascend_deployer-0.0.3-py3-none-any.whl",
+          "path": "dist/ascend_deployer-0.0.3-py3-none-any.whl",
+          "size": "799K(817460字节)",
+          "type": "wheel"
+        }
+      ],
+      "cmake": "无（Python setuptools 打包，非 CMake 工程）",
+      "compiler": "无（Python wheel 打包，py3-none-any）",
+      "concurrency": 51,
+      "concurrency_ratio": "容器核数 256 × 20% = 51（向下取整，至少 1）；本仓为 Python wheel 打包，无并行编译阶段",
+      "duration_seconds": 1,
+      "notes": "构建命令 python3 setup.py bdist_wheel 一次成功；setup.py 先对 install.sh/start_download.sh/large_scale_install.sh 设可执行权限并做 CRLF→LF 转换，再 setuptools 打包。产物为纯 Python wheel（py3-none-any），含 playbooks/scripts/yamls 等资源",
+      "status": "success"
+    },
+    "sample": {
+      "duration_seconds": 3,
+      "results": [
+        {
+          "execution_status": "success",
+          "execution_time": "\u003c1s",
+          "output_summary": "pip install dist/ascend_deployer-0.0.3-py3-none-any.whl 成功；ascend-deployer -h 打印 usage（-h/--check/--clean/--install/--upgrade/--test/--hccn 等，描述 'Manage Ascend Packages and dependence packages for specified OS'），入口可正常加载",
+          "sample_name": "pip install 构建产物 + ascend-deployer -h（冒烟）"
+        },
+        {
+          "execution_status": "success",
+          "execution_time": "\u003c1s",
+          "output_summary": "ascend-download -h 打印 usage（--os-list/--download/--show-releases，描述 'Download Ascend Packages and dependence packages for specified OS'），含 MD5 自更新配置提示后正常输出帮助",
+          "sample_name": "ascend-download -h"
+        },
+        {
+          "execution_status": "success",
+          "execution_time": "\u003c1s",
+          "output_summary": ".devcontainer/readme.md 第8节验证入口：start_deploy.py --help 正常打印 usage，与 ascend-deployer -h 一致，证明 PYTHONPATH 加载源码可用",
+          "sample_name": "python3 ascend_deployer/start_deploy.py --help"
+        }
+      ],
+      "status": "success"
+    },
+    "ut": {
+      "duration_seconds": 12,
+      "failed": 275,
+      "failures": [
+        {
+          "error": "AttributeError: module 'library_test.mock_manage.mock_model.mock_pwd' has no attribute 'getpwuid'. Did you mean: 'getpwnam'? — 被 module 下代码调用 pwd.getpwuid() 触发，mock 仅实现 getpwnam，setup 阶段即失败",
+          "test_name": "library_test/module_utils_test 全量（约200+项）"
+        },
+        {
+          "error": "ModuleNotFoundError: No module named 'ascend_deployer.ascend_deployer'（dev 分支已删除/重命名该模块，测试未同步）",
+          "test_name": "test/test_ascend_deployer.py（collection error）"
+        },
+        {
+          "error": "ImportError: cannot import name 'CONFIG_INST' from 'ascend_deployer.utils'（符号已不存在）",
+          "test_name": "test/downloader/test_utils.py（collection error）"
+        },
+        {
+          "error": "TypeError: get_validated_env() got an unexpected keyword argument 'min_length'/'max_length'/'check_symlink'（函数签名已重构，测试未同步）",
+          "test_name": "test/test_utils.py::TestGetValidatedEnv（7 failed）"
+        },
+        {
+          "error": "AttributeError 系列：CLI API 已重构（初始化/参数/方法名变更），st 测试断言旧接口",
+          "test_name": "test/st/test_download.py、test/st/test_start_deploy.py（约30 failed）"
+        },
+        {
+          "error": "mock 不完整导致 _download_blob 触发真实 HTTP 重试循环（resp.read 卡死），pytest-timeout 线程法无法杀死 unittest，需 --ignore 排除",
+          "test_name": "test/downloader/test_image_downloader.py::test_retries_on_5xx_then_succeeds（挂起被排除）"
+        }
+      ],
+      "passed": 112,
+      "python": {
+        "failed": 275,
+        "modules": [
+          {
+            "module": "_summary",
+            "note": "排除挂起文件后：112 passed, 58 failed, 217 errors（11.33s）。217 errors 绝大多数根因相同：mock_pwd 未实现 getpwuid；58 failed 为 API/签名漂移；另 1 个文件 test_image_downloader.py 因 mock 不完整触发真实 HTTP 重试循环挂起被排除"
+          }
+        ],
+        "passed": 112,
+        "status": "failed",
+        "total": 387
+      },
+      "skipped": 0,
+      "status": "failed",
+      "total": 387
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "ascend-deployer-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "Ubuntu 22.04.5 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "6.9T(/home 挂载，可用 6.0T)",
+      "docker_version": "18.09.0",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 2
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_dockerfile": ".devcontainer/Dockerfile（Ubuntu 22.04 apt，OS 一致无需跨发行版映射）",
+        "from_readme": "README 构建仅需 wheel\u003e=0.38.0（镜像已含 wheel 0.48.0）",
+        "mappings": []
+      },
+      "image_name": "ascend-deployer-ttfhw:latest（由 .devcontainer/Dockerfile 构建，FROM ubuntu:22.04）",
+      "selection_reason": "Tier 2 Dockerfile 构建：文档闭包未发现业务预构建镜像（devcontainer.json 用 build.dockerfile 非 image；README 无 docker pull 自定义镜像），仓库存在 .devcontainer/Dockerfile（FROM ubuntu:22.04），按 Tier2 原样 docker build 构建开发镜像。镜像已含 python3/pip/setuptools/wheel，满足构建需求；UT 测试依赖由 test/run_dt_tests.sh 自动安装",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "dev",
+    "commit": "4cf66f2",
+    "duration_seconds": 1625,
+    "end_time": "2026-08-31T15:57:09",
+    "environment": "远程容器 ascend-deployer-ttfhw（Ubuntu 22.04.5 aarch64, 256 核, Python 3.10.12）；宿主机 192.168.9.114 Kunpeng-920 aarch64",
+    "repo_url": "https://gitcode.com/Ascend/ascend-deployer.git",
+    "start_time": "2026-08-31T15:30:04",
+    "total_steps": 24,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "dev 分支单元测试与源代码大面积不同步（测试漂移）：ascend_deployer.ascend_deployer 模块已删除但 test_ascend_deployer.py 仍导入；CONFIG_INST 已移除但 test/downloader/test_utils.py 仍导入；get_validated_env 签名重构（移除 min_length/max_length/check_symlink）但 test_utils.py 未更新；CLI API 重构但 test/st 仍断言旧接口；mock_pwd 未实现 getpwuid 导致 library_test/module_utils_test 约 200+ 项 setup 失败；test_image_downloader.py mock 不完整触发真实 HTTP 重试循环挂起",
+      "solution": "验证侧已做最大努力：①加 test/ 到 PYTHONPATH 修复 library_test 导入；②--continue-on-collection-errors 跳过 collection error 继续执行；③安装 pytest-timeout(--timeout=30 --timeout-method=signal) 防挂起；④--ignore 排除触发真实 HTTP 的挂起文件。最终 112 passed / 58 failed / 217 errors。根因属仓库测试维护问题，需仓库侧同步测试与代码，验证侧无法通过装依赖修复",
+      "source": "test/run_dt_tests.sh + pytest 全量执行",
+      "timestamp": "2026-08-31T15:55:57"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

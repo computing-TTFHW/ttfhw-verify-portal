@@ -1,0 +1,866 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "docs/zh/user-guide/install_guide.md 镜像安装章节 + README 版本配套表 + .devcontainer/Dockerfile FROM",
+      "value": "aarch64（install_guide 明确「最新镜像仅支持aarch64架构」；远程机器 910B3/aarch64 匹配）"
+    },
+    "build_commands": {
+      "source": "setup.py + README 安装章节 + .devcontainer/postCreate.sh + CONTRIBUTING.md",
+      "value": "pip install -e .（editable 模式安装 MindSpeed 本体；mindspeed/ops/csrc 下 C++ 扩展通过 op_builder 在 import 时 JIT 编译，无需手动构建；仓库无 build.sh）"
+    },
+    "dependencies": {
+      "source": "ci/Dockerfile + requirements.txt + ci/run_ci_ut.sh + docs/zh/user-guide/install_guide.md",
+      "value": [
+        "CANN 9.0.1 toolkit（基础镜像预装）",
+        "torch 2.9.0",
+        "torch_npu 2.9.0",
+        "Megatron-LM core_v0.12.1（--no-deps editable 安装）",
+        "transformers 4.57.1",
+        "requirements.txt: pybind11/ninja/wheel/numpy\u003c=1.26.0/six/regex/psutil/pyyaml/protobuf/einops/scipy/sentencepiece/pytest/pytest-mock/pandas/scikit-learn/SQLAlchemy",
+        "pytest-xdist（单卡 UT 并行）/ pytest-timeout",
+        "setuptools==80.10.2",
+        "Ascend NPU 驱动 + 固件（宿主机 /usr/local/Ascend/driver, /usr/local/Ascend/firmware, npu-smi）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "ci/Dockerfile（CI 标准环境，UT 验证依据）+ .devcontainer/Dockerfile + docker/Dockerfile",
+      "value": [
+        {
+          "original": "yum install cmake curl findutils gcc gcc-c++ git jq make numactl-devel tar vim wget which",
+          "target_equivalent": "CANN 基础镜像已含 openEuler 系统；ci/Dockerfile 在其上 yum 安装系统工具链"
+        },
+        {
+          "original": "pip install torch==2.9.0 torch_npu==2.9.0 --extra-index-url https://mirrors.aliyun.com/pypi/simple/",
+          "target_equivalent": "aarch64 走阿里云 pip 源安装 torch 2.9.0 + torch_npu 2.9.0"
+        },
+        {
+          "original": "pip install -r requirements.txt",
+          "target_equivalent": "安装 pybind11/ninja/numpy\u003c=1.26.0/six/regex/psutil/pyyaml/protobuf/einops/scipy/sentencepiece/pytest/pytest-mock/transformers\u003e=4.43.2/pandas/scikit-learn/SQLAlchemy"
+        },
+        {
+          "original": "pip install -e /MindSpeed",
+          "target_equivalent": "editable 模式安装 MindSpeed 本体"
+        },
+        {
+          "original": "pip install --no-deps -e /Megatron-LM",
+          "target_equivalent": "安装 Megatron-LM core_v0.12.1（--no-deps 避免覆盖 torch 版本）"
+        },
+        {
+          "original": "pip install transformers==4.57.1",
+          "target_equivalent": "固定 transformers 4.57.1"
+        },
+        {
+          "original": "pip install pytest-xdist pytest-timeout",
+          "target_equivalent": "UT 并行与超时插件"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "ci/Dockerfile FROM + .devcontainer/Dockerfile FROM（均为昇腾 Hub CANN 预构建镜像）",
+      "value": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.1-910b-openeuler24.03-py3.12（Tier 1 业务预构建镜像，含 CANN 9.0.1 toolkit / openEuler 24.03 / Python 3.12）"
+    },
+    "sample_commands": {
+      "source": "docs/zh/user-guide/quickstart.md 启动预训练章节",
+      "value": "在 Megatron-LM/pretrain_gpt.py 的 import torch 下新增 import mindspeed.megatron_adaptor；bash ./train_distributed.sh（torchrun 启动 pretrain_gpt.py，NPUS_PER_NODE 默认 8，单卡需调小；需先下载 tokenizer + Alpaca 数据集并预处理）"
+    },
+    "special_dependencies": {
+      "source": "README 版本配套表 + ci/Dockerfile + docs/zh/user-guide/install_guide.md",
+      "value": [
+        "Megatron-LM core_v0.12.1（必须，MindSpeed 是其适配加速库，UT 需复制 tests_extend 到 Megatron-LM 目录执行）",
+        "CANN 9.0.1 + Ascend NPU 驱动固件（910B3）",
+        "ENABLE_ATB=1 环境变量 + source /usr/local/Ascend/nnal/atb/set_env.sh",
+        "NPU 设备挂载：davinci0/davinci_manager/devmm_svm/hisi_hdc + driver/firmware/npu-smi"
+      ]
+    },
+    "ut_commands": {
+      "source": "ci/run_ci_ut.sh（CI UT 门禁入口脚本）",
+      "value": "单卡模式（NPU_COUNT=1 fallback）：python3 -m pytest --color=no --timeout=1800 -k 'not allocator' -x --ignore=./tests_extend/unit_tests/features/moe/test_1f1b_overlap.py --ignore=./tests_extend/unit_tests/features/reuse_fp32_param/test_reuse_fp32_param.py --ignore=./tests_extend/unit_tests/features/multi_model/test_conv3d_model.py --ignore=./tests_extend/unit_tests/ops/cann/test_npu_mm_all_reduce_add_rms_norm_.py ./tests_extend/unit_tests/；前置：source CANN+ATB 环境，pip install -e MindSpeed，复制 Megatron-LM(core_v0.12.1) 并 cp tests_extend 进去，sed patch pretrain_gpt.py 加 import mindspeed.megatron_adaptor"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "README 版本配套表写 CANN 9.0.0/PyTorch 2.7.1/TorchNPU 26.0.0/Python 3.10，但 ci/Dockerfile 和 .devcontainer/Dockerfile 实际用 CANN 9.0.1/PyTorch 2.9.0/TorchNPU 2.9.0/Python 3.12。文档与代码版本漂移，新手易混淆。",
+      "source": "README.md 版本说明章节 vs ci/Dockerfile + .devcontainer/Dockerfile",
+      "time": "2026-08-29T18:15:11",
+      "title": "README 版本配套表与 Dockerfile 实际版本不一致"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "SSH 远程 clone MindSpeed 仓库（master 分支）到 /home/workspace/Mindspeed-verify",
+      "command": "ssh root@192.168.9.114 \"git clone --depth 1 --branch master https://gitcode.com/Ascend/MindSpeed.git /home/workspace/Mindspeed-verify\"",
+      "details": {
+        "branch": "master",
+        "commit": "dff8941",
+        "remote_path": "/home/workspace/Mindspeed-verify"
+      },
+      "duration_seconds": 12,
+      "error": "",
+      "output": "Cloning into '/home/workspace/Mindspeed-verify'... commit dff8941 chore(ci): run single-card UT in parallel across NPUs via pytest-xdist",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T18:15:11"
+    },
+    {
+      "action": "阅读 README.md 提取版本配套、安装方式、构建/UT/样例入口链接",
+      "command": "cat README.md",
+      "details": {
+        "cann": "9.0.0(README表)/9.0.1(Dockerfile)",
+        "install": "pip install -e MindSpeed",
+        "links_followed": [
+          "docs/zh/user-guide/install_guide.md",
+          "docs/zh/user-guide/quickstart.md",
+          "CONTRIBUTING.md",
+          ".devcontainer/",
+          "docker/",
+          "ci/"
+        ],
+        "megatron": "core_v0.12.1",
+        "python": "3.10(README)/3.12(Dockerfile)",
+        "torch": "2.7.1(README)/2.9.0(Dockerfile)",
+        "torch_npu": "26.0.0(README)/2.9.0(Dockerfile)"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "MindSpeed Core 昇腾大模型加速库，依赖 Megatron-LM；安装 pip install -e MindSpeed；版本配套 CANN9.0.0/PyTorch2.7.1/TorchNPU26.0.0/Python3.10（README表，Dockerfile 用 9.0.1/2.9.0/3.12）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T18:15:11"
+    },
+    {
+      "action": "阅读 CONTRIBUTING.md 贡献指南，提取 UT 用例位置和 CI 门禁触发方式",
+      "command": "cat CONTRIBUTING.md",
+      "details": {
+        "ci_trigger": "评论 compile 触发 CI",
+        "dist_test": "继承 DistributedTest 类",
+        "ut_dir": "tests_extend/unit_tests"
+      },
+      "duration_seconds": 4,
+      "error": "",
+      "output": "UT 用例位于 tests_extend/unit_tests；分布式测试继承 DistributedTest；单卡测试勿继承 DistributedTest；CI 门禁评论 compile 触发",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T18:15:11"
+    },
+    {
+      "action": "阅读 .devcontainer/Dockerfile + devcontainer.json + README + postCreate.sh，提取 Tier 1 镜像信号",
+      "command": "cat .devcontainer/Dockerfile .devcontainer/devcontainer.json .devcontainer/postCreate.sh",
+      "details": {
+        "cann": "9.0.1",
+        "from": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.1-910b-ubuntu22.04-py3.12",
+        "npu_mounts": "driver/dcmi/npu-smi/ascend_install.info",
+        "postCreate": "source CANN + pip install -r requirements + pip install -e MindSpeed + pre-commit",
+        "python": "3.12",
+        "torch": "2.9.0",
+        "torch_npu": "2.9.0"
+      },
+      "duration_seconds": 6,
+      "error": "",
+      "output": "FROM swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.1-910b-ubuntu22.04-py3.12（昇腾Hub CANN预构建镜像，非纯基础OS）→ Tier 1 信号命中；postCreate.sh 安装 requirements + MindSpeed editable",
+      "result": "成功（Tier 1 业务预构建镜像信号命中）",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T18:15:11"
+    },
+    {
+      "action": "阅读 ci/Dockerfile + ci/build.sh + ci/run_ci_ut.sh + ci/run_ci_st.sh，提取 CI 标准 UT 执行流程",
+      "command": "cat ci/Dockerfile ci/run_ci_ut.sh ci/run_ci_st.sh ci/build.sh",
+      "details": {
+        "ci_from": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.1-910b-openeuler24.03-py3.12",
+        "megatron_dir_in_image": "/mindspeed_ci_deps/Megatron-LM",
+        "megatron_ref": "core_v0.12.1(从README grep git checkout)",
+        "patches": "sed pretrain_gpt.py 加 import mindspeed.megatron_adaptor; patch dist_checkpointing/strategies/base.py",
+        "ut_cmd_single_card": "python3 -m pytest --color=no --timeout=1800 -k 'not allocator' -x ./tests_extend/unit_tests/"
+      },
+      "duration_seconds": 8,
+      "error": "",
+      "output": "CI 镜像 FROM cann:9.0.1-910b-openeuler24.03-py3.12；UT 脚本 source CANN+ATB → pip install -e MindSpeed → 复制 Megatron-LM(core_v0.12.1) → cp tests_extend → pytest tests_extend/unit_tests；单卡 fallback 全串行",
+      "result": "成功（确定 UT 执行入口为 ci/run_ci_ut.sh）",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T18:15:11"
+    },
+    {
+      "action": "阅读 docker/Dockerfile + docker/build.sh + docker/support_tags.md，提取生产镜像版本配套",
+      "command": "cat docker/Dockerfile docker/build.sh docker/support_tags.md",
+      "details": {
+        "prod_from": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.11",
+        "prod_mindspeed_branch": "v26.1.0_core_r0.12.1",
+        "prod_torch": "2.7.1",
+        "prod_torch_npu": "2.7.1.post8"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "生产镜像用 CANN 9.1.0 + torch 2.7.1 + torch_npu 2.7.1.post8 + py3.11；CI/devcontainer 用 CANN 9.0.1 + torch 2.9.0 + py3.12；UT 验证以 ci 为准",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T18:15:11"
+    },
+    {
+      "action": "阅读 docs/zh/user-guide/install_guide.md + quickstart.md，提取镜像安装命令和样例执行流程",
+      "command": "cat docs/zh/user-guide/install_guide.md docs/zh/user-guide/quickstart.md",
+      "details": {
+        "image_install_docker_run": "docker run -itd --privileged --network host --ipc=host -v driver -v dcmi -v npu-smi -v ascend_install.info ...",
+        "sample": "train_distributed.sh(torchrun pretrain_gpt.py, NPUS_PER_NODE=8)",
+        "source_install_torch": "torch 2.7.1 + torch_npu 2.7.1post4(cp310)"
+      },
+      "duration_seconds": 6,
+      "error": "",
+      "output": "镜像安装提供 docker run 挂载参数（driver/firmware/npu-smi/dcmi）；样例为 train_distributed.sh 需 8 卡+数据集；源码安装 torch 2.7.1/torch_npu 2.7.1post4",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T18:15:11"
+    },
+    {
+      "action": "镜像信号探测汇总：三级优先级判定 Tier 1（昇腾 Hub CANN 预构建镜像）",
+      "command": "综合 ci/Dockerfile + .devcontainer/Dockerfile FROM 判定",
+      "details": {
+        "note": "CANN 镜像含 CANN toolkit 但不含 torch/torch_npu/MindSpeed，需按 ci/Dockerfile RUN 补充安装应用层依赖（UT 必需子集，不构建完整 CI 镜像的 vllm/verl）",
+        "npu_required": true,
+        "selected_image": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.1-910b-openeuler24.03-py3.12",
+        "tier1_signal": "ci/Dockerfile 与 .devcontainer/Dockerfile FROM 均指向 swr.cn-south-1.myhuaweicloud.com/ascendhub/cann（非纯基础OS，含 CANN toolkit）"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "Tier 1 命中：CANN 预构建镜像；npu_required=true（CANN/Ascend/torch_npu/davinci/910B3 均命中）",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-29T18:15:11"
+    },
+    {
+      "action": "docker pull 昇腾 Hub CANN 预构建镜像（ci/Dockerfile FROM 指定）",
+      "command": "docker pull swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.1-910b-openeuler24.03-py3.12",
+      "details": {
+        "digest": "sha256:1c550098974b4c240a0d6c7870c81dd156a14c81cf8845d93de0f0c4e156f096",
+        "image": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.1-910b-openeuler24.03-py3.12",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 280,
+      "error": "",
+      "output": "Status: Downloaded newer image for swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.1-910b-openeuler24.03-py3.12",
+      "result": "Tier 1 业务预构建镜像 pull 成功",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-29T18:44:14"
+    },
+    {
+      "action": "docker run 启动容器 Mindspeed-ttfhw，挂载 NPU 设备/驱动/固件 + 工作目录",
+      "command": "docker run -d --name Mindspeed-ttfhw --privileged --network host --ipc=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/Ascend/driver:/usr/local/Ascend/driver -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware -v /home/workspace/Mindspeed-verify:/workspace cann:9.0.1-910b-openeuler24.03-py3.12 sleep infinity",
+      "details": {
+        "container_name": "Mindspeed-ttfhw",
+        "ipc": "host",
+        "mounts": "npu-smi/driver/firmware + /home/workspace/Mindspeed-verify:/workspace",
+        "network": "host",
+        "npu_devices": "davinci0/davinci_manager/devmm_svm/hisi_hdc",
+        "privileged": true,
+        "startup_command_source": "default_挂卡"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "容器 ID a4122ce4198c，状态 Up；容器内 openEuler 24.03 LTS-SP3 / Python 3.12.13 / CANN 9.0.1 toolkit + ATB 已预装 / 256 核",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-29T18:44:14"
+    },
+    {
+      "action": "升级 pip + packaging + setuptools==80.10.2（ci/Dockerfile 一致）",
+      "command": "pip3 install --upgrade pip packaging setuptools==80.10.2 --extra-index-url https://mirrors.aliyun.com/pypi/simple/",
+      "details": {
+        "versions": "pip 26.2.1 / packaging 26.3 / setuptools 80.10.2"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "Successfully installed packaging-26.3 pip-26.2.1 setuptools-80.10.2",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-29T18:44:14"
+    },
+    {
+      "action": "安装 torch==2.9.0 + torch_npu==2.9.0（aarch64 走阿里云源，ci/Dockerfile 版本）",
+      "command": "pip3 install --no-cache-dir torch==2.9.0 torch_npu==2.9.0 --extra-index-url https://mirrors.aliyun.com/pypi/simple/",
+      "details": {
+        "pip_source": "https://mirrors.aliyun.com/pypi/simple/",
+        "torch": "2.9.0+cpu",
+        "torch_npu": "2.9.0"
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "Successfully installed torch-2.9.0 torch_npu-2.9.0；aarch64 上 torch 为 cpu 变体，torch_npu 提供 NPU 适配",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-29T18:44:14"
+    },
+    {
+      "action": "安装 requirements.txt 依赖（pybind11/ninja/numpy\u003c=1.26.0/scipy/scikit-learn/sentencepiece/pandas/SQLAlchemy 等）",
+      "command": "pip3 install --no-cache-dir -r requirements.txt --extra-index-url https://mirrors.aliyun.com/pypi/simple/",
+      "details": {
+        "key_packages": "numpy 1.26.0 / scipy 1.16.3 / scikit-learn 1.9.0 / pandas 3.0.5 / sentencepiece 0.2.2 / SQLAlchemy 2.0.52 / einops 0.8.2 / protobuf 3.20.0"
+      },
+      "duration_seconds": 900,
+      "error": "",
+      "output": "全部安装成功（scipy/scikit-learn 在 aarch64 编译耗时较长，SSH 超时但容器内 pip 已完成）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-29T18:44:14"
+    },
+    {
+      "action": "editable 安装 MindSpeed 本体（pip install -e .，触发 op_builder JIT 编译入口注册）",
+      "command": "pip3 install --no-cache-dir -e . --extra-index-url https://mirrors.aliyun.com/pypi/simple/",
+      "details": {
+        "editable_location": "/workspace",
+        "install_mode": "editable",
+        "mindspeed_version": "0.12.1"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "Successfully installed mindspeed-0.12.1（卸载旧版后重装）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-29T18:44:14"
+    },
+    {
+      "action": "固定 transformers==4.57.1（ci/run_ci_ut.sh 指定版本，覆盖 requirements 拉取的 5.16.1）",
+      "command": "pip3 install --no-cache-dir transformers==4.57.1 --extra-index-url https://mirrors.aliyun.com/pypi/simple/",
+      "details": {
+        "from_version": "5.16.1",
+        "reason": "ci/run_ci_ut.sh 显式 pip install transformers==4.57.1",
+        "to_version": "4.57.1"
+      },
+      "duration_seconds": 45,
+      "error": "",
+      "output": "Successfully installed transformers-4.57.1（卸载 5.16.1）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-29T18:44:14"
+    },
+    {
+      "action": "安装 pytest-xdist + pytest-timeout（UT 并行与超时插件，ci/run_ci_ut.sh 依赖）",
+      "command": "pip3 install --no-cache-dir pytest-xdist pytest-timeout --extra-index-url https://mirrors.aliyun.com/pypi/simple/",
+      "details": {
+        "execnet": "2.1.2",
+        "pytest_timeout": "2.4.0",
+        "pytest_xdist": "3.8.0"
+      },
+      "duration_seconds": 20,
+      "error": "",
+      "output": "Successfully installed execnet-2.1.2 pytest-timeout-2.4.0 pytest-xdist-3.8.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-29T18:44:14"
+    },
+    {
+      "action": "clone Megatron-LM core_v0.12.1 到 /mindspeed_ci_deps/Megatron-LM 并 pip install --no-deps -e（UT 关键依赖）",
+      "command": "git clone --depth 1 --branch core_v0.12.1 https://github.com/NVIDIA/Megatron-LM.git /mindspeed_ci_deps/Megatron-LM \u0026\u0026 pip3 install --no-cache-dir --no-deps -e /mindspeed_ci_deps/Megatron-LM",
+      "details": {
+        "branch": "core_v0.12.1",
+        "install_mode": "--no-deps editable（避免覆盖 torch 版本）",
+        "megatron_commit": "a845aa7",
+        "megatron_core_version": "0.12.1"
+      },
+      "duration_seconds": 90,
+      "error": "",
+      "output": "Successfully installed megatron-core-0.12.1；Megatron-LM commit a845aa7",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-29T18:44:14"
+    },
+    {
+      "action": "验证依赖完整性：import mindspeed / torch_npu / megatron + NPU 可用性",
+      "command": "python3 verify_env.py（import mindspeed + torch_npu.is_available + megatron）",
+      "details": {
+        "megatron_adaptor_standalone": "报 No module named megatron.training（需在 Megatron-LM 目录+PYTHONPATH 下执行，UT 时按 run_ci_ut.sh 流程处理）",
+        "megatron_core": "0.12.1 import 成功",
+        "mindspeed_import": "成功（0.12.1）",
+        "npu_device_count": 8,
+        "npu_is_available": true,
+        "torch": "2.9.0+cpu",
+        "torch_npu": "2.9.0"
+      },
+      "duration_seconds": 30,
+      "error": "mindspeed.megatron_adaptor 单独 import 报 megatron.training 缺失（PYTHONPATH 未含 Megatron-LM 根目录，UT 执行时按 CI 流程 cd Megatron-LM 解决）",
+      "output": "mindspeed 0.12.1 import 成功；torch_npu 2.9.0 NPU is_available=True device_count=8；megatron-core 0.12.1 OK；megatron_adaptor 需在 Megatron-LM 目录执行",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-29T18:44:14"
+    },
+    {
+      "action": "执行构建：pip install -e .（setup.py，editable 模式安装 MindSpeed 本体）",
+      "command": "pip3 install --no-cache-dir -e . --extra-index-url https://mirrors.aliyun.com/pypi/simple/",
+      "details": {
+        "build_entry": "setup.py（无 build.sh/Makefile，纯 Python 包）",
+        "concurrency": 51,
+        "concurrency_ratio": "20%",
+        "install_mode": "editable",
+        "version": "0.12.1"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "Successfully installed mindspeed-0.12.1；mindspeed 包 11M，位于 /workspace/mindspeed/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-29T18:47:43"
+    },
+    {
+      "action": "触发 op_builder JIT 编译验证 C++ 编译链：FusionAttentionV2OpBuilder.load()",
+      "command": "python3 -c 'from mindspeed.op_builder import FusionAttentionV2OpBuilder; FusionAttentionV2OpBuilder().load(verbose=True)'",
+      "details": {
+        "artifact": "fusion_attention_v2.so (426K)",
+        "cmake": "3.27.9",
+        "compiler": "gcc 12.3.1",
+        "elapsed": 39.9,
+        "link_libs": "-lascendcl (CANN) + -ltorch_npu + -ltorch_cpu + -ltorch",
+        "ninja": "并行编译",
+        "warnings": "narrowing conversion uint64_t→long int（非致命）"
+      },
+      "duration_seconds": 40,
+      "error": "",
+      "output": "[3/3] c++ fusion_attention_v2.o flop_counter.o -shared -L/usr/local/Ascend/cann-9.0.1/lib64 -lascendcl ... -o fusion_attention_v2.so；FusionAttentionV2 JIT compile OK, elapsed: 39.9s；产物 /root/.cache/torch_extensions/py312_cpu/fusion_attention_v2/fusion_attention_v2.so (426K)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-29T18:47:43"
+    },
+    {
+      "action": "按 ci/run_ci_ut.sh 流程准备 UT 环境：复制 Megatron-LM(core_v0.12.1) + tests_extend + sed patch pretrain_gpt.py/dist_checkpointing",
+      "command": "cp -rf /mindspeed_ci_deps/Megatron-LM /ut_workspace/ \u0026\u0026 cp -r /workspace/tests_extend ./ \u0026\u0026 sed -i '1s/^/import mindspeed.megatron_adaptor\\n/' pretrain_gpt.py",
+      "details": {
+        "megatron_adaptor_import": "成功",
+        "megatron_commit": "a845aa7",
+        "patches": "pretrain_gpt.py 加 import mindspeed.megatron_adaptor; dist_checkpointing/strategies/base.py 加 from __future__ import annotations"
+      },
+      "duration_seconds": 20,
+      "error": "",
+      "output": "megatron_adaptor import OK；UT 环境就绪（PYTHONPATH 含 /workspace + Megatron-LM + CANN python 包）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-29T19:24:55"
+    },
+    {
+      "action": "执行单卡 UT（ci/run_ci_ut.sh 多卡分支 -m 'not dist' -n 8，去掉 -x 让全部跑完）",
+      "command": "python3 -m pytest --color=no --timeout=1800 -k 'not allocator' -m 'not dist' -n 8 --tb=short ./tests_extend/unit_tests/",
+      "details": {
+        "cmd": "python3 -m pytest --color=no --timeout=1800 -k 'not allocator' -m 'not dist' -n 8 ./tests_extend/unit_tests/",
+        "concurrency": "8 worker 并行",
+        "duration": "69.21s",
+        "errors": 24,
+        "failed": 13,
+        "passed": 243,
+        "skipped": 92
+      },
+      "duration_seconds": 69,
+      "error": "13 failed（11 mxfp8 torch_npu 版本 + 2 card0 HBM ECC）；24 errors（15 triton 未装 + 8 test_config 版本 + 1 swap_attention acl PYTHONPATH）",
+      "output": "13 failed, 243 passed, 92 skipped, 24 errors in 69.21s",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-29T19:24:55"
+    },
+    {
+      "action": "修复 2 个 card0 HBM ECC 硬件错误：用 ASCEND_RT_VISIBLE_DEVICES=1（card 1 OK）重跑 fused_adamw_v2 + ring_attention",
+      "command": "ASCEND_RT_VISIBLE_DEVICES=1 python3 -m pytest test_npu_apply_fused_adamw_v2.py test_npu_ring_attention_update.py",
+      "details": {
+        "fused_adamw_v2": "pass",
+        "original_card": 0,
+        "rerun_card": 1,
+        "ring_attention": "pass",
+        "root_cause": "card 0 (910B3 Critical) HBM MULTI BIT ECC ERROR 导致 gw0 上的测试硬件失败"
+      },
+      "duration_seconds": 76,
+      "error": "",
+      "output": "2 passed, 18 skipped in 75.53s（card 1 上两个测试均通过，证明 card 0 Critical 硬件问题非仓库 bug）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-29T19:24:55"
+    },
+    {
+      "action": "修复 swap_attention acl import：PYTHONPATH 追加 CANN python 包路径（之前覆盖了 set_env.sh 设的路径）",
+      "command": "export PYTHONPATH=\"/workspace:/ut_workspace/Megatron-LM:$PYTHONPATH\"",
+      "details": {
+        "fix": "PYTHONPATH 追加 $PYTHONPATH 而非覆盖",
+        "result": "swap_attention collect 成功，测试 skipped",
+        "root_cause": "export PYTHONPATH 覆盖了 CANN 的 /usr/local/Ascend/cann-9.0.1/python/site-packages（含 acl 包）"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "swap_attention acl import 修复，collection error 消除（测试本身 skipped）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-29T19:24:55"
+    },
+    {
+      "action": "执行分布式 UT 子集（-m dist，7 卡避开 card 0）：test_register_patches + test_quant_states",
+      "command": "ASCEND_RT_VISIBLE_DEVICES=1,2,3,4,5,6,7 python3 -m pytest -m dist test_register_patches.py test_quant_states.py",
+      "details": {
+        "cards": "card 1-7（ASCEND_RT_VISIBLE_DEVICES=1,2,3,4,5,6,7）",
+        "duration": "100.44s",
+        "framework": "DistributedTest + torchrun 多卡协同成功",
+        "passed": 10,
+        "skipped": 6
+      },
+      "duration_seconds": 100,
+      "error": "",
+      "output": "10 passed, 6 skipped in 100.44s（分布式框架 torchrun + HCCL 多卡协同正常）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-29T19:24:55"
+    },
+    {
+      "action": "安装 triton-ascend==3.2.1（ci/Dockerfile 依赖，triton 测试需要）",
+      "command": "pip3 install triton-ascend==3.2.1 --extra-index-url https://triton-ascend.osinfra.cn/pypi/simple/",
+      "details": {
+        "impact": "15 个 ops/triton 测试 collection error",
+        "issue": "aarch64 上下载/编译耗时极长（\u003e25 分钟未完成），pip 卡在下载阶段无编译进程",
+        "source": "https://triton-ascend.osinfra.cn/pypi/simple/"
+      },
+      "duration_seconds": 1500,
+      "error": "triton-ascend 安装超时（\u003e25min），15 个 triton 测试保留为 collection error",
+      "output": "pip 持续运行但无 gcc/cc1 编译进程，CPU 0.2%，疑似大文件下载缓慢或 aarch64 需源码编译",
+      "result": "失败",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-08-29T19:24:55"
+    },
+    {
+      "action": "UT 结果汇总分析：11 个 mxfp8 失败根因 torch_npu 2.9.0 版本不匹配",
+      "command": "分析 ut_single.log 失败 traceback",
+      "details": {
+        "mxfp8_failed": 11,
+        "root_cause": "torch_npu 2.9.0 缺 float4_e1m2fn_x2/npu_dynamic_block_mx_quant/npu_dynamic_mx_quant_with_dual_axis 属性",
+        "test_config_errors": 8,
+        "triton_errors": 15,
+        "version_drift": "README 配套 TorchNPU 26.0.0，ci/Dockerfile 配 2.9.0，master 分支 mxfp8 特性需更高版本"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "11 mxfp8 失败 + 8 test_config error 同根因（torch_npu 版本）；2 硬件错误已修复；triton 依赖未装；最终 255 passed / 11 failed / 99 skipped / 23 errors",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-29T19:24:55"
+    },
+    {
+      "action": "下载 GPT2 BPE tokenizer + Alpaca 数据集（hf-mirror.com 镜像，HF 直连被墙）",
+      "command": "curl -sL -o gpt-tokenizer/vocab.json https://hf-mirror.com/Xenova/gpt-3.5-turbo/resolve/main/vocab.json; curl -sL -o gpt_pretrain_data/alpaca.parquet https://hf-mirror.com/datasets/tatsu-lab/alpaca/resolve/main/data/train-00000-of-00001-a09b74b3ef9c3b56.parquet",
+      "details": {
+        "dataset": "alpaca.parquet(24MB) from tatsu-lab/alpaca",
+        "source": "hf-mirror.com 国内镜像",
+        "tokenizer": "vocab.json(2MB) + merges.txt(916KB) from Xenova/gpt-3.5-turbo"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "vocab.json 2MB + merges.txt 916KB + alpaca.parquet 24MB 下载成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-29T19:38:01"
+    },
+    {
+      "action": "语料格式转换（parquet→json）+ preprocess_data.py 生成预训练二进制数据集",
+      "command": "python3 tools/preprocess_data.py --input alpaca_json.json --output-prefix ./gpt_pretrain_data/alpaca --tokenizer-type GPT2BPETokenizer --vocab-file ./gpt-tokenizer/vocab.json --merge-file ./gpt-tokenizer/merges.txt --append-eod --workers 8",
+      "details": {
+        "bin": "alpaca_text_document.bin(23MB)",
+        "idx": "alpaca_text_document.idx(1MB)",
+        "json_size": "28MB",
+        "rows": 52002,
+        "speed": "12635 docs/s",
+        "tokenizer": "GPT2BPETokenizer",
+        "workers": 8
+      },
+      "duration_seconds": 20,
+      "error": "",
+      "output": "Processed 52000 documents (12635 docs/s)；生成 alpaca_text_document.bin + .idx",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-29T19:38:01"
+    },
+    {
+      "action": "首次运行 train_distributed.sh 失败：interleaved schedule 要求 PP\u003e1（quickstart 示例 8卡 TP=2 PP=2，我适配 2卡 TP=2 PP=1）",
+      "command": "bash ./train_distributed.sh",
+      "details": {
+        "error": "AssertionError: When interleaved schedule is used, pipeline-model-parallel size should be greater than 1",
+        "fix": "去掉 --num-layers-per-virtual-pipeline-stage 参数（2卡 TP=2 PP=1 不用 interleaved）",
+        "root_cause": "--num-layers-per-virtual-pipeline-stage 1 触发 interleaved schedule，需 PP\u003e1"
+      },
+      "duration_seconds": 30,
+      "error": "quickstart 示例参数为 8 卡 TP=2 PP=2，适配 2 卡需去掉 interleaved schedule 参数",
+      "output": "AssertionError: When interleaved schedule is used, pipeline-model-parallel size should be greater than 1",
+      "result": "失败",
+      "returncode": 1,
+      "step": "sample_execution",
+      "success": false,
+      "timestamp": "2026-08-29T19:38:01"
+    },
+    {
+      "action": "修复后运行 train_distributed.sh（2 卡 card1,2 TP=2 PP=1，5 iter）：pretrain_gpt.py + mindspeed.megatron_adaptor 预训练",
+      "command": "ASCEND_RT_VISIBLE_DEVICES=1,2 torchrun --nproc_per_node 2 pretrain_gpt.py --transformer-impl local --tensor-model-parallel-size 2 --num-layers 8 --hidden-size 4096 ... --train-iters 5 --fp16",
+      "details": {
+        "cards": "card 1,2（ASCEND_RT_VISIBLE_DEVICES=1,2 避开 card0 Critical）",
+        "config": "TP=2 PP=1, num-layers 8, hidden 4096, seq 4096, fp16, train-iters 5",
+        "iterations": "5/5 完成",
+        "loss_trend": "11.72→10.40（持续下降）",
+        "memory": "allocated 19.3GB/max 39.4GB（64G HBM 充足）",
+        "throughput": "42.4 TFLOP/s/GPU",
+        "validation": "lm loss 10.10, PPL 24226"
+      },
+      "duration_seconds": 165,
+      "error": "",
+      "output": "iteration 1/5 loss 11.72; iteration 5/5 loss 10.40; validation lm loss 10.10; 训练正常完成，loss 持续下降，throughput 42.4 TFLOP/s/GPU",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-29T19:38:01"
+    },
+    {
+      "action": "清理远程容器 Mindspeed-ttfhw（保留 Mindspeed-mm-ttfhw 不动）",
+      "command": "docker rm -f Mindspeed-ttfhw",
+      "details": {
+        "removed": "Mindspeed-ttfhw"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "Mindspeed-ttfhw 已删除",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-08-29T19:38:39"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "mindspeed",
+          "path": "/workspace/mindspeed/（editable 安装）",
+          "size": "11M",
+          "type": "python package"
+        },
+        {
+          "name": "fusion_attention_v2.so",
+          "path": "/root/.cache/torch_extensions/py312_cpu/fusion_attention_v2/fusion_attention_v2.so",
+          "size": "426K",
+          "type": "c++ extension (op_builder JIT)"
+        }
+      ],
+      "cmake": "3.27.9",
+      "compiler": "gcc 12.3.1 (openEuler 12.3.1-105.oe2403sp3)",
+      "concurrency": 51,
+      "concurrency_ratio": "20%（256核 × 20% = 51，向下取整）",
+      "duration_seconds": 100,
+      "notes": "MindSpeed 为纯 Python + op_builder JIT 编译仓库，无 build.sh/Makefile。构建入口为 setup.py（pip install -e .），C++ 算子扩展通过 op_builder 在 import/调用时 JIT 编译（ninja 并行）。已验证 FusionAttentionV2 算子 JIT 编译成功，链接 CANN -lascendcl + torch_npu + torch 库，生成 .so 产物。编译有 narrowing conversion 警告但不影响成功。",
+      "status": "success"
+    },
+    "sample": {
+      "duration_seconds": 165,
+      "results": [
+        {
+          "execution_status": "success",
+          "execution_time": "约 165s（含数据加载 + 5 iteration 训练 + validation）",
+          "output_summary": "torchrun 2 卡（card 1,2 TP=2 PP=1）启动 pretrain_gpt.py，完成 5 个训练 iteration。loss 11.72→10.40 持续下降，throughput 42.4 TFLOP/s/GPU，单卡显存 allocated 19.3GB/max 39.4GB（64G HBM 充足）。validation lm loss 10.10, PPL 24226。数据：Alpaca 数据集（52002 行）经 GPT2BPETokenizer 预处理为 megatron 二进制格式。",
+          "sample_name": "GPT 预训练样例（quickstart.md train_distributed.sh：Megatron-LM pretrain_gpt.py + import mindspeed.megatron_adaptor）"
+        }
+      ],
+      "status": "success"
+    },
+    "ut": {
+      "cpp": {
+        "failed": 0,
+        "note": "MindSpeed 无独立 C++ 单元测试，C++ 算子扩展通过 op_builder JIT 编译后在 Python UT 中验证",
+        "passed": 0,
+        "status": "not_run",
+        "total": 0
+      },
+      "duration_seconds": 245,
+      "failed": 11,
+      "failures": [
+        {
+          "error": "AttributeError: module 'torch_npu' has no attribute 'float4_e1m2fn_x2'（torch_npu 2.9.0 版本不支持 mxfp8 量化属性，master 分支 mxfp8 特性需更高版本 torch_npu）",
+          "test_name": "test_gmm_mxfp8.py::TestWeightQuantGMM::test_weight_quant[mxfp8]"
+        },
+        {
+          "error": "torch_npu 2.9.0 缺 float4_e1m2fn_x2，mxfp8 版本不匹配",
+          "test_name": "test_gmm_mxfp8.py::TestGMMWithHpOrLpWeight::test_forward[mxfp8]"
+        },
+        {
+          "error": "同上，mxfp8 版本不匹配",
+          "test_name": "test_gmm_mxfp8.py::TestWeightQuantGMM::test_weight_quant[mxfp8-32x32]"
+        },
+        {
+          "error": "同上，mxfp8 版本不匹配",
+          "test_name": "test_gmm_mxfp8.py::TestGMMWithHpOrLpWeight::test_forward[mxfp8-32x32]"
+        },
+        {
+          "error": "torch_npu 2.9.0 缺 npu_dynamic_block_mx_quant / npu_dynamic_mx_quant_with_dual_axis",
+          "test_name": "test_linear_mxfp8.py::TestProcessQuantResultFn::test_process_quant_result_fn[mxfp8]"
+        },
+        {
+          "error": "同上 mxfp8 版本不匹配",
+          "test_name": "test_linear_mxfp8.py::TestWeightQuant::test_weight_quant[mxfp8]"
+        },
+        {
+          "error": "同上 mxfp8 版本不匹配",
+          "test_name": "test_linear_mxfp8.py::TestProcessQuantResultFn::test_process_quant_result_fn[mxfp8-32x32]"
+        },
+        {
+          "error": "同上 mxfp8 版本不匹配",
+          "test_name": "test_linear_mxfp8.py::TestWeightQuant::test_weight_quant[mxfp8-32x32]"
+        },
+        {
+          "error": "同上 mxfp8 版本不匹配",
+          "test_name": "test_linear_mxfp8.py::TestMatmulWithHpOrLpWeight::test_forward[mxfp8]"
+        },
+        {
+          "error": "同上 mxfp8 版本不匹配",
+          "test_name": "test_linear_mxfp8.py::TestMatmulWithHpOrLpWeight::test_forward[mxfp8-32x32]"
+        },
+        {
+          "error": "torch_npu 2.9.0 缺 npu_dynamic_mx_quant_with_dual_axis（mxfp8 相关）",
+          "test_name": "test_compress_tensor.py::TestCompressTensor::test_CompressTensor"
+        }
+      ],
+      "passed": 255,
+      "python": {
+        "failed": 11,
+        "modules": [
+          {
+            "errors": 23,
+            "failed": 11,
+            "name": "单卡 UT（-m 'not dist' -n 8）",
+            "passed": 245,
+            "skipped": 93
+          },
+          {
+            "failed": 0,
+            "name": "分布式 UT（-m dist 子集）",
+            "passed": 10,
+            "skipped": 6
+          }
+        ],
+        "passed": 255,
+        "status": "partial_success",
+        "total": 388
+      },
+      "skipped": 99,
+      "status": "partial_success",
+      "total": 388
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "Mindspeed-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "openEuler 24.03 LTS-SP3"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "69G(/,4.7G可用) + 6.9T(/home,docker数据,6.1T可用)",
+      "docker_version": "18.09.0",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 0
+      }
+    },
+    "image_source": {
+      "image_name": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.1-910b-openeuler24.03-py3.12",
+      "selection_reason": "Tier 1 业务预构建镜像：ci/Dockerfile 和 .devcontainer/Dockerfile 的 FROM 均指向昇腾 Hub CANN 预构建镜像（含 CANN 9.0.1 toolkit / openEuler 24.03 / Python 3.12）。pull 成功后按 ci/Dockerfile RUN 指令补充安装应用层依赖（torch 2.9.0 / torch_npu 2.9.0 / requirements / MindSpeed editable / Megatron-LM core_v0.12.1），未构建完整 CI 镜像（vllm/verl 非 UT 必需，省时省磁盘）",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "dff8941",
+    "duration_seconds": 5364,
+    "end_time": "2026-08-29T19:38:01",
+    "environment": "openEuler 24.03 LTS-SP3 / aarch64 / Kunpeng-920 256核 / 2.0Ti RAM / CANN 9.0.1 / PyTorch 2.9.0 / torch_npu 2.9.0 / Python 3.12 / 910B3 NPU",
+    "repo_url": "https://gitcode.com/Ascend/MindSpeed.git",
+    "start_time": "2026-08-29T18:08:37",
+    "total_steps": 32,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "card 0 (910B3) 状态 Critical，运行高强度计算时触发 HBM MULTI BIT ECC ERROR，导致分配到 card 0 的 gw0 worker 上 fused_adamw_v2 和 ring_attention 测试硬件失败",
+      "solution": "用 ASCEND_RT_VISIBLE_DEVICES=1 指定 card 1（OK 状态）重跑，两个测试均通过，证明是 card 0 硬件问题而非仓库代码 bug",
+      "source": "ci/run_ci_ut.sh 单卡 UT gw0 worker",
+      "timestamp": "2026-08-29T19:24:55"
+    },
+    {
+      "problem": "PYTHONPATH 覆盖导致 acl 包 import 失败（swap_attention collection error）",
+      "solution": "PYTHONPATH 追加 $PYTHONPATH 而非覆盖，保留 set_env.sh 设置的 CANN python 包路径（/usr/local/Ascend/cann-9.0.1/python/site-packages）",
+      "source": "UT 环境配置",
+      "timestamp": "2026-08-29T19:24:55"
+    },
+    {
+      "problem": "triton-ascend==3.2.1 在 aarch64 上安装耗时极长（\u003e25 分钟未完成），15 个 ops/triton 测试 collection error",
+      "solution": "kill 卡住的 pip 进程，triton 测试保留为 collection error（依赖安装非仓库问题，aarch64 编译 triton 耗时过长）",
+      "source": "ci/Dockerfile triton-ascend 依赖",
+      "timestamp": "2026-08-29T19:24:55"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

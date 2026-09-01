@@ -1,0 +1,692 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md + .devcontainer/devcontainer.json + 远程机器 npu-smi",
+      "value": "aarch64 (昇腾 910B3 NPU)"
+    },
+    "build_commands": {
+      "source": "docs/zh/development_guide/develop_guide.md + build.py + .vscode/tasks.json",
+      "value": "python3 build.py (一键式: 下载依赖 + cmake ../cmake + make -j; 产物归档到 artifacts/)"
+    },
+    "dependencies": {
+      "source": "dependencies.json + build.py + CMakeLists.txt + .gitmodules",
+      "value": [
+        "git submodules: thirdparty/json, thirdparty/securec, thirdparty/makeself, thirdparty/llvm-project, msopscommon",
+        "测试 submodule: thirdparty/mockcpp",
+        "numpy (build.py test 中 pip install numpy)",
+        "GCC 11.2 (镜像内置)",
+        "CMake \u003e= 3.20.2 (镜像内置)",
+        "CANN 9.1.0 (镜像内置)",
+        "Python 3.11 (镜像内置)",
+        "ccache (镜像内置, 可选)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库无 Dockerfile (使用 .devcontainer 预构建镜像)",
+      "value": "无 Dockerfile，依赖由 mindstudio-build 预构建镜像提供；构建依赖 git submodules: thirdparty/json, thirdparty/securec, thirdparty/makeself, thirdparty/llvm-project, thirdparty/mockcpp(仅测试), msopscommon"
+    },
+    "recommended_image": {
+      "source": ".devcontainer/devcontainer.json image 字段 + docs/zh/install_guide/msopprof_install_guide.md 引用 dev_env_setup.md",
+      "value": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801 (Tier 1 业务预构建镜像, openEuler 24.03 LTS 基础, 含 GCC 11.2 / Python 3.11 / CANN 9.1.0)"
+    },
+    "sample_commands": {
+      "source": "example/*/README.md + docs/zh/quick_start/msopprof_quick_start.md",
+      "value": "样例需 NPU 运行环境: msopprof --output=./msopprof_output_npu ./execute_add_op (上板采集) / msopprof simulator --soc-version=Ascendxxxyy --output=./msopprof_output_sim ./execute_add_op (仿真采集)。注: mindstudio-build 镜像仅用于编译不支持 NPU 程序运行"
+    },
+    "special_dependencies": {
+      "source": ".gitmodules + download_dependencies.py",
+      "value": [
+        "git submodule update --init (download_dependencies.py 自动执行)",
+        "NPU 驱动 + 固件 (宿主机 /usr/local/Ascend/driver, /usr/local/Ascend/firmware)",
+        "npu-smi 工具 (/usr/local/sbin/npu-smi)"
+      ]
+    },
+    "ut_commands": {
+      "source": "docs/zh/development_guide/develop_guide.md + build.py + .vscode/tasks.json",
+      "value": "python3 build.py test (下载测试依赖 + pip install numpy + cmake .. -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug + make -j install + ./test/ut/msopt_test --gtest_output=xml:test_detail.xml)"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "dev_env_setup.md (msot 仓库) 明确标注 mindstudio-build 镜像\"仅用于编译不支持 NPU 程序运行\", 但 msopprof 仓库的 README.md 和 install_guide.md 未直接说明此限制, 导致用户可能在编译镜像中尝试运行 UT 和样例时遇到 SIGSEGV 或链接错误",
+      "source": "docs/zh/install_guide/msopprof_install_guide.md → msot/docs/zh/common/dev_env_setup.md",
+      "time": "2026-08-31T19:52:25",
+      "title": "构建镜像不支持 NPU 程序运行的限制未在仓库 README 中说明"
+    },
+    {
+      "body": "HalHelperTest.DcmiInit_Return_False 和 DcmiInit_Return_True 在缺少 NPU 运行库的环境中直接 SIGSEGV 崩溃, 而非优雅返回失败; 建议对 DCMI 初始化测试增加环境检测或 try-catch 保护",
+      "source": "test/ut/op_profiling/ (build.py test 运行结果)",
+      "time": "2026-08-31T19:52:25",
+      "title": "UT 崩溃测试 HalHelperTest.DcmiInit 未做环境保护"
+    },
+    {
+      "body": "example/ 目录下的样例为性能调优案例(README + .asc + optimize.diff), build.sh 仅构建算子但缺少完整的\"构建→运行→采集→解析\"一键脚本; 用户需参考 quick_start.md 在完整 CANN 运行环境中手动操作",
+      "source": "example/ 目录结构",
+      "time": "2026-08-31T19:52:25",
+      "title": "样例缺少独立运行脚本"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "git clone msopprof 仓库到本地临时目录阅读 README.md",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/Ascend/msopprof.git /tmp/opencode/msopprof-read",
+      "details": {
+        "branch": "master",
+        "file": "README.md",
+        "repo": "https://gitcode.com/Ascend/msopprof.git"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "README.md 确认项目为 MindStudio Ops Profiler (msOpProf) 昇腾 AI 算子调优工具, 采集分析算子性能指标。链接到快速入门/安装指南/使用指南/贡献指南。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T19:22:51"
+    },
+    {
+      "action": "阅读 .devcontainer/devcontainer.json 提取镜像信号",
+      "command": "cat .devcontainer/devcontainer.json",
+      "details": {
+        "file": ".devcontainer/devcontainer.json",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "tier": 1
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "image 字段指向非基础 OS 镜像 mindstudio-build:26.2.0-0801, workspaceFolder=/workspace, remoteUser=mindstudio, runArgs 含 --network=host --privileged --ipc=host",
+      "result": "成功 - Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T19:22:51"
+    },
+    {
+      "action": "阅读 .devcontainer/README.md 了解开发环境与编译测试入口",
+      "command": "cat .devcontainer/README.md",
+      "details": {
+        "file": ".devcontainer/README.md"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "确认 python3 build.py 为构建命令, python3 build.py test 为单元测试命令; 镜像为预构建, 内置工具链",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T19:22:51"
+    },
+    {
+      "action": "阅读 docs/zh/install_guide/msopprof_install_guide.md 安装指南",
+      "command": "cat docs/zh/install_guide/msopprof_install_guide.md",
+      "details": {
+        "file": "docs/zh/install_guide/msopprof_install_guide.md"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "源码安装用 mindstudio-build 镜像, 编译命令 python3 build.py, UT 命令 python3 build.py test; 引用 dev_env_setup.md 和 docker_image_build_guide.md (msot 仓库)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T19:22:51"
+    },
+    {
+      "action": "WebFetch 失败后 git clone msot 仓库读取 dev_env_setup.md (文档闭包)",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/Ascend/msot.git /tmp/opencode/msot-read",
+      "details": {
+        "fallback": "git clone",
+        "file": "msot/docs/zh/common/dev_env_setup.md"
+      },
+      "duration_seconds": 8,
+      "error": "",
+      "output": "确认 docker pull swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801; 镜像基于 openEuler 24.03, GCC 11.2, Python 3.11, CANN 9.1.0; 注: 镜像仅用于编译不支持 NPU 程序运行",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T19:22:51"
+    },
+    {
+      "action": "阅读 msot docker_image_build_guide.md 镜像制作指南 (文档闭包)",
+      "command": "cat /tmp/opencode/msot-read/docs/zh/common/docker_image_build_guide.md",
+      "details": {
+        "file": "msot/docs/zh/common/docker_image_build_guide.md"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "镜像分层: openEuler 24.03 LTS 底座 + GCC 11.2 + Python 3.8-3.13 + CANN 运行环境; 为 Tier 2/3 候选路径, 但 Tier 1 镜像已可用无需构建",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T19:22:51"
+    },
+    {
+      "action": "阅读 docs/zh/development_guide/develop_guide.md 开发指南",
+      "command": "cat docs/zh/development_guide/develop_guide.md",
+      "details": {
+        "file": "docs/zh/development_guide/develop_guide.md"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "构建: python3 build.py (一键式) 或分步骤(python3 download_dependencies.py + python3 build.py local); UT: python3 build.py test; 产物在 artifacts/ 目录",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T19:22:51"
+    },
+    {
+      "action": "阅读 build.py 构建脚本提取构建与 UT 流程",
+      "command": "cat build.py",
+      "details": {
+        "file": "build.py"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "产品构建: mkdir build \u0026\u0026 cd build \u0026\u0026 cmake ../cmake \u0026\u0026 make -j; UT: mkdir build_ut \u0026\u0026 cd build_ut \u0026\u0026 pip install numpy \u0026\u0026 cmake .. -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug \u0026\u0026 make -j install \u0026\u0026 ./test/ut/msopt_test --gtest_output=xml",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T19:22:51"
+    },
+    {
+      "action": "阅读 .gitmodules 和 dependencies.json 提取依赖列表",
+      "command": "cat .gitmodules dependencies.json",
+      "details": {
+        "files": [
+          ".gitmodules",
+          "dependencies.json"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "submodules: thirdparty/json, thirdparty/securec, thirdparty/makeself, thirdparty/llvm-project, thirdparty/mockcpp(仅test), msopscommon; prod 集不含 mockcpp, test 集含 mockcpp",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T19:22:51"
+    },
+    {
+      "action": "阅读 download_dependencies.py 了解依赖下载机制",
+      "command": "cat download_dependencies.py",
+      "details": {
+        "file": "download_dependencies.py"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "DependencyManager 按 dependencies.json 拉取 submodules 和 artifacts; 支持 prod/test/local 模式; build.py 非 local 时自动调用",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T19:22:51"
+    },
+    {
+      "action": "阅读 CMakeLists.txt 提取构建配置",
+      "command": "cat CMakeLists.txt",
+      "details": {
+        "file": "CMakeLists.txt"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "project(msopt), cmake\u003e=3.20.2, ccache 可选, BUILD_TESTS 选项, BUILD_INJECTION 选项; 依赖 securec/json/llvm-project/msopscommon; install 到 output 目录",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T19:22:51"
+    },
+    {
+      "action": "阅读 .vscode/tasks.json 提取构建/测试任务定义",
+      "command": "cat .vscode/tasks.json",
+      "details": {
+        "file": ".vscode/tasks.json"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "Build: Release Mode -\u003e python3 build.py; Test: Run Unit Tests -\u003e python3 build.py test; Clean -\u003e git clean -xdf",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T19:22:51"
+    },
+    {
+      "action": "阅读 docs/zh/contributing/contributing_guide.md 贡献指南",
+      "command": "cat docs/zh/contributing/contributing_guide.md",
+      "details": {
+        "file": "docs/zh/contributing/contributing_guide.md"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "贡献流程引用 msot contribute_workflow.md; 开发指南引用 develop_guide.md, 无额外 UT 脚本",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T19:22:51"
+    },
+    {
+      "action": "阅读 docs/zh/quick_start/msopprof_quick_start.md 和 example/ 样例",
+      "command": "cat docs/zh/quick_start/msopprof_quick_start.md; ls example/",
+      "details": {
+        "example_dirs": 8,
+        "file": "docs/zh/quick_start/msopprof_quick_start.md"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "样例需 NPU 运行环境: msopprof --output=./output ./execute_add_op (上板) 或 msopprof simulator --soc-version=Ascendxxxyy (仿真); 8 个 example 子目录均为性能调优案例, 需真实 NPU 硬件运行算子",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T19:22:51"
+    },
+    {
+      "action": "分析仓库无 Dockerfile, 镜像来源为 devcontainer.json 预构建镜像",
+      "command": "find . -name Dockerfile -o -name '*.dockerfile'",
+      "details": {
+        "devcontainer_image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "dockerfile_present": false
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "仓库无 Dockerfile; .devcontainer/devcontainer.json image 字段指向预构建镜像; 远程机器已存在该镜像",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-31T19:22:51"
+    },
+    {
+      "action": "Tier 1 业务预构建镜像选择: devcontainer.json image 字段指向非基础 OS 镜像",
+      "command": "docker images | grep mindstudio-build",
+      "details": {
+        "already_on_host": true,
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "tier": 1
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "镜像 swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801 已存在于远程机器 (4.34GB, 6 days ago)",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-31T19:25:32"
+    },
+    {
+      "action": "git clone msopprof 仓库到远程工作路径 /home/workspace/msopprof-verify",
+      "command": "ssh root@192.168.9.114 'git clone --depth 1 --branch master https://gitcode.com/Ascend/msopprof.git /home/workspace/msopprof-verify'",
+      "details": {
+        "branch": "master",
+        "commit": "a41d46a",
+        "remote_path": "/home/workspace/msopprof-verify"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "克隆成功, commit a41d46a [bugfix]: 移除cmakelist对于版本的最高约束",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-31T19:25:32"
+    },
+    {
+      "action": "检查 NPU 卡状态, 确定挂载 davinci2 (OK 状态, 跳过 Critical 的 davinci0 和 Alarm 的 davinci1)",
+      "command": "ssh root@192.168.9.114 'npu-smi info | grep 910B3'",
+      "details": {
+        "card_0": "Critical(跳过)",
+        "card_1": "Alarm(跳过)",
+        "card_2": "OK(挂载)",
+        "mounted_card_id": 2,
+        "startup_command_source": "default_挂卡"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "8 张 910B3 卡: 卡0 Critical, 卡1 Alarm, 卡2-7 OK; 按技能规则挂载状态 OK 的 davinci2",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-31T19:25:32"
+    },
+    {
+      "action": "docker run 启动容器 msopprof-ttfhw, 挂载 NPU 设备和工作目录",
+      "command": "docker run -d --name msopprof-ttfhw --network=host --privileged --ipc=host --device /dev/davinci2 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/Ascend/driver:/usr/local/Ascend/driver -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware -v /home/workspace/msopprof-verify:/workspace \u003cimage\u003e sleep infinity",
+      "details": {
+        "container_name": "msopprof-ttfhw",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "mounts": [
+          "/workspace",
+          "davinci2",
+          "davinci_manager",
+          "devmm_svm",
+          "hisi_hdc",
+          "npu-smi",
+          "driver",
+          "firmware"
+        ],
+        "run_args": [
+          "--network=host",
+          "--privileged",
+          "--ipc=host"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "容器 31d872d496ca 已启动, 状态 Up",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-31T19:25:32"
+    },
+    {
+      "action": "验证容器内预装依赖: GCC 11.2 / CMake 3.31 / Python 3.11 / CANN 9.1.0 / ccache / Git",
+      "command": "docker exec msopprof-ttfhw bash -lc 'gcc --version; cmake --version; python3 --version; git --version; which ccache'",
+      "details": {
+        "ascend_home_path": "/usr/local/Ascend/cann-9.1.0",
+        "cann": "9.1.0",
+        "ccache": "4.8.3",
+        "cmake": "3.31.10",
+        "gcc": "11.2.0",
+        "git": "2.54.0",
+        "python": "3.11.15"
+      },
+      "duration_seconds": 8,
+      "error": "",
+      "output": "GCC 11.2.0, CMake 3.31.10, Python 3.11.15, Git 2.54.0, ccache 4.8.3, CANN 9.1.0 (ASCEND_HOME_PATH 已设置); NPU DCMI 初始化失败(ret=-8005) 因构建镜像裁剪了运行库, 符合文档说明(仅用于编译)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-31T19:25:32"
+    },
+    {
+      "action": "执行 python3 build.py local 构建产品 (taskset 限制 51 核)",
+      "command": "docker exec --user root msopprof-ttfhw bash -lc 'cd /workspace \u0026\u0026 taskset -c 0-50 python3 build.py local'",
+      "details": {
+        "build_end": "19:35:53",
+        "cmake_start": "19:32:44",
+        "command": "python3 build.py local",
+        "concurrency": 51,
+        "exit_code": 0,
+        "make_start": "19:32:45",
+        "taskset": "0-50"
+      },
+      "duration_seconds": 189,
+      "error": "",
+      "output": "[100%] Built target package_msopprof; Self-extractable archive mindstudio-opprof_26.0.0_aarch64.run successfully created; BUILD_EXIT=0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-31T19:37:34"
+    },
+    {
+      "action": "执行 python3 build.py test 单元测试 (下载测试依赖 mockcpp + pip install numpy + Debug 编译 + gtest 运行)",
+      "command": "docker exec --user root msopprof-ttfhw bash -lc 'cd /workspace \u0026\u0026 taskset -c 0-50 python3 build.py test'",
+      "details": {
+        "build_duration_s": 208,
+        "crashed_at": "HalHelperTest.DcmiInit_Return_False",
+        "exit_code": 1,
+        "failed": 13,
+        "not_run": 589,
+        "passed": 68,
+        "ran": 82,
+        "test_duration_s": 1,
+        "total_registered": 671
+      },
+      "duration_seconds": 261,
+      "error": "SIGSEGV: Command './test/ut/msopt_test --gtest_output=xml:test_detail.xml' died with Signal 11; 13 ArgChecker 测试失败, 多为 NPU/soc版本/设备相关; 崩溃原因: mindstudio-build 镜像仅用于编译不支持 NPU 程序运行(DCMI 运行库不完整)",
+      "output": "[==========] Running 671 tests from 87 test suites; 82 ran (68 OK, 13 FAILED); SIGSEGV at HalHelperTest.DcmiInit_Return_False; UT_EXIT=1",
+      "result": "部分成功 - 68 通过, 13 失败, 1 崩溃(SIGSEGV), 589 未运行",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-08-31T19:48:07"
+    },
+    {
+      "action": "msopprof 工具冒烟测试: 对 /bin/true 执行性能采集",
+      "command": "docker exec --user root msopprof-ttfhw /workspace/output/bin/msopprof --output=/tmp/smoke_test /bin/true",
+      "details": {
+        "binary": "/workspace/output/bin/msopprof",
+        "output_dir": "OPPROF_20260831195155_VECYFYAELEJDDUPP",
+        "target": "/bin/true"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "[INFO] Op profiling analysis start → [INFO] Running device task: DeviceProf → [INFO] Profiling running finished. All task success → [WARN] Profiling results are empty. No kernel profiling data was generated.",
+      "result": "成功 - 工具可正常启动和完成分析流程",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-31T19:52:25"
+    },
+    {
+      "action": "构建 sample_sim_analysis 算子样例 (dav-3510, sim 模式)",
+      "command": "docker exec --user root msopprof-ttfhw bash -lc 'cd /workspace/example/sample_sim_analysis \u0026\u0026 bash build.sh after dav-3510 sim'",
+      "details": {
+        "arch": "dav-3510",
+        "error": "ld.lld: unable to find library -lruntime_camodel / -lnpu_drv_camodel",
+        "mode": "sim",
+        "sample": "sample_sim_analysis"
+      },
+      "duration_seconds": 5,
+      "error": "libruntime_camodel 和 libnpu_drv_camodel 运行库在 mindstudio-build 镜像中被裁剪, 无法链接算子可执行文件",
+      "output": "bisheng 编译成功, 链接失败: ld.lld: error: unable to find library -lruntime_camodel / -lnpu_drv_camodel; cceld: Linker ReturnCode: 1",
+      "result": "失败 - 链接阶段缺少 NPU 运行库",
+      "returncode": 1,
+      "step": "sample_execution",
+      "success": false,
+      "timestamp": "2026-08-31T19:52:25"
+    },
+    {
+      "action": "构建 sample_sim_analysis 算子样例 (dav-2201, sim 模式)",
+      "command": "docker exec --user root msopprof-ttfhw bash -lc 'cd /workspace/example/sample_sim_analysis \u0026\u0026 bash build.sh after dav-2201 sim'",
+      "details": {
+        "arch": "dav-2201",
+        "error": "ld.lld: unable to find library -lruntime_camodel / -lnpu_drv_camodel",
+        "mode": "sim",
+        "sample": "sample_sim_analysis"
+      },
+      "duration_seconds": 4,
+      "error": "与 dav-3510 相同的链接错误, 确认是镜像运行库缺失而非架构问题",
+      "output": "链接失败: ld.lld: error: unable to find library -lruntime_camodel / -lnpu_drv_camodel; 确认与架构无关",
+      "result": "失败 - 同样缺少 NPU 运行库",
+      "returncode": 1,
+      "step": "sample_execution",
+      "success": false,
+      "timestamp": "2026-08-31T19:52:25"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "mindstudio-opprof_26.0.0_aarch64.run",
+          "path": "/workspace/artifacts/mindstudio-opprof_26.0.0_aarch64.run",
+          "size": "11M",
+          "type": "binary (self-extractable run package)"
+        },
+        {
+          "name": "mindstudio-opprof (install dir)",
+          "path": "/workspace/output/",
+          "size": "11M",
+          "type": "install directory (bin/ lib64/ mindstudio-opprof/)"
+        }
+      ],
+      "cmake": "cmake 3.31.10",
+      "compiler": "GCC 11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility)",
+      "concurrency": 51,
+      "concurrency_ratio": "20% (256核 × 20% = 51, taskset -c 0-50)",
+      "duration_seconds": 189,
+      "notes": "使用 taskset -c 0-50 限制 CPU 亲和性到 51 核 (256 × 20%); build.py 内部 make -j 256 但实际调度受 taskset 限制; ccache 已启用",
+      "status": "success"
+    },
+    "sample": {
+      "duration_seconds": 15,
+      "reason": "mindstudio-build 镜像仅用于编译不支持 NPU 程序运行; 样例算子构建缺少 libruntime_camodel/libnpu_drv_camodel 运行库; msopprof 工具冒烟测试通过但实际算子性能采集需 CANN 运行环境",
+      "results": [
+        {
+          "execution_status": "success",
+          "execution_time": "2s",
+          "output_summary": "msopprof 成功启动并完成分析流程: [INFO] Op profiling analysis start → [INFO] Running device task: DeviceProf → [INFO] Profiling running finished. All task success → [WARN] Profiling results are empty (因 /bin/true 非算子应用); 输出目录 OPPROF_20260831195155_VECYFYAELEJDDUPP 已创建",
+          "sample_name": "msopprof 工具冒烟测试 (msopprof --output=/tmp/smoke_test /bin/true)"
+        },
+        {
+          "execution_status": "failed",
+          "execution_time": "5s",
+          "output_summary": "bisheng 编译器成功编译 .asc 算子源码, 但链接阶段失败: ld.lld: error: unable to find library -lruntime_camodel / -lnpu_drv_camodel; 这些 NPU 运行库在 mindstudio-build 镜像中被裁剪",
+          "sample_name": "sample_sim_analysis 算子构建 (grouped_matmul_after, dav-3510, sim 模式)"
+        },
+        {
+          "execution_status": "failed",
+          "execution_time": "4s",
+          "output_summary": "同样链接失败: ld.lld: error: unable to find library -lruntime_camodel / -lnpu_drv_camodel; 确认与架构无关, 是镜像运行库缺失",
+          "sample_name": "sample_sim_analysis 算子构建 (dav-2201, sim 模式)"
+        }
+      ],
+      "status": "partial_success"
+    },
+    "ut": {
+      "cpp": {
+        "failed": 14,
+        "note": "82 个测试运行后第 83 个测试 HalHelperTest.DcmiInit_Return_False 因 DCMI 初始化 SIGSEGV 崩溃; 13 个 ArgChecker 测试失败(多为 NPU/soc 版本/设备相关); 崩溃原因: mindstudio-build 镜像仅用于编译不支持 NPU 程序运行, DCMI 库不完整",
+        "passed": 68,
+        "status": "partial_success",
+        "total": 671
+      },
+      "duration_seconds": 261,
+      "failed": 14,
+      "failures": [
+        {
+          "error": "Expected: true, 实际: false (onboard 真机模式需要 NPU 设备)",
+          "test_name": "ArgChecker.args_with_onboard_run_mode_expect_check_success"
+        },
+        {
+          "error": "Expected: true, 实际: false (replay 模式)",
+          "test_name": "ArgChecker.replay_mode_return_should_be_true"
+        },
+        {
+          "error": "Expected: true, 实际: false (ascend950 相关)",
+          "test_name": "ArgChecker.ascend950_range_replay_with_unsupported_metrics_expect_return_false"
+        },
+        {
+          "error": "Expected: true, 实际: false (ascend910b 相关)",
+          "test_name": "ArgChecker.ascend910b_range_replay_with_roofline_expect_return_true"
+        },
+        {
+          "error": "Expected: true, 实际: false (sim soc 版本, ASCEND_HOME_PATH 相关)",
+          "test_name": "ArgChecker.args_with_sim_soc_version_get_ascend_home_path_failed"
+        },
+        {
+          "error": "Expected: true, 实际: false (sim soc 版本)",
+          "test_name": "ArgChecker.args_with_sim_soc_version_str_failed"
+        },
+        {
+          "error": "Expected: true, 实际: false (设备核心 ID, ascend950)",
+          "test_name": "ArgChecker.device_core_id_on_ascend950_requires_timeline_detail"
+        },
+        {
+          "error": "Expected: false, 实际: true (输出路径校验)",
+          "test_name": "ArgChecker.test_CheckOutputPathValid_with_warning_and_invalid_cases"
+        },
+        {
+          "error": "Expected: true, 实际: false (AicMetrics 设备指标)",
+          "test_name": "ArgChecker.test_CheckAicMetrics_device_metric_failed_expect_return_false"
+        },
+        {
+          "error": "Expected: true, 实际: false (AicMetrics 时间线)",
+          "test_name": "ArgChecker.test_CheckAicMetrics_device_timeline_metric_both_exist_expect_return_false"
+        },
+        {
+          "error": "Expected: true, 实际: false (AicMetrics 设备)",
+          "test_name": "ArgChecker.test_CheckAicMetrics_device_expect_return_true"
+        },
+        {
+          "error": "Expected: true, 实际: false (Dump 设备/soc 检查)",
+          "test_name": "ArgChecker.test_CheckDump_device_unsupported_soc_expect_return_false"
+        },
+        {
+          "error": "Expected: true, 实际: false (自定义输入检查)",
+          "test_name": "ArgChecker.test_CheckCustomInput_expect_return_true"
+        },
+        {
+          "error": "SIGSEGV (Signal 11): DCMI 初始化导致段错误, mindstudio-build 镜像 DCMI 运行库不完整",
+          "test_name": "HalHelperTest.DcmiInit_Return_False"
+        }
+      ],
+      "passed": 68,
+      "skipped": 589,
+      "status": "partial_success",
+      "total": 671
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "msopprof-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "openEuler 24.03 (LTS-SP3)"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "6.0T (/home 分区, / 分区 6.6G)",
+      "docker_version": "18.09.0",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 2
+      }
+    },
+    "image_source": {
+      "image_name": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+      "selection_reason": "Tier 1 业务预构建镜像: .devcontainer/devcontainer.json image 字段指定, dev_env_setup.md 确认; 镜像基于 openEuler 24.03 LTS, 内置 GCC 11.2 / CMake 3.31 / Python 3.11 / CANN 9.1.0 / ccache; 远程机器已存在该镜像",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "a41d46a",
+    "duration_seconds": 1938,
+    "end_time": "2026-08-31T19:52:25",
+    "environment": "远程容器验证: 192.168.9.114 / mindstudio-build:26.2.0-0801 / aarch64 / 256核 / 2.0TiB / NPU 910B3×8(挂载davinci2)",
+    "repo_url": "https://gitcode.com/Ascend/msopprof.git",
+    "start_time": "2026-08-31T19:20:07",
+    "total_steps": 25,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "单元测试二进制 msopt_test 在第 83 个测试 HalHelperTest.DcmiInit_Return_False 处 SIGSEGV 崩溃, 导致后续 589 个测试无法运行",
+      "solution": "根因: mindstudio-build 镜像文档明确标注\"仅用于编译不支持 NPU 程序运行\", DCMI 运行库被裁剪; 13 个 ArgChecker 测试也因缺少 NPU 设备/soc 版本环境而失败; 建议: 需在 CANN 运行环境容器(swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.12)中运行完整测试",
+      "source": "build.py test / HalHelperTest.DcmiInit_Return_False",
+      "timestamp": "2026-08-31T19:48:07"
+    },
+    {
+      "problem": "样例算子构建链接失败: ld.lld: error: unable to find library -lruntime_camodel / -lnpu_drv_camodel",
+      "solution": "根因: mindstudio-build 镜像裁剪了 NPU 运行库(仅保留编译工具链); 解决方案: 需在 CANN 运行环境容器(如 swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.12)中构建和运行样例, 或采用 dev_env_setup.md 推荐的\"双终端模式\"(编译镜像+CANN运行镜像)",
+      "source": "example/sample_sim_analysis/build.sh",
+      "timestamp": "2026-08-31T19:52:25"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

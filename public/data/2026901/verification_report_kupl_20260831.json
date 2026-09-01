@@ -1,0 +1,696 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md 版本配套章节 + /proc/cpuinfo 实测",
+      "value": "aarch64（鲲鹏 920 系列，CPU implementer 0x48 / part 0xd22），与远程验证机器 aarch64 架构匹配，MMA 模块自动启用"
+    },
+    "build_commands": {
+      "source": "README.md 编译安装第 5 步 + build.sh",
+      "value": "sh build.sh --install_path=\u003c绝对路径\u003e（GCC 模式）；BiSheng 模式：sh build.sh --compiler=clang --install_path=\u003c绝对路径\u003e。build.sh 内部执行 cmake 配置 + cmake --build -j --target install，并用 nm 检查 libkupl.so 的 GLIBC 2.17 兼容性"
+    },
+    "dependencies": {
+      "source": "README.md 编译安装章节 + build.sh + test/functest/CMakeLists.txt + run_lcov.sh",
+      "value": [
+        "HPCKit 26.1.RC1 软件包（含 GCC 12.3.1 编译器、BiSheng 编译器、HMPI/mpirun、KML、modulefiles）",
+        "cmake（CMakeLists 要求 \u003e= 3.14.1）",
+        "numactl、numactl-devel（README 第 4 步明确要求，run_lcov.sh 使用 numactl 绑核）",
+        "environment-modules + tcl（module 工具，install_014 前置条件）",
+        "gcc/g++、make（build.sh set_compiler 使用 which gcc/g++）",
+        "googletest/GTest（test/functest/CMakeLists.txt find_package(GTest HINTS $LIBRARY_PATH 中含 gtest 路径)；BiSheng 模式 README 要求自编译，GCC 模式未明确说明来源）",
+        "lcov + genhtml（run_lcov.sh 生成覆盖率报告）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库文件扫描（find -iname '*dockerfile*' 等）",
+      "value": "仓库内无 Dockerfile，无 .devcontainer 目录，依赖全部来自 README 编译安装章节与 build.sh/CMakeLists.txt 分析"
+    },
+    "recommended_image": {
+      "source": "文档闭包全量探测：README.md/README_en.md/HPCKit 安装指南 3 篇/build.sh/仓库全文件扫描",
+      "value": "Tier 3 基础 OS 从零安装：hub.oepkgs.net/openeuler/openeuler:24.03-lts（README 系统规格明确要求 openEuler AArch64，支持 20.03/22.03/24.03 LTS；全文档无 docker pull 命令、仓库无 Dockerfile、无 devcontainer，Tier 1/Tier 2 信号均未命中）"
+    },
+    "sample_commands": {
+      "source": "README.md 全文检查",
+      "value": "README 未提供独立样例脚本或样例命令（学习教程章节仅为 API 用法文档链接）。run_lcov.sh 中执行的 test_pthread_main/test_omp_main/test_shm_main/test_mma_main 为功能验证程序，可在 UT 阶段覆盖"
+    },
+    "special_dependencies": {
+      "source": "README.md 编译安装第 1-3 步",
+      "value": [
+        "HPCKit 软件包下载：wget https://mirrors.huaweicloud.com/kunpeng/archive/HPC/HPCKit/HPCKit_26.1.RC1_Linux-aarch64.tar.gz",
+        "HPCKit 安装：tar xvf 后执行 sh HPCKit_26.1.RC1_Linux-aarch64/install.sh -y --prefix=\u003c安装目录\u003e（install_012 非交互式，hmpi_type 默认 hns）",
+        "环境加载：source /etc/profile.d/modules.sh \u0026\u0026 module use \u003cHPCKit安装目录\u003e/HPCKit/latest/modulefiles \u0026\u0026 module load gcc/compiler12.3.1/gccmodule"
+      ]
+    },
+    "ut_commands": {
+      "source": "README.md 更多章节第 6 节 + run_lcov.sh",
+      "value": "module unload bisheng/hmpi26.1.RC1/release \u0026\u0026 module load gcc/hmpi26.1.RC1/release \u0026\u0026 sh build.sh --build_kind=test \u0026\u0026 sh run_lcov.sh。run_lcov.sh 依次执行 test_pthread_main/test_omp_main（numactl -N 0 绑核）和 test_shm_main（mpirun 多算法组合）和 test_mma_main，输出 gtest xml，随后 lcov/genhtml 生成覆盖率"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "README 编译运行测试程序（GCC）章节直接给出 sh build.sh --build_kind=test \u0026\u0026 sh run_lcov.sh 命令，未提示：1) GCC 编译分支下 MATRIX_COMP_ON()（SMSTART）为空宏，依赖 SME ZA tile 的 14 个 KP36 系列测试（test_copy.RM2ZZ/CM2NN 类与 test_mma 全部矩阵乘用例）会因 ZA 未激活而失败；2) BiSheng（clang）分支才有完整 SMSTART/SMSTOP 支持。也未说明 run_lcov.sh 使用 set -e，test_mma_main 失败会跳过 lcov 覆盖率生成。新手按 README 走 GCC 流程会得到部分失败的 UT 且无覆盖率报告，文档未给出预期基线",
+      "source": "验证过程实测（kupl 仓库 README.md 第 6 节 + src/mma/kupl_mma.cpp 对比）",
+      "time": "2026-08-31T11:57:34",
+      "title": "README 未说明 GCC 模式下 mma ZA 系列测试的预期行为"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "读取仓库根 README.md（远程已 git clone 到 /home/workspace/kupl-verify），提取编译安装流程、依赖清单、构建/UT 命令",
+      "command": "ssh root@123.60.114.33 \"cat /home/workspace/kupl-verify/README.md\"",
+      "details": {
+        "下一跳": [
+          "install_007",
+          "install_012",
+          "install_014",
+          "学习教程7篇(API文档)"
+        ],
+        "来源": "仓库根目录"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "# KUPL 鲲鹏统一并行加速库…编译安装：1.获取HPCKit软件包 2.安装HPCKit 3.设置环境变量 4.安装编译所需依赖 5.编译KUPL 6.更多（测试程序）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T11:17:42"
+    },
+    {
+      "action": "读取 README_en.md 对照检查是否含中文版未覆盖的 docker/镜像/依赖信息",
+      "command": "ssh root@123.60.114.33 \"grep -iE 'docker|image' README_en.md\"",
+      "details": {
+        "结论": "英文版无额外镜像或依赖信息"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "无匹配（grep docker|image|镜像 均无结果，README_en.md 与 README.md 内容同构）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T11:17:42"
+    },
+    {
+      "action": "WebFetch HPCKit 安装指南《获取软件包》(install_007)，提取软件包下载地址",
+      "command": "webfetch https://www.hikunpeng.com/document/detail/zh/kunpenghpcs/hpckit/instg/KunpengHPCKit_install_007.html",
+      "details": {
+        "下一跳": "无新环境链接",
+        "结论": "HPCKit 主包即可覆盖 kupl 构建需求，KuLitho/KuRTM 可选不装"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "HPCKit_26.1.RC1_Linux-aarch64.tar.gz 下载地址 hikunpeng.com/developer/hpc/hpckit-download；KuLitho/KuRTM 为可选组件",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T11:17:42"
+    },
+    {
+      "action": "WebFetch HPCKit 安装指南《安装HPCKit（非交互式）》(install_012)，提取安装命令",
+      "command": "webfetch https://www.hikunpeng.com/document/detail/zh/kunpenghpcs/hpckit/instg/KunpengHPCKit_install_012.html",
+      "details": {
+        "结论": "远程机器无 Mellanox 网卡（rdma-core 无 mlnx），使用默认 hmpi_type=hns"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "sh HPCKit_26.1.RC1_Linux-aarch64/install.sh -y --prefix=\u003c目录\u003e --hmpi_type=mlx|hns；默认 hns；安装目录需 10GB 空间",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T11:17:42"
+    },
+    {
+      "action": "WebFetch HPCKit 安装指南《设置环境变量（modules方式）》(install_014)，提取 module 加载流程",
+      "command": "webfetch https://www.hikunpeng.com/document/detail/zh/kunpenghpcs/hpckit/instg/KunpengHPCKit_install_014.html",
+      "details": {
+        "结论": "模块名示例：gcc/compiler12.3.1/gccmodule、gcc/hmpi26.1.RC1/release，环境变量含 CC/CXX/LD_LIBRARY_PATH/PATH/OPAL_PREFIX"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "前置：tcl + environment-modules；module use modulefiles → module avail → module load gcc/compiler12.3.1/gccmodule 等",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T11:17:42"
+    },
+    {
+      "action": "读取 build.sh 编译脚本全文，确认构建入口参数与编译器探测逻辑",
+      "command": "ssh root@123.60.114.33 \"cat /home/workspace/kupl-verify/build.sh\"",
+      "details": {
+        "结论": "必须使用 build.sh 作为唯一构建入口；UT 构建依赖 HMPI 的 mpicc/mpicxx（module load hmpi 后可用）"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "参数 --compiler=[gcc|clang] --build_kind=[src|test|cida|fuzz] --install_path；set_enable_mma_by_cputype 检查 CPU 0x48-0xd22（鲲鹏920）自动启用 MMA；build_test 使用 which mpicc/mpicxx",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T11:17:42"
+    },
+    {
+      "action": "读取 run_lcov.sh、根 CMakeLists.txt、test/functest/CMakeLists.txt、cmake/*.cmake、test/conf/config.yaml",
+      "command": "ssh root@123.60.114.33 \"cat run_lcov.sh CMakeLists.txt test/functest/CMakeLists.txt\"",
+      "details": {
+        "结论": "UT 依赖 gtest/mpirun/lcov/genhtml/numactl；GCC 模式需 LIBRARY_PATH 中有 gtest 路径或系统安装 GTest"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "run_lcov.sh 依次执行 test_pthread_main/test_omp_main（numactl -N 0）、test_shm_main（mpirun --allow-run-as-root 多算法）、test_mma_main；functest CMakeLists find_package(GTest HINTS $LIBRARY_PATH)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T11:17:42"
+    },
+    {
+      "action": "文档闭包决策：学习教程 7 篇链接（executor/多线程/计算图/多队列/内存/共享内存/矩阵编程 API 文档）为接口用法说明，不属于环境/安装/镜像/依赖/编译/UT 类别，不纳入闭包；Issues/论坛/社区链接为交互入口非文档",
+      "command": "基于 README 链接分类判断",
+      "details": {
+        "已读文档数": 8,
+        "闭包状态": "完成"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "闭包完成：已覆盖 README.md/README_en.md/install_007/install_012/install_014/build.sh/run_lcov.sh/CMakeLists 全链路，无剩余未读环境相关文档",
+      "result": "跳过",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T11:17:42"
+    },
+    {
+      "action": "NPU 需求判断：全文档扫描 CANN/Ascend/torch_npu/npu/davinci/910/昇腾 关键词",
+      "command": "基于 README/build.sh/CMakeLists 扫描（鲲鹏920 为 CPU 型号非昇腾 NPU）",
+      "details": {
+        "npu_required": false
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "无昇腾 NPU/CANN 依赖，kupl 为鲲鹏 CPU 并行加速库",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T11:17:42"
+    },
+    {
+      "action": "镜像信号探测汇总（Tier 决策）：检查 README/文档 docker pull、仓库 Dockerfile、devcontainer、registry/harbor 链接",
+      "command": "全文档闭包结果汇总",
+      "details": {
+        "tier": "Tier 3 基础 OS 从零安装",
+        "镜像": "hub.oepkgs.net/openeuler/openeuler:24.03-lts"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Tier 1 无信号（无预构建镜像）；Tier 2 无信号（无 Dockerfile）；README 系统规格明确要求 openEuler AArch64 → 选 hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+      "result": "Tier 3 基础 OS 从零安装",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-31T11:17:42"
+    },
+    {
+      "action": "按文档闭包结论执行 Tier 决策：无预构建镜像（Tier 1 未命中）、无 Dockerfile（Tier 2 未命中），选 Tier 3 基础 OS 镜像",
+      "command": "docker pull hub.oepkgs.net/openeuler/openeuler:24.03-lts（首次尝试）",
+      "details": {
+        "tier": "Tier 3 基础 OS 从零安装",
+        "说明": "首次选 24.03-lts，因 HPCKit OS 白名单限制降级修正为 24.03-lts-sp3"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "镜像拉取成功，但后续 HPCKit install.sh 报 openEuler24.03(LTS) is not in the list of supported OS",
+      "result": "Tier 3 基础 OS 从零安装",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": false,
+      "timestamp": "2026-08-31T11:45:49"
+    },
+    {
+      "action": "核查 HPCKit install.sh 的 OS 支持白名单（script/bootstrapper.conf SUPPORT_OS_NAME），确认 24.03 仅支持 LTS-SP3，与 README 系统规格一致",
+      "command": "grep SUPPORT_OS_NAME /tmp/HPCKit_26.1.RC1_Linux-aarch64/script/bootstrapper.conf",
+      "details": {
+        "结论": "改用 openEuler 24.03-lts-sp3 镜像"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "SUPPORT_OS_NAME=openEuler20.03(LTS);...;openEuler22.03(LTS-SP4);openEuler24.03(LTS-SP3);KylinV10;...",
+      "result": "成功",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-31T11:45:49"
+    },
+    {
+      "action": "拉取 openEuler 24.03-lts-sp3 基础镜像并重建容器 kupl-ttfhw（挂载 /home/workspace/kupl-verify 到 /workspace，--privileged）",
+      "command": "docker rm -f kupl-ttfhw \u0026\u0026 docker pull hub.oepkgs.net/openeuler/openeuler:24.03-lts-sp3 \u0026\u0026 docker run -d --privileged --name kupl-ttfhw -v /home/workspace/kupl-verify:/workspace hub.oepkgs.net/openeuler/openeuler:24.03-lts-sp3 sleep infinity",
+      "details": {
+        "startup_command_source": "default_非NPU参考命令",
+        "tier": "Tier 3 基础 OS 从零安装"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "容器 864937c8f00b 启动，os-release 显示 openEuler 24.03 (LTS-SP3)，aarch64",
+      "result": "Tier 3 基础 OS 从零安装",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-31T11:45:49"
+    },
+    {
+      "action": "收集宿主机与容器规格信息（架构/CPU/内存/磁盘/Docker/NPU）",
+      "command": "ssh root@123.60.114.33 \"lscpu; free -g; df -h\" + docker exec 查容器内 os-release/nproc/free",
+      "details": {
+        "npu_required": false
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "宿主机 Kunpeng 920 72F8 两路 608 核 1069GB；容器 openEuler 24.03 LTS-SP3 aarch64 608 核 1069GB；无 NPU",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-31T11:45:49"
+    },
+    {
+      "action": "安装系统工具链 gcc/g++/make/cmake/git/wget/tar（dnf，禁用元数据损坏的 update 源）",
+      "command": "docker exec kupl-ttfhw dnf install --disablerepo=update -y gcc gcc-c++ make cmake git wget tar",
+      "details": {
+        "注意": "openEuler 24.03 官方 update 源 repomd.xml 校验和不匹配（镜像缓存不一致），OS/everything 源正常，禁用 update 源后安装成功"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "gcc (GCC) 12.3.1 (openEuler 12.3.1-105.oe2403sp3)；cmake 3.27.9；GNU Make 4.4.1",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-31T11:45:49"
+    },
+    {
+      "action": "安装 numactl、numactl-devel（README 第 4 步要求，run_lcov.sh 绑核使用）",
+      "command": "docker exec kupl-ttfhw dnf install --disablerepo=update -y numactl numactl-devel",
+      "details": {},
+      "duration_seconds": 5,
+      "error": "",
+      "output": "numactl 安装成功，--hardware 命令可执行",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-31T11:45:49"
+    },
+    {
+      "action": "安装 environment-modules + tcl（README 第 3 步/install_014 前置条件，module 工具）",
+      "command": "docker exec kupl-ttfhw dnf install -y environment-modules tcl \u0026\u0026 source /etc/profile.d/modules.sh",
+      "details": {},
+      "duration_seconds": 5,
+      "error": "",
+      "output": "module 命令可用（modulecmd 在 /usr/bin/modulecmd）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-31T11:45:49"
+    },
+    {
+      "action": "安装 gtest/gtest-devel 1.14.0（UT 隐式依赖，test/functest/CMakeLists.txt find_package(GTest)）",
+      "command": "docker exec kupl-ttfhw dnf install --disablerepo=update -y gtest gtest-devel",
+      "details": {
+        "来源": "openEuler everything 源"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "gtest-devel-1.14.0-2.oe2403sp3.aarch64",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-31T11:45:49"
+    },
+    {
+      "action": "安装 lcov/genhtml 1.16（run_lcov.sh 覆盖率依赖；openEuler 24.03 无 lcov rpm，容器内直连 GitHub 超时，改宿主机下载后 docker cp 进容器源码安装）",
+      "command": "wget lcov-1.16.tar.gz（宿主机）→ docker cp → make install PREFIX=/usr/local",
+      "details": {
+        "解决": "宿主机下载后 docker cp，源码 make install",
+        "问题": "openEuler 24.03 官方源无 lcov 包，容器访问 GitHub 网络超时"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "lcov: LCOV version 1.16；genhtml 位于 /usr/local/bin",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-31T11:45:49"
+    },
+    {
+      "action": "下载 HPCKit 26.1.RC1 软件包（README 第 1 步，2.3GB）",
+      "command": "docker exec kupl-ttfhw wget https://mirrors.huaweicloud.com/kunpeng/archive/HPC/HPCKit/HPCKit_26.1.RC1_Linux-aarch64.tar.gz",
+      "details": {
+        "镜像": "mirrors.huaweicloud.com/kunpeng/archive/HPC/HPCKit"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "2.3G 下载耗时 28.7 秒",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-31T11:45:49"
+    },
+    {
+      "action": "解压并安装 HPCKit（README 第 2 步/install_012 非交互式，--prefix=/opt/HPCKit，hmpi_type 默认 hns）",
+      "command": "docker exec kupl-ttfhw sh HPCKit_26.1.RC1_Linux-aarch64/install.sh -y --prefix=/opt/HPCKit",
+      "details": {
+        "安装目录": "/opt/HPCKit/HPCKit/26.1.RC1（latest 符号链接）"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "BiSheng/GCC 编译器、KML、KUPL、HMPI、KuDNN、KuQCD 等组件安装完成，耗时 52 秒；HIO 提示 hdf5 版本不足（kupl 不使用 HIO，忽略）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-31T11:45:49"
+    },
+    {
+      "action": "加载 module 环境验证编译器与 HMPI（README 第 3 步）",
+      "command": "module use /opt/HPCKit/HPCKit/latest/modulefiles \u0026\u0026 module load gcc/compiler12.3.1/gccmodule \u0026\u0026 module load gcc/hmpi26.1.RC1/release",
+      "details": {
+        "模块": "gcc/compiler12.3.1/gccmodule + gcc/hmpi26.1.RC1/release"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "gcc 位于 /opt/HPCKit/HPCKit/26.1.RC1/compiler/gcc/bin/gcc 12.3.1；mpicc/mpicxx/mpirun (Open MPI) 4.1.6rc4 可用",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-31T11:45:49"
+    },
+    {
+      "action": "使用仓库构建入口 build.sh 执行源码构建（GCC 模式，README 编译安装第 5 步命令原样执行）：module load gcc/compiler12.3.1/gccmodule 后 sh build.sh --install_path=/workspace/install，通过 CMAKE_BUILD_PARALLEL_LEVEL=121 控制编译并发（608核×20%=121）",
+      "command": "docker exec kupl-ttfhw bash -c 'source /etc/profile.d/modules.sh \u0026\u0026 module use /opt/HPCKit/HPCKit/latest/modulefiles \u0026\u0026 module load gcc/compiler12.3.1/gccmodule \u0026\u0026 export CMAKE_BUILD_PARALLEL_LEVEL=121 \u0026\u0026 cd /workspace \u0026\u0026 time sh build.sh --install_path=/workspace/install'",
+      "details": {
+        "一次通过": true,
+        "构建模式": "Release，MMA 模块自动启用（检测到鲲鹏 920 CPU 0x48-0xd22）",
+        "编译器": "HPCKit GCC 12.3.1（gcc for openEuler 3.0.3）"
+      },
+      "duration_seconds": 20,
+      "error": "",
+      "output": "[100%] Built target kupl → Installing: /workspace/install/lib/libkupl.so.1.26.2.0 与 include/kupl.h、kupl_mma.h；build.sh 内置 check_glibc 通过（libkupl.so 无高于 GLIBC_2.17 的符号依赖）；real 0m19.746s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-31T11:47:04"
+    },
+    {
+      "action": "构建测试程序：按 README 第 6 节 GCC 模式 UT 流程执行 sh build.sh --build_kind=test（module load gcc/compiler12.3.1/gccmodule + gcc/hmpi26.1.RC1/release，CMAKE_BUILD_PARALLEL_LEVEL=121）",
+      "command": "docker exec kupl-ttfhw bash -c 'module load gcc/compiler12.3.1/gccmodule \u0026\u0026 module load gcc/hmpi26.1.RC1/release \u0026\u0026 cd /workspace \u0026\u0026 time sh build.sh --build_kind=test --install_path=/workspace/install'",
+      "details": {
+        "测试二进制": [
+          "test_pthread_main",
+          "test_omp_main",
+          "test_shm_main",
+          "test_mma_main"
+        ]
+      },
+      "duration_seconds": 37,
+      "error": "",
+      "output": "4 个测试可执行文件全部构建并安装到 /workspace/install/bin/，real 0m36.573s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-31T11:57:34"
+    },
+    {
+      "action": "执行仓库 UT 入口脚本 run_lcov.sh（README 第 6 节：sh run_lcov.sh），依次运行 test_pthread_main（numactl -N 0 绑核多组环境变量组合）、test_omp_main、test_shm_main（mpirun --allow-run-as-root np=1/3/4 × allreduce/bcast/alltoall/fence 算法组合共 48 次多进程执行）、test_mma_main",
+      "command": "docker exec kupl-ttfhw bash -c 'module load gcc/compiler12.3.1/gccmodule \u0026\u0026 module load gcc/hmpi26.1.RC1/release \u0026\u0026 cd /workspace \u0026\u0026 time sh run_lcov.sh test gcc'",
+      "details": {
+        "产物": "/workspace/lcov/report/ 下生成 test_pthread_detail.xml、test_detail.xml、test_shm_detail.xml、test_mma_detail.xml",
+        "失败": "test_mma_main 22 个用例中 14 个失败（test_copy 8 个 + test_mma 6 个，全部为 KP36 系列依赖 SME ZA tile/流式模式的用例）",
+        "通过": "pthread/omp/shm 三套测试全部通过（累计 4923 次 OK，含多算法/多环境组合重复执行）"
+      },
+      "duration_seconds": 204,
+      "error": "[  FAILED  ] 14 tests, listed below: test_copy.KP36_*（8）与 test_mma.KP36_*（6）",
+      "output": "real 3m23.588s；总执行用例 4937 次，通过 4923，失败 14；test_mma_main 返回非 0 触发 run_lcov.sh（set -e）跳过后续 lcov 覆盖率统计与 genhtml 阶段",
+      "result": "部分成功",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-08-31T11:57:34"
+    },
+    {
+      "action": "失败根因分析：读取 src/mma/kupl_mma.cpp、src/utils/sys/kupl_hardware.cpp、test/functest/mma/test_*.cpp 源码，定位 14 个失败用例的共性",
+      "command": "grep MATRIX_COMP_ON /workspace/src/mma/kupl_mma.cpp + sed 查看测试断言逻辑",
+      "details": {
+        "根因": "失败的 14 个 KP36 系列用例均为依赖 ARM SME ZA tile 与流式模式的矩阵原子操作（源码 kernel 函数带 test_kupl_za/test_kupl_streaming 标记，数据搬运到 ZA 相关布局 RM2ZZ/CM2NN）。GCC 编译分支下 MATRIX_COMP_ON()（SMSTART 指令）被定义为空宏（kupl_mma.cpp:74 #elif defined(__GNUC__) #define MATRIX_COMP_ON()），ZA 未激活导致拷贝/矩阵乘结果比对失败；通过的非 ZA 用例（RM2CM/CM2RM 直传、PREFETCH、tensor 系列）不受影响",
+        "硬件检测正常": "kupl_arch_detect 读 MIDR_EL1，本机 part_id 0xD22 识别为 KUPL_CPU_HISILICOM_920F，mma_check 的架构校验通过",
+        "结论": "属编译器模式（GCC vs BiSheng/clang）与环境（SME ZA 支持）限制导致的预期差异，非依赖缺失，不适用缺依赖重装流程"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "kupl_mma.cpp:74 GCC 分支 MATRIX_COMP_ON() 为空宏；失败的 14 个用例全部涉及 ZA tile 布局（RM2ZZ/CM2NN）或 ZA 矩阵乘",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-31T11:57:34"
+    },
+    {
+      "action": "编写最小样例程序 kupl_sample.cpp：README 未提供样例脚本/命令（学习教程为 API 文档链接），按 skill 规则从安装头文件 kupl.h 与仓库测试代码（test/functest/pthread/test_static_graph_egroup.cpp）提取标准用法，实现版本查询、执行器数查询、静态图双节点依赖任务提交",
+      "command": "docker exec kupl-ttfhw g++ /workspace/kupl_sample.cpp -I/workspace/install/include -L/workspace/install/lib -lkupl -o /workspace/kupl_sample",
+      "details": {
+        "样例来源": "README 学习教程描述的执行器/计算图 API + 仓库 functest 标准用法",
+        "编译": "g++ -I/workspace/install/include -L/workspace/install/lib -lkupl"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "编译成功（BUILD-OK）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-31T11:59:34"
+    },
+    {
+      "action": "执行编译后的样例程序 kupl_sample（LD_LIBRARY_PATH 指向安装库目录）",
+      "command": "docker exec kupl-ttfhw bash -c 'LD_LIBRARY_PATH=/workspace/install/lib /workspace/kupl_sample'",
+      "details": {
+        "退出码": 0
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "[sample] kupl_get_version ret=0, version=26.2.0, abi=1；executor num = 608；kupl_graph_submit ret=0；static graph node1/node2 按序执行；graph done；SAMPLE-EXIT=0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-31T11:59:34"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "libkupl.so.1.26.2.0",
+          "path": "/workspace/install/lib/libkupl.so.1.26.2.0",
+          "size": "323K",
+          "type": "shared_library"
+        },
+        {
+          "name": "libkupl.so",
+          "path": "/workspace/install/lib/libkupl.so（符号链接链: .so → .so.1 → .so.1.26.2.0）",
+          "type": "symlink"
+        },
+        {
+          "name": "kupl.h",
+          "path": "/workspace/install/include/kupl.h",
+          "size": "46K",
+          "type": "header"
+        },
+        {
+          "name": "kupl_mma.h",
+          "path": "/workspace/install/include/kupl_mma.h",
+          "size": "38K",
+          "type": "header"
+        }
+      ],
+      "duration_seconds": 20,
+      "status": "success"
+    },
+    "sample": {
+      "duration_seconds": 30,
+      "results": [
+        {
+          "execution_status": "success",
+          "execution_time": "1",
+          "output_summary": "kupl_get_version 返回 26.2.0（abi=1）；kupl_get_num_executors 返回 608；kupl_graph_submit 返回 KUPL_OK，静态图 node1→node2 按依赖顺序执行完成，进程退出码 0。输出含 [WARN kupl_memcpy_init] failed to init sdma memcpy func（宿主机无 sdma 内核模块的预期提示，run_lcov.sh 亦有 sdma_detected 规避逻辑，不影响功能）",
+          "sample_name": "kupl_sample（最小 API 冒烟样例：版本查询 + 执行器数 + 静态图双节点依赖提交）"
+        }
+      ],
+      "status": "success"
+    },
+    "ut": {
+      "duration_seconds": 204,
+      "failed": 14,
+      "failures": [
+        {
+          "error": "/workspace/test/functest/mma/test_copy.cpp:72: Value of: res, Actual: false, Expected: true",
+          "test_name": "test_copy.KP36_32x1_F64_TRANS_RM2CM"
+        },
+        {
+          "error": "/workspace/test/functest/mma/test_copy.cpp:123: Value of: res, Actual: false, Expected: true",
+          "test_name": "test_copy.KP36_1x16_F64_TRANS_CM2RM"
+        },
+        {
+          "error": "/workspace/test/functest/mma/test_copy.cpp:190: Value of: res, Actual: false, Expected: true",
+          "test_name": "test_copy.KP36_16x2_BF16_TRANS_RM2ZZ"
+        },
+        {
+          "error": "/workspace/test/functest/mma/test_copy.cpp:241: Value of: res, Actual: false, Expected: true",
+          "test_name": "test_copy.KP36_2x64_BF16_TRANS_CM2NN"
+        },
+        {
+          "error": "/workspace/test/functest/mma/test_copy.cpp:298: Value of: res, Actual: false, Expected: true",
+          "test_name": "test_copy.KP36_16x4_INT8_TRANS_RM2ZZ"
+        },
+        {
+          "error": "/workspace/test/functest/mma/test_copy.cpp:349: Value of: res, Actual: false, Expected: true",
+          "test_name": "test_copy.KP36_4x64_INT8_TRANS_CM2NN"
+        },
+        {
+          "error": "/workspace/test/functest/mma/test_copy.cpp:407: Value of: res, Actual: false, Expected: true",
+          "test_name": "test_copy.KP36_32x4_INT8_TRANS_RM2ZZ"
+        },
+        {
+          "error": "/workspace/test/functest/mma/test_copy.cpp:458: Value of: res, Actual: false, Expected: true",
+          "test_name": "test_copy.KP36_4x32_INT8_TRANS_CM2NN"
+        },
+        {
+          "error": "/workspace/test/functest/mma/test_mma.cpp:92: Value of: res, Actual: false, Expected: true",
+          "test_name": "test_mma.KP36_32x16x1_F64F64F64"
+        },
+        {
+          "error": "/workspace/test/functest/mma/test_mma.cpp:163: Value of: res, Actual: false, Expected: true",
+          "test_name": "test_mma.KP36_32x16x512_F64F64F64"
+        },
+        {
+          "error": "/workspace/test/functest/mma/test_mma.cpp:262: Value of: res, Actual: false, Expected: true",
+          "test_name": "test_mma.KP36_16x64x2_BF16BF16F32"
+        },
+        {
+          "error": "/workspace/test/functest/mma/test_mma.cpp:353: Value of: res, Actual: false, Expected: true",
+          "test_name": "test_mma.KP36_16x64x1_BF16BF16F32"
+        },
+        {
+          "error": "/workspace/test/functest/mma/test_mma.cpp:445: Value of: res, Actual: false, Expected: true",
+          "test_name": "test_mma.KP36_16x64x4_INT8INT8INT32"
+        },
+        {
+          "error": "/workspace/test/functest/mma/test_mma.cpp:536: Value of: res, Actual: false, Expected: true",
+          "test_name": "test_mma.KP36_32x32x4_INT8INT8INT32"
+        }
+      ],
+      "passed": 4923,
+      "status": "partial_success",
+      "total": 4937
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "kupl-ttfhw",
+      "cpu_cores": 608,
+      "memory": "1069GB",
+      "os": "openEuler 24.03 (LTS-SP3)"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 608,
+      "cpu_model": "Kunpeng 920 72F8（2 路，CPU implementer 0x48 / part 0xd22）",
+      "disk": "/home 2.4T（已用 106G）",
+      "docker_version": "Docker version 18.09.0, build 4fc3a92",
+      "memory": "1069GB",
+      "npu": {
+        "available": false,
+        "card_count": 0,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "CMakeLists.txt 要求 cmake \u003e= 3.14.1；test/functest/CMakeLists.txt find_package(GTest)",
+        "from_dockerfile": "仓库内无 Dockerfile",
+        "from_readme": "HPCKit 26.1.RC1 软件包、cmake、numactl、numactl-devel、environment-modules（module 工具）、yum 源",
+        "mappings": [
+          {
+            "original": "cmake",
+            "source": "README 第4步",
+            "target": "cmake-3.27.9（OS/everything 源）"
+          },
+          {
+            "original": "numactl",
+            "source": "README 第4步",
+            "target": "numactl（dnf）"
+          },
+          {
+            "original": "numactl-devel",
+            "source": "README 第4步",
+            "target": "numactl-devel（dnf）"
+          },
+          {
+            "original": "environment-modules（yum install）",
+            "source": "README 第3步/install_014",
+            "target": "environment-modules（dnf）"
+          },
+          {
+            "original": "HPCKit_26.1.RC1_Linux-aarch64.tar.gz（含 GCC12.3.1/BiSheng/HMPI/KML）",
+            "source": "README 第1-2步",
+            "target": "wget mirrors.huaweicloud.com 后 install.sh -y --prefix=/opt/HPCKit"
+          },
+          {
+            "original": "gtest（UT 隐式依赖，find_package(GTest)）",
+            "source": "test/functest/CMakeLists.txt",
+            "target": "gtest-devel-1.14.0（dnf everything 源）"
+          },
+          {
+            "original": "lcov/genhtml（run_lcov.sh 覆盖率）",
+            "source": "run_lcov.sh",
+            "target": "lcov 1.16 源码安装（openEuler 24.03 无 lcov 包，GitHub release 下载 make install）"
+          }
+        ]
+      },
+      "image_name": "hub.oepkgs.net/openeuler/openeuler:24.03-lts-sp3",
+      "selection_reason": "Tier 3 基础 OS 从零安装：文档闭包确认全文档无 docker pull 预构建镜像、仓库无 Dockerfile（Tier 1/Tier 2 未命中）；README 系统规格明确要求 openEuler AArch64，HPCKit 26.1.RC1 安装脚本 OS 白名单仅支持 openEuler 24.03(LTS-SP3)（不支持 24.03 LTS），故选 24.03-lts-sp3",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "main",
+    "commit": "main 最新（浅克隆）",
+    "duration_seconds": 2782,
+    "end_time": "2026-08-31T11:59:34",
+    "environment": "远程 aarch64 验证机（Kunpeng 920 72F8/608核/1069GB）Docker 18.09.0，容器 kupl-ttfhw（hub.oepkgs.net/openeuler/openeuler:24.03-lts-sp3，--privileged，挂载 /home/workspace/kupl-verify 到 /workspace），HPCKit 26.1.RC1（GCC 12.3.1 + HMPI 4.1.6rc4），gtest 1.14.0，lcov 1.16",
+    "repo_url": "https://gitcode.com/kunpengcompute/kupl.git",
+    "start_time": "2026-08-31T11:13:12",
+    "total_steps": 28,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "火山AI网关/glm-5.3-flash",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

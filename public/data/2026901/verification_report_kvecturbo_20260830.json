@@ -1,0 +1,929 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md + docs/zh/installation_guide.md 已验证环境表",
+      "value": "aarch64（鲲鹏920 7282C处理器，支持NEON 128位宽指令）"
+    },
+    "build_commands": {
+      "source": "docs/zh/installation_guide.md 编译KVecTurbo章节 + build.sh",
+      "value": "export BINARYLIBS=/workspace/binarylibs/openGauss-third_party_binarylibs_openEuler_2203_arm \u0026\u0026 export CPLUS_INCLUDE_PATH=${BINARYLIBS}/kernel/platform/Huawei_Secure_C/comm/include/:$CPLUS_INCLUDE_PATH \u0026\u0026 cd /workspace \u0026\u0026 sh build.sh（build.sh: rm -rf out/build \u0026\u0026 mkdir build \u0026\u0026 cd build \u0026\u0026 cmake .. \u0026\u0026 make VERBOSE=1 \u0026\u0026 make install）"
+    },
+    "dependencies": {
+      "source": "docs/zh/installation_guide.md + CMakeLists.txt + test/ut_test/CMakeLists.txt",
+      "value": [
+        "gcc（10.3）",
+        "g++（gcc-c++）",
+        "cmake（\u003e=3.22.0）",
+        "libgomp（OpenMP 运行时）",
+        "make",
+        "Huawei_Secure_C（openGauss binarylibs 第三方库，提供 -lsecurec）",
+        "gtest（UT 链接 gtest/gtest_main）",
+        "gcov（UT 代码覆盖率 -fprofile-arcs -ftest-coverage）",
+        "lcov/genhtml（UT 覆盖率报告生成，非构建硬依赖）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库根目录及子目录",
+      "value": "无 Dockerfile"
+    },
+    "recommended_image": {
+      "source": "docs/zh/installation_guide.md 已验证环境（openEuler 22.03 LTS SP3）；仓库无 Dockerfile/devcontainer/预构建镜像",
+      "value": "openeuler:22.03-lts-sp3（Tier 3 基础 OS 从零安装；文档要求 openEuler 22.03 LTS SP3，依赖用 yum 安装，binarylibs 为 openEuler_2203_arm 版本）"
+    },
+    "sample_commands": {
+      "source": "docs/zh/api_reference.md 各接口使用示例 + quick_start.md",
+      "value": "仓库无独立样例脚本；api_reference.md 提供 ComputePQTable/ComputeVectorPQCode/GetPQDistanceTableSdc/GetPQDistanceTableAdc/GetPQDistance 五个接口的 C++ 使用示例代码片段；quick_start.md 指向 openGauss 集成使用（非本仓库可独立执行的样例）"
+    },
+    "special_dependencies": {
+      "source": "docs/zh/installation_guide.md 第3步 + CMakeLists.txt target_link",
+      "value": [
+        "wget https://opengauss.obs.cn-south-1.myhuaweicloud.com/latest/binarylibs/gcc10.3/openGauss-third_party_binarylibs_openEuler_2203_arm.tar.gz --no-check-certificate（含 Huawei_Secure_C，提供 libsecurec）"
+      ]
+    },
+    "ut_commands": {
+      "source": "test/ut_test/test.sh + test/ut_test/CMakeLists.txt",
+      "value": "export BINARYLIBS=/workspace/binarylibs/openGauss-third_party_binarylibs_openEuler_2203_arm \u0026\u0026 cd test/ut_test \u0026\u0026 sh test.sh（test.sh: mkdir build \u0026\u0026 cd build \u0026\u0026 cmake .. \u0026\u0026 cmake --build . \u0026\u0026 ./test_main --gtest_output=xml:./）"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "api_reference.md 各接口使用示例中声明 `VectorArray samples;` 后直接 `samples.maxLen=...` 赋值。但头文件中 `typedef VectorArrayData *VectorArray` 是指针类型，直接声明为局部变量是未初始化指针，对其解引用赋值会导致段错误。正确用法应使用 `VectorArrayData samples;`（值类型）后传 `\u0026samples`，或如 test.cpp 中使用 VectorArrayInit 分配。该缺陷导致按文档示例原样编译运行的样例无法工作。",
+      "source": "docs/zh/api_reference.md 使用示例 + include/kvecturbo.h 类型定义 + test/ut_test/test.cpp 正确用法对照",
+      "time": "2026-08-30T05:26:18",
+      "title": "api_reference.md 使用示例 VectorArray 类型误用"
+    },
+    {
+      "body": "api_reference.md ComputePQTable 使用示例中 `samples.itemSize = dim * sizeof(float)`，缺少 Vector 结构体的 8 字节头部（vlen 4B + dim 2B + unused 2B）。库内部 ComputePQTable 对 itemSize 做校验（item size mismatch），此赋值会被拒绝返回 -1。正确值应为 `MAXALIGN(VECTOR_SIZE(dim))`，其中 `VECTOR_SIZE(dim)=offsetof(Vector,x)+sizeof(float)*dim`。正确用法仅在 test.cpp 中体现，api_reference.md 未说明。",
+      "source": "docs/zh/api_reference.md + test/ut_test/test.cpp + 运行时 'Error: Item size mismatch' 报错验证",
+      "time": "2026-08-30T05:26:18",
+      "title": "api_reference.md 使用示例 itemSize 计算错误"
+    },
+    {
+      "body": "quick_start.md 样例入口指向 openGauss 官方文档（极简版安装/DataVec 向量数据库/PQ 特性）的集成使用，本仓库内无独立样例脚本或可执行样例。样例验证需从 api_reference.md 的使用示例代码片段提取并修正后编译运行。",
+      "source": "docs/zh/quick_start.md + 仓库目录结构（无 examples/ 目录）",
+      "time": "2026-08-30T05:26:18",
+      "title": "本仓库无独立可执行样例脚本"
+    },
+    {
+      "body": "installation_guide.md 编译步骤中 `yum install gcc g++ cmake libgomp make`，其中 `g++` 是 Debian/Ubuntu 系的写法，openEuler 上不存在 `g++` 包，对应包名为 `gcc-c++`。按文档原样执行 yum install g++ 会报 'No match for argument: g++'。",
+      "source": "docs/zh/installation_guide.md 第2步 + openEuler 22.03 包管理验证",
+      "time": "2026-08-30T05:26:18",
+      "title": "installation_guide.md yum 安装 g++ 包名错误"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "git clone kvecturbo 仓库到本地用于文档闭包阅读",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/boostkit/kvecturbo.git /tmp/opencode/kvecturbo",
+      "details": {
+        "branch": "master",
+        "repo_url": "https://gitcode.com/boostkit/kvecturbo.git"
+      },
+      "duration_seconds": 8,
+      "error": "",
+      "output": "Cloning into '/tmp/opencode/kvecturbo'... 仓库含 README.md/README_en.md/CMakeLists.txt/build.sh/docs/test",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-30T05:07:19"
+    },
+    {
+      "action": "阅读 README.md 提取项目定位、架构要求、目录结构与文档链接",
+      "command": "cat /tmp/opencode/kvecturbo/README.md",
+      "details": {
+        "file": "README.md",
+        "key_findings": [
+          "KVecTurbo 适用于鲲鹏920 7282C处理器，支持 NEON 指令(128位宽)",
+          "目录: include/src/test/docs",
+          "文档链接: 版本说明书/快速入门/安装指南/API参考"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "# KVecTurbo介绍 ... KVecTurbo适用于鲲鹏920 7282C处理器，支持NEON指令（128位宽）。目录结构: include(kvecturbo.h)/src(kvecturbo.cpp)/test(ut测试)/docs。贡献指南链接指向 boostkit/community",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-30T05:07:19"
+    },
+    {
+      "action": "阅读 README_en.md 交叉确认英文版项目介绍与架构信息",
+      "command": "cat /tmp/opencode/kvecturbo/README_en.md",
+      "details": {
+        "file": "README_en.md",
+        "key_findings": [
+          "Kunpeng 920 processor, supports NEON instructions (128-bit width)",
+          "与中文版一致"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "# Introduction to KVecTurbo ... applicable to Kunpeng 920 new model processor and supports NEON instructions (128-bit width)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-30T05:07:19"
+    },
+    {
+      "action": "阅读 docs/zh/installation_guide.md 提取已验证环境、依赖与编译命令",
+      "command": "cat /tmp/opencode/kvecturbo/docs/zh/installation_guide.md",
+      "details": {
+        "file": "docs/zh/installation_guide.md",
+        "key_findings": [
+          "已验证环境: openEuler 22.03 LTS SP3 / openEuler 20.03 LTS SP4, 鲲鹏920 7282C, GCC 10.3.1, CMake\u003e=3.22.0",
+          "依赖安装: yum install gcc g++ cmake libgomp make",
+          "特殊依赖: wget binarylibs (openGauss-third_party_binarylibs_openEuler_2203_arm.tar.gz)",
+          "构建命令: export BINARYLIBS=... \u0026\u0026 export CPLUS_INCLUDE_PATH=... \u0026\u0026 sh build.sh",
+          "产物: out/lib/libkvecturbo.so.xxxx, out/include/"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "# 安装指南 ... 已验证环境: openEuler 22.03 LTS SP3. yum install gcc g++ cmake libgomp make. wget https://opengauss.obs.cn-south-1.myhuaweicloud.com/latest/binarylibs/gcc10.3/openGauss-third_party_binarylibs_openEuler_2203_arm.tar.gz",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-30T05:07:19"
+    },
+    {
+      "action": "阅读 docs/zh/quick_start.md 确认样例入口",
+      "command": "cat /tmp/opencode/kvecturbo/docs/zh/quick_start.md",
+      "details": {
+        "file": "docs/zh/quick_start.md",
+        "key_findings": [
+          "KVecTurbo 对接 openGauss 7.0.0 RC1 使用，非本仓库独立样例",
+          "指向 openGauss 官方文档，本仓库无独立可执行样例脚本"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "# 快速入门 ... KVecTurbo 量化算法可对接 openGauss(7.0.0 RC1及后续版本)数据库使用 ... 请参见 openGauss 极简版安装教程/DataVec 向量数据库快速入门/PQ 特性",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-30T05:07:19"
+    },
+    {
+      "action": "阅读 docs/zh/release_notes.md 提取版本与已验证环境",
+      "command": "cat /tmp/opencode/kvecturbo/docs/zh/release_notes.md",
+      "details": {
+        "file": "docs/zh/release_notes.md",
+        "key_findings": [
+          "产品版本: 25.2.RC1, 代码分支版本 v1.1.0",
+          "已验证环境与安装指南一致(openEuler 22.03/20.03, 鲲鹏920, GCC 10.3.1)"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "# 版本说明书 ... 产品版本 25.2.RC1, 软件名称 KVecturbo ... 已验证环境: openEuler 22.03 LTS SP3 / openEuler 20.03 LTS SP4",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-30T05:07:19"
+    },
+    {
+      "action": "阅读 docs/zh/api_reference.md 提取 API 接口与使用示例代码",
+      "command": "cat /tmp/opencode/kvecturbo/docs/zh/api_reference.md",
+      "details": {
+        "file": "docs/zh/api_reference.md",
+        "key_findings": [
+          "5个接口: ComputePQTable/ComputeVectorPQCode/GetPQDistanceTableSdc/GetPQDistanceTableAdc/GetPQDistance",
+          "每个接口均附 C++ 使用示例代码片段（可作为样例参考）",
+          "结构体: VectorArray, PQParams"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "# API参考 ... 接口: ComputePQTable, ComputeVectorPQCode, GetPQDistanceTableSdc, GetPQDistanceTableAdc, GetPQDistance ... 含使用示例",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-30T05:07:19"
+    },
+    {
+      "action": "检查仓库是否存在 Dockerfile/devcontainer（Tier 1/2 信号探测）",
+      "command": "ls /tmp/opencode/kvecturbo/ \u0026\u0026 find /tmp/opencode/kvecturbo -name 'Dockerfile' -o -name 'devcontainer.json'",
+      "details": {
+        "result": "仓库根目录及子目录均无 Dockerfile，无 .devcontainer 目录，无 docker pull 命令，无自定义镜像链接"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "仓库文件: .clang-format .pre-commit-config.yaml CMakeLists.txt LICENSE README.md README_en.md build.sh ci-pre-commit-pr.sh docs include src test —— 无 Dockerfile",
+      "result": "无 Dockerfile",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-30T05:07:19"
+    },
+    {
+      "action": "阅读 CMakeLists.txt 提取构建配置与链接依赖",
+      "command": "cat /tmp/opencode/kvecturbo/CMakeLists.txt",
+      "details": {
+        "file": "CMakeLists.txt",
+        "key_findings": [
+          "add_library(kvecturbo SHARED src/kvecturbo.cpp)",
+          "find_package(OpenMP REQUIRED)",
+          "依赖 BINARYLIBS 环境变量指向 Huawei_Secure_C 头文件和库",
+          "target_link: -lsecurec, OpenMP::OpenMP_CXX",
+          "产物 libkvecturbo.so VERSION 1.1.0 SOVERSION 1"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "add_library(kvecturbo SHARED src/kvecturbo.cpp) ... find_package(OpenMP REQUIRED) ... -lsecurec ... VERSION 1.1.0 SOVERSION 1",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-30T05:07:19"
+    },
+    {
+      "action": "阅读 build.sh 确认构建入口脚本",
+      "command": "cat /tmp/opencode/kvecturbo/build.sh",
+      "details": {
+        "file": "build.sh",
+        "key_findings": [
+          "rm -rf ./out ./build, mkdir build, cd build, cmake .., make VERBOSE=1, make install"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "rm -rf ./out\\nrm -rf ./build\\nmkdir build\\ncd build\\ncmake ..\\nmake VERBOSE=1\\nmake install",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-30T05:07:19"
+    },
+    {
+      "action": "阅读 test/ut_test/CMakeLists.txt 提取 UT 构建依赖",
+      "command": "cat /tmp/opencode/kvecturbo/test/ut_test/CMakeLists.txt",
+      "details": {
+        "file": "test/ut_test/CMakeLists.txt",
+        "key_findings": [
+          "project(KVecturboTest), C++14",
+          "add_executable(test_main test.cpp ../../src/kvecturbo.cpp)",
+          "find_package(GTest REQUIRED), 链接 gtest/gtest_main/gcov/-lsecurec",
+          "依赖 BINARYLIBS 环境变量",
+          "cmake_minimum_required 3.22"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "cmake_minimum_required(VERSION 3.22) ... add_executable(test_main test.cpp ${PROJECT_SOURCE_DIR}/../../src/kvecturbo.cpp) ... find_package(GTest REQUIRED) ... -lsecurec",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-30T05:07:19"
+    },
+    {
+      "action": "阅读 test/ut_test/test.sh 确认 UT 执行入口",
+      "command": "cat /tmp/opencode/kvecturbo/test/ut_test/test.sh",
+      "details": {
+        "file": "test/ut_test/test.sh",
+        "key_findings": [
+          "rm -rf build, mkdir build, cd build, cmake .., cmake --build ., ./test_main --gtest_output=xml:./",
+          "后续 lcov/genhtml 生成覆盖率报告（非测试硬依赖）"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "rm -rf build\\nmkdir build\\ncd build\\ncmake ..\\ncmake --build .\\n./test_main --gtest_output=xml:./\\n... lcov ... genhtml",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-30T05:07:19"
+    },
+    {
+      "action": "阅读 test/ut_test/test.cpp 确认 UT 测试用例内容",
+      "command": "cat /tmp/opencode/kvecturbo/test/ut_test/test.cpp",
+      "details": {
+        "file": "test/ut_test/test.cpp",
+        "key_findings": [
+          "4个 TEST: PQTest.ParamsTest, GetPQDistance_testl2_Sdc.l2_Sdc, GetPQDistance_testl2_adc.l2_adc, ComputeVectorPQCode_Test.ComputeVectorPQCode, GetPQDistanceTable_test.sdc_adc",
+          "测试 ComputePQTable/GetPQDistance/ComputeVectorPQCode/GetPQDistanceTableSdc/GetPQDistanceTableAdc 接口的参数校验与正确性"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "TEST(PQTest, ParamsTest) ... TEST(GetPQDistance_testl2_Sdc, l2_Sdc) ... TEST(GetPQDistance_testl2_adc, l2_adc) ... TEST(ComputeVectorPQCode_Test, ComputeVectorPQCode) ... TEST(GetPQDistanceTable_test, sdc_adc)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-30T05:07:19"
+    },
+    {
+      "action": "git clone boostkit/community 仓库读取贡献指南（README 链接 WebFetch 因 JS 渲染失败，按规则回退 git clone）",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/boostkit/community.git /tmp/opencode/community \u0026\u0026 cat /tmp/opencode/community/docs/contributor/contributing.md",
+      "details": {
+        "file": "docs/contributor/contributing.md",
+        "key_findings": [
+          "通用 BoostKit 社区贡献流程（CLA/Issue/PR）",
+          "明确指向各项目 README 了解环境准备和构建验证",
+          "无 kvecturbo 特定构建/UT 命令或前置依赖脚本"
+        ],
+        "repo_url": "https://gitcode.com/boostkit/community.git"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "贡献指南: 了解行为准则/签署CLA/参与贡献(bug修复/算子优化/新特性/文档纠错)/贡献编码(参考每个开放项目的README.md了解环境准备)... 无 kvecturbo 构建细节",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-30T05:07:19"
+    },
+    {
+      "action": "文档闭包完成，汇总镜像信号探测与 Tier 决策",
+      "command": "汇总: README/installation_guide/release_notes/CMakeLists.txt/build.sh/test.sh/api_reference/contributing 均已读取，闭包完成",
+      "details": {
+        "base_image": "openeuler:22.03-lts-sp3",
+        "npu_required": false,
+        "tier1_signal": "无（无 docker pull/devcontainer/自定义镜像FROM）",
+        "tier2_signal": "无（仓库无 Dockerfile）",
+        "tier3_signal": "命中（installation_guide 要求 openEuler 22.03 LTS SP3，yum 安装依赖，binarylibs 为 openEuler_2203_arm 版）"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "无 Tier1/Tier2 信号，选 Tier 3 openEuler 22.03 LTS SP3；无 NPU/CANN/Ascend 相关内容，npu_required=false",
+      "result": "Tier 3 基础 OS 从零安装",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-30T05:07:19"
+    },
+    {
+      "action": "Tier 信号探测汇总：仓库无 Dockerfile/devcontainer/预构建镜像，确定 Tier 3 基础 OS 从零安装",
+      "command": "文档闭包汇总判断",
+      "details": {
+        "base_image": "openeuler/openeuler:22.03-lts-sp3",
+        "reason": "installation_guide 要求 openEuler 22.03 LTS SP3",
+        "tier1": "无（无 docker pull/devcontainer/自定义镜像 FROM）",
+        "tier2": "无（仓库无 Dockerfile）",
+        "tier3": "命中"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "无 Tier1/Tier2 信号，选 Tier 3 openEuler 22.03 LTS SP3",
+      "result": "Tier 3 基础 OS 从零安装",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-30T05:19:03"
+    },
+    {
+      "action": "SSH 连接远程验证机器并收集宿主机规格",
+      "command": "ssh -p 33430 root@123.60.114.33 \"uname -m \u0026\u0026 lscpu \u0026\u0026 free -h \u0026\u0026 df -h \u0026\u0026 docker --version\"",
+      "details": {
+        "arch": "aarch64",
+        "cpu_cores": 608,
+        "cpu_model": "Kunpeng 920 72F8",
+        "disk": "214G(root)+2.2T(workspace)",
+        "docker": "18.09.0",
+        "ip": "123.60.114.33",
+        "memory": "1.0Ti",
+        "npu": "无",
+        "port": 33430,
+        "user": "root"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "aarch64, Kunpeng 920 72F8, 608核, 1.0Ti, Docker 18.09.0, NO_NPU",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-30T05:19:03"
+    },
+    {
+      "action": "远程 clone 仓库到 /home/workspace/kvecturbo-verify（代码必须 clone 到此目录，容器挂载到 /workspace）",
+      "command": "ssh root@123.60.114.33 \"mkdir -p /home/workspace \u0026\u0026 git clone --depth 1 --branch master https://gitcode.com/boostkit/kvecturbo.git /home/workspace/kvecturbo-verify\"",
+      "details": {
+        "branch": "master",
+        "remote_path": "/home/workspace/kvecturbo-verify",
+        "repo_url": "https://gitcode.com/boostkit/kvecturbo.git"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "Cloning into '/home/workspace/kvecturbo-verify'... 仓库含 CMakeLists.txt/README.md/build.sh/docs/include/src/test",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-30T05:19:03"
+    },
+    {
+      "action": "docker pull openeuler/openeuler:22.03-lts-sp3 基础镜像",
+      "command": "docker pull openeuler/openeuler:22.03-lts-sp3",
+      "details": {
+        "image": "openeuler/openeuler:22.03-lts-sp3"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "Digest: sha256:4b1c8fd72bebda8a371036f95ac3c8a0d4721fd13e9154264154d8948e03b2e3 Status: Downloaded",
+      "result": "成功",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-30T05:19:03"
+    },
+    {
+      "action": "docker run 启动容器 kvecturbo-ttfhw（非 NPU 仓库，挂载工作目录到 /workspace）",
+      "command": "docker run -d --privileged --name kvecturbo-ttfhw -v /home/workspace/kvecturbo-verify:/workspace openeuler/openeuler:22.03-lts-sp3 sleep infinity",
+      "details": {
+        "container_name": "kvecturbo-ttfhw",
+        "image": "openeuler/openeuler:22.03-lts-sp3",
+        "mount": "/home/workspace/kvecturbo-verify:/workspace",
+        "startup_command_source": "default（README 未提供 docker run 命令，非 NPU 仓库用默认挂载命令）"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "容器启动成功，OS=openEuler 22.03 LTS-SP3, arch=aarch64, cpu=608, mem=1.0Ti",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-30T05:19:03"
+    },
+    {
+      "action": "yum makecache 构建包元数据缓存（首次需构建缓存）",
+      "command": "docker exec kvecturbo-ttfhw sh -c 'yum clean all \u0026\u0026 yum makecache'",
+      "details": {
+        "note": "openEuler 22.03 SP3 镜像首次需 makecache"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "source 67kB/s | 1.8MB ... update 4.6MB/s | 86MB ... Metadata cache created.",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-30T05:19:03"
+    },
+    {
+      "action": "安装系统工具链 gcc gcc-c++ make cmake libgomp wget git（文档 yum install gcc g++ cmake libgomp make，g++ 映射为 gcc-c++）",
+      "command": "docker exec kvecturbo-ttfhw sh -c 'yum install -y gcc gcc-c++ make cmake libgomp wget git'",
+      "details": {
+        "note": "文档写的 g++ 是 Debian 系写法，openEuler 对应包名为 gcc-c++",
+        "packages": [
+          "gcc",
+          "gcc-c++",
+          "make",
+          "cmake",
+          "libgomp",
+          "wget",
+          "git"
+        ],
+        "versions": {
+          "cmake": "3.22.0",
+          "g++": "10.3.1",
+          "gcc": "10.3.1"
+        }
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "gcc (GCC) 10.3.1, g++ (GCC) 10.3.1, cmake version 3.22.0 —— 版本均满足文档要求",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-30T05:19:03"
+    },
+    {
+      "action": "下载 openGauss binarylibs 第三方库（含 Huawei_Secure_C，提供 securec.h 和 libsecurec.a）",
+      "command": "docker exec kvecturbo-ttfhw sh -c 'cd /workspace/binarylibs \u0026\u0026 wget --no-check-certificate \u003cbinarylibs_url\u003e'",
+      "details": {
+        "path": "/workspace/binarylibs/openGauss-third_party_binarylibs_openEuler_2203_arm",
+        "size": "833MB",
+        "url": "https://opengauss.obs.cn-south-1.myhuaweicloud.com/latest/binarylibs/gcc10.3/openGauss-third_party_binarylibs_openEuler_2203_arm.tar.gz"
+      },
+      "duration_seconds": 180,
+      "error": "",
+      "output": "833MB 下载完成，解压后含 kernel/platform/Huawei_Secure_C/comm/include/securec.h + securectype.h, comm/lib/libsecurec.a",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-30T05:19:03"
+    },
+    {
+      "action": "解压 binarylibs 并验证 Huawei_Secure_C 头文件与库存在",
+      "command": "docker exec kvecturbo-ttfhw sh -c 'cd /workspace/binarylibs \u0026\u0026 tar -zxf binarylibs.tar.gz \u0026\u0026 ls .../Huawei_Secure_C/comm/'",
+      "details": {
+        "extracted_dir": "openGauss-third_party_binarylibs_openEuler_2203_arm",
+        "securec_header": "securec.h, securectype.h",
+        "securec_lib": "libsecurec.a"
+      },
+      "duration_seconds": 90,
+      "error": "",
+      "output": "securec.h securectype.h | libsecurec.a —— Huawei_Secure_C 依赖就位",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-30T05:19:03"
+    },
+    {
+      "action": "安装 UT 依赖 gtest-devel（CMakeLists.txt find_package(GTest REQUIRED)）",
+      "command": "docker exec kvecturbo-ttfhw sh -c 'yum install -y gtest-devel'",
+      "details": {
+        "gtest_version": "1.8.1",
+        "locations": [
+          "/usr/include/gtest/gtest.h",
+          "/usr/lib64/libgtest.so",
+          "/usr/lib64/cmake/GTest/GTestConfig.cmake"
+        ],
+        "packages": [
+          "gtest-devel",
+          "gmock",
+          "gtest"
+        ]
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "gtest-1.8.1 安装完成，GTestConfig.cmake 和 libgtest.so 就位，find_package(GTest) 可用",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-30T05:19:03"
+    },
+    {
+      "action": "验证 gcov（UT 代码覆盖率 -fprofile-arcs -ftest-coverage 依赖）已随 gcc 安装",
+      "command": "docker exec kvecturbo-ttfhw sh -c 'which gcov \u0026\u0026 gcov --version | head -1'",
+      "details": {
+        "gcov": "/usr/bin/gcov",
+        "note": "gcc 安装自带 gcov，UT CMakeLists 的 -fprofile-arcs -ftest-coverage 可用"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "/usr/bin/gcov —— gcov 随 gcc 安装就位",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-30T05:19:03"
+    },
+    {
+      "action": "收集容器规格信息（OS/架构/核数/内存/磁盘）",
+      "command": "docker exec kvecturbo-ttfhw sh -c 'cat /etc/os-release; nproc; free -h; df -h /workspace'",
+      "details": {
+        "container_arch": "aarch64",
+        "container_cpu_cores": 608,
+        "container_memory": "1.0Ti",
+        "container_os": "openEuler 22.03 (LTS-SP3)",
+        "workspace_disk": "2.2T 可用"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "openEuler 22.03 LTS-SP3, aarch64, 608核, 1.0Ti, /workspace 2.2T 可用",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-30T05:19:03"
+    },
+    {
+      "action": "使用仓库 build.sh 脚本执行构建（编译并发 MAKEFLAGS=-j121，608核×20%）",
+      "command": "docker exec kvecturbo-ttfhw bash -c 'export BINARYLIBS=... \u0026\u0026 export CPLUS_INCLUDE_PATH=... \u0026\u0026 export MAKEFLAGS=-j121 \u0026\u0026 cd /workspace \u0026\u0026 sh build.sh'",
+      "details": {
+        "build_script": "build.sh",
+        "concurrency": "121（608×20%）",
+        "duration": "10s",
+        "env": "BINARYLIBS=/workspace/binarylibs/openGauss-third_party_binarylibs_openEuler_2203_arm, CPLUS_INCLUDE_PATH 含 Huawei_Secure_C"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "[100%] Built target kvecturbo ... Linking CXX shared library libkvecturbo.so ... -lsecurec -shared -Wl,-soname,libkvecturbo.so.1 ... Installing: /workspace/out/lib/libkvecturbo.so.1.1.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-30T05:20:28"
+    },
+    {
+      "action": "验证构建产物（动态库 + 头文件）",
+      "command": "docker exec kvecturbo-ttfhw sh -c 'ls -lh /workspace/out/lib/ /workspace/out/include/ \u0026\u0026 file libkvecturbo.so.1.1.0'",
+      "details": {
+        "artifacts": [
+          "libkvecturbo.so.1.1.0 (67K, ELF aarch64)",
+          "libkvecturbo.so.1 (symlink)",
+          "libkvecturbo.so (symlink)",
+          "kvecturbo.h (3.8K)"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "libkvecturbo.so.1.1.0: ELF 64-bit LSB shared object, ARM aarch64, dynamically linked, stripped, 67K; kvecturbo.h 3.8K",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-30T05:20:28"
+    },
+    {
+      "action": "安装 lcov（test.sh 覆盖率步骤依赖）",
+      "command": "docker exec kvecturbo-ttfhw sh -c 'yum install -y lcov'",
+      "details": {
+        "note": "lcov 仅为覆盖率报告工具，非 UT 核心；test_main 在 lcov 之前执行，结果不受影响"
+      },
+      "duration_seconds": 30,
+      "error": "lcov 包不存在于 openEuler 22.03 默认源",
+      "output": "No match for argument: lcov. Error: Unable to find a match",
+      "result": "跳过（openEuler 22.03 默认源无 lcov 包）",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-08-30T05:22:57"
+    },
+    {
+      "action": "使用仓库 test/ut_test/test.sh 脚本执行单元测试（编译并发 MAKEFLAGS=-j121）",
+      "command": "docker exec kvecturbo-ttfhw bash -c 'export BINARYLIBS=... \u0026\u0026 export CPLUS_INCLUDE_PATH=... \u0026\u0026 export MAKEFLAGS=-j121 \u0026\u0026 cd /workspace/test/ut_test \u0026\u0026 sh test.sh'",
+      "details": {
+        "concurrency": "121",
+        "duration": "60s",
+        "env": "BINARYLIBS + CPLUS_INCLUDE_PATH 含 Huawei_Secure_C",
+        "failed": 0,
+        "passed": 5,
+        "total": 5,
+        "ut_script": "test/ut_test/test.sh"
+      },
+      "duration_seconds": 60,
+      "error": "lcov/genhtml: command not found（覆盖率报告无法生成，不影响测试结果）",
+      "output": "[100%] Built target test_main ... [==========] Running 5 tests from 5 test cases. [PASSED] 5 tests. ===UT_TIME=60s===",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-30T05:22:57"
+    },
+    {
+      "action": "解析 gtest XML 报告确认测试结果",
+      "command": "docker exec kvecturbo-ttfhw sh -c 'cat /workspace/test/ut_test/build/test_main.xml'",
+      "details": {
+        "errors": 0,
+        "failures": 0,
+        "test_cases": [
+          "PQTest.ParamsTest (52.228s)",
+          "GetPQDistance_testl2_Sdc.l2_Sdc (0s)",
+          "GetPQDistance_testl2_adc.l2_adc (0s)",
+          "ComputeVectorPQCode_Test.ComputeVectorPQCode (0s)",
+          "GetPQDistanceTable_test.sdc_adc (0s)"
+        ],
+        "tests": 5,
+        "time": "52.229s",
+        "xml": "build/test_main.xml"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "\u003ctestsuites tests=5 failures=0 disabled=0 errors=0 time=52.229\u003e ... 全部通过",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-30T05:22:57"
+    },
+    {
+      "action": "基于 api_reference.md ComputePQTable 使用示例编写样例（仓库无独立样例脚本，quick_start 指向 openGauss 集成）",
+      "command": "编写 sample_computepqtable.cpp 基于 api_reference.md 示例",
+      "details": {
+        "fixes": [
+          "VectorArray 指针类型误用为值类型（修正为 VectorArrayData 值类型传地址）",
+          "itemSize 由 dim*sizeof(float) 修正为 MAXALIGN(VECTOR_SIZE(dim))"
+        ],
+        "note": "仓库无独立样例脚本，从文档使用示例提取代码编写",
+        "sample_source": "docs/zh/api_reference.md ComputePQTable 使用示例"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "基于 api_reference.md ComputePQTable 接口使用示例编写样例，修正 VectorArray 用法和 itemSize 计算",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-30T05:26:18"
+    },
+    {
+      "action": "编译样例链接 libkvecturbo.so + libsecurec + OpenMP",
+      "command": "docker exec kvecturbo-ttfhw g++ /workspace/sample_computepqtable.cpp -o /workspace/sample_computepqtable ...",
+      "details": {
+        "compile": "g++ sample.cpp -o sample -Iout/include -Lout/lib -lkvecturbo -L binarylibs/Huawei_Secure_C/lib -lsecurec -fopenmp",
+        "compile_rc": 0
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "COMPILE_RC=0 编译成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-30T05:26:18"
+    },
+    {
+      "action": "运行 ComputePQTable 样例验证 libkvecturbo.so 接口可用性",
+      "command": "LD_LIBRARY_PATH=/workspace/out/lib /workspace/sample_computepqtable",
+      "details": {
+        "duration": "7s",
+        "output": "成功计算PQ码本 子空间数:8 聚类中心数:256 维度:128 样本数:10000",
+        "run_rc": 0
+      },
+      "duration_seconds": 7,
+      "error": "",
+      "output": "成功计算PQ码本\n  - 子空间数: 8\n  - 每子空间聚类中心数: 256\n  - 向量维度: 128\n  - 训练样本数: 10000  RUN_RC=0 ===SAMPLE_TIME=7s===",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-30T05:26:18"
+    },
+    {
+      "action": "验证完成后清理远程容器 kvecturbo-ttfhw",
+      "command": "ssh root@123.60.114.33 \"docker rm -f kvecturbo-ttfhw\"",
+      "details": {
+        "container": "kvecturbo-ttfhw",
+        "note": "全量校验与 JSON Schema 校验均通过后清理"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "kvecturbo-ttfhw 已删除，docker ps 无残留容器",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-08-30T05:26:52"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "libkvecturbo.so.1.1.0",
+          "path": "/workspace/out/lib/libkvecturbo.so.1.1.0",
+          "size": "67K",
+          "type": "library（ELF 64-bit ARM aarch64, dynamically linked, stripped）"
+        },
+        {
+          "name": "libkvecturbo.so.1",
+          "path": "/workspace/out/lib/libkvecturbo.so.1",
+          "size": "symlink -\u003e libkvecturbo.so.1.1.0",
+          "type": "library（符号链接）"
+        },
+        {
+          "name": "libkvecturbo.so",
+          "path": "/workspace/out/lib/libkvecturbo.so",
+          "size": "symlink -\u003e libkvecturbo.so.1",
+          "type": "library（符号链接）"
+        },
+        {
+          "name": "kvecturbo.h",
+          "path": "/workspace/out/include/kvecturbo.h",
+          "size": "3.8K",
+          "type": "header"
+        }
+      ],
+      "cmake": "cmake 3.22.0（CMakeLists.txt 无 cmake_minimum_required，add_library SHARED）",
+      "compiler": "g++ (GCC) 10.3.1",
+      "concurrency": 121,
+      "concurrency_ratio": "20%（608核 × 20% = 121，通过 MAKEFLAGS=-j121 传给 build.sh 的 make）",
+      "duration_seconds": 10,
+      "notes": "使用仓库 build.sh 脚本构建（rm -rf out/build \u0026\u0026 mkdir build \u0026\u0026 cd build \u0026\u0026 cmake .. \u0026\u0026 make VERBOSE=1 \u0026\u0026 make install）；仅 1 个 warning（unused parameter randGen），不影响；链接 -lsecurec（Huawei_Secure_C）+ -lgomp（OpenMP）",
+      "status": "success"
+    },
+    "sample": {
+      "duration_seconds": 7,
+      "results": [
+        {
+          "execution_status": "成功",
+          "execution_time": "7s",
+          "output_summary": "成功计算PQ码本（子空间数=8, 每子空间聚类中心数=256, 向量维度=128, 训练样本数=10000）。基于 api_reference.md ComputePQTable 接口使用示例编写，修正了原示例中 VectorArray 指针类型误用和 itemSize 计算两个文档缺陷后成功运行，验证 libkvecturbo.so ComputePQTable 接口可用",
+          "sample_name": "ComputePQTable 使用示例（基于 api_reference.md，修正 VectorArray 用法与 itemSize 计算）"
+        }
+      ],
+      "status": "success"
+    },
+    "ut": {
+      "cpp": {
+        "failed": 0,
+        "note": "5 个 GTest 测试用例全部通过：PQTest.ParamsTest（K-means 聚类参数校验+正确性，52s）、GetPQDistance_testl2_Sdc.l2_Sdc、GetPQDistance_testl2_adc.l2_adc、ComputeVectorPQCode_Test.ComputeVectorPQCode、GetPQDistanceTable_test.sdc_adc。gtest xml: tests=5 failures=0 errors=0。lcov/genhtml 未安装（openEuler 22.03 默认源无 lcov 包），仅覆盖率报告无法生成，不影响测试结果",
+        "passed": 5,
+        "status": "success",
+        "total": 5
+      },
+      "duration_seconds": 60,
+      "failed": 0,
+      "failures": [],
+      "passed": 5,
+      "status": "success",
+      "total": 5
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "kvecturbo-ttfhw",
+      "cpu_cores": 608,
+      "memory": "1.0Ti",
+      "os": "openEuler 22.03 (LTS-SP3)"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 608,
+      "cpu_model": "Kunpeng 920 72F8",
+      "disk": "2.2T 可用（/home/workspace 分区）",
+      "docker_version": "18.09.0",
+      "memory": "1.0Ti",
+      "npu": {
+        "available": false,
+        "card_count": 0,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "CMakeLists.txt: find_package(OpenMP REQUIRED), 链接 -lsecurec（来自 binarylibs Huawei_Secure_C）",
+        "from_dockerfile": "无 Dockerfile",
+        "from_readme": "installation_guide.md: yum install gcc g++ cmake libgomp make；其中 g++ 为 Debian 系写法，openEuler 对应包名为 gcc-c++",
+        "mappings": [
+          {
+            "original": "yum install gcc",
+            "source": "installation_guide.md",
+            "target": "yum install -y gcc（openEuler 直接复用）"
+          },
+          {
+            "original": "yum install g++",
+            "source": "installation_guide.md + 包名映射",
+            "target": "yum install -y gcc-c++（openEuler 上 g++ 包名为 gcc-c++）"
+          },
+          {
+            "original": "yum install cmake",
+            "source": "installation_guide.md",
+            "target": "yum install -y cmake（openEuler 直接复用，版本 3.22.0 满足 \u003e=3.22.0）"
+          },
+          {
+            "original": "yum install libgomp",
+            "source": "installation_guide.md",
+            "target": "yum install -y libgomp（openEuler 直接复用）"
+          },
+          {
+            "original": "yum install make",
+            "source": "installation_guide.md",
+            "target": "yum install -y make（openEuler 直接复用）"
+          }
+        ]
+      },
+      "image_name": "openeuler/openeuler:22.03-lts-sp3",
+      "selection_reason": "Tier 3 基础 OS 从零安装：仓库无 Dockerfile/devcontainer/预构建镜像（Tier 1/2 信号均无）；installation_guide.md 已验证环境要求 openEuler 22.03 LTS SP3，依赖用 yum 安装，binarylibs 为 openEuler_2203_arm 版本，故选 openEuler 22.03 LTS SP3 基础镜像",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "master 分支最新提交（--depth 1 浅克隆）",
+    "duration_seconds": 1266,
+    "end_time": "2026-08-30T05:26:18",
+    "environment": "openEuler 22.03 LTS-SP3 / aarch64 鲲鹏920 72F8 / GCC 10.3.1 / CMake 3.22.0 / Docker 18.09.0 远程容器",
+    "repo_url": "https://gitcode.com/boostkit/kvecturbo.git",
+    "start_time": "2026-08-30T05:05:12",
+    "total_steps": 36,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "容器内首次 yum install 超时（元数据缓存未构建，下载慢）",
+      "solution": "先执行 `yum clean all \u0026\u0026 yum makecache` 构建元数据缓存，再执行 yum install 即可正常安装。openEuler 22.03 SP3 基础镜像首次使用需 makecache。",
+      "source": "步骤2 容器依赖安装",
+      "timestamp": "2026-08-30T05:26:18"
+    },
+    {
+      "problem": "test.sh 中 lcov/genhtml 命令未找到（openEuler 22.03 默认源无 lcov 包），test.sh 末尾覆盖率报告步骤失败",
+      "solution": "lcov 仅为代码覆盖率报告工具，非 UT 核心。test_main 在 lcov 步骤之前已成功执行并产出 gtest XML 报告（5 tests 0 failures），lcov 缺失不影响 UT 测试结果判定。UT status 判定为 success。",
+      "source": "步骤4 单元测试执行",
+      "timestamp": "2026-08-30T05:26:18"
+    },
+    {
+      "problem": "按 api_reference.md ComputePQTable 使用示例原样编写样例运行返回 -1（Error: Item size mismatch）",
+      "solution": "根因是示例代码 itemSize 赋值为 dim*sizeof(float)，缺少 Vector 结构体 8 字节头部。参考 test.cpp 正确用法，将 itemSize 修正为 MAXALIGN(VECTOR_SIZE(dim))=MAXALIGN(offsetof(Vector,x)+sizeof(float)*dim)，并将 VectorArray 指针类型误用修正为 VectorArrayData 值类型传地址。修正后样例成功运行，ComputePQTable 返回 0。已记录为 documentation_gap。",
+      "source": "步骤5 样例执行",
+      "timestamp": "2026-08-30T05:26:18"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

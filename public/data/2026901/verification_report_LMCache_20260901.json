@@ -1,0 +1,796 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md + installation.rst + pyproject.toml cibuildwheel 配置",
+      "value": "Linux; 文档要求 NVIDIA GPU (compute capability 7.0+, CUDA 12.1+); cibuildwheel 仅构建 manylinux_x86_64; 代码亦支持 ROCm/HIP (aarch64 可走 BUILD_WITH_HIP=1 路径); 远程机器为 aarch64 无 GPU"
+    },
+    "build_commands": {
+      "source": "installation.rst 从源码安装章节 + contributing.rst 开发环境章节",
+      "value": "uv venv --python 3.12 \u0026\u0026 source .venv/bin/activate \u0026\u0026 uv pip install -r requirements/build.txt \u0026\u0026 uv pip install torch==2.8.0 \u0026\u0026 uv pip install -e . --no-build-isolation (无 CUDA 环境用 NO_CUDA_EXT=1 跳过 CUDA 扩展); 或 pip install -e .; Docker 构建: docker build --target lmcache-final --file docker/Dockerfile.standalone ."
+    },
+    "dependencies": {
+      "source": "requirements/common.txt + requirements/cuda.txt + requirements/build.txt + setup.py + pyproject.toml",
+      "value": [
+        "Python 3.10-3.13",
+        "torch (构建需 2.8.0, 运行时不固定版本)",
+        "ninja (构建)",
+        "packaging\u003e=24.2 (构建)",
+        "setuptools\u003e=77.0.3,\u003c81.0.0 (构建)",
+        "setuptools_scm\u003e=8 (构建)",
+        "wheel (构建)",
+        "vllm (运行时, 集成测试需要)",
+        "transformers\u003e=4.51.1",
+        "aiofile, aiofiles, aiohttp, awscrt",
+        "cufile-python",
+        "fastapi, httpx, msgspec",
+        "nixl (python\u003c3.13, NIXL 单元测试需要, 需单独安装)",
+        "numpy\u003c=2.2.6",
+        "nvtx, prometheus_client\u003e=0.18.0, psutil, py-cpuinfo",
+        "pyyaml, pyzmq\u003e=25.0.0, redis, safetensors",
+        "sortedcontainers, uvicorn, httptools",
+        "cupy-cuda12x",
+        "ray\u003e=2.9, nvidia-ml-py, torchvision, xformers (cuda.txt)",
+        "pytest\u003e=7.0,\u003c9.1, pytest-asyncio, pytest-benchmark, pytest-cov, pytest-html (test.txt)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "docker/Dockerfile + docker/Dockerfile.standalone",
+      "value": [
+        {
+          "original": "apt-get install ccache software-properties-common git curl sudo python3 python3-dev python3-venv python3-pip tzdata libxcb1-dev",
+          "target_equivalent": "apt-get install -y ccache software-properties-common git curl sudo python3 python3-dev python3-venv python3-pip tzdata libxcb1-dev"
+        },
+        {
+          "original": "curl -LsSf https://astral.sh/uv/install.sh | sh",
+          "target_equivalent": "安装 uv 包管理器"
+        },
+        {
+          "original": "uv pip install -r cuda.txt",
+          "target_equivalent": "安装 requirements/cuda.txt 依赖 (含 torch, torchvision, ray, nvidia-ml-py, xformers, cupy-cuda12x 等)"
+        },
+        {
+          "original": "uv pip install -r build.txt",
+          "target_equivalent": "安装 requirements/build.txt (ninja, packaging, setuptools, setuptools_scm, wheel)"
+        },
+        {
+          "original": "uv pip install vllm[runai,tensorizer,flashinfer] + triton-kernels",
+          "target_equivalent": "安装 vLLM nightly 及 triton-kernels"
+        },
+        {
+          "original": "python3 setup.py bdist_wheel --dist-dir=dist_lmcache",
+          "target_equivalent": "构建 LMCache wheel"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "docker/README.md 已发布镜像章节 + installation.rst Docker 章节",
+      "value": "Tier 1 候选: docker pull lmcache/vllm-openai:latest / docker pull lmcache/standalone:latest (Docker Hub 预构建); Tier 2 候选: docker/Dockerfile.standalone (FROM nvcr.io/nvidia/cuda-dl-base:25.03-cuda12.8-devel-ubuntu24.04); Tier 3 回退: ubuntu:22.04 + NO_CUDA_EXT=1 跳过 CUDA 扩展编译"
+    },
+    "sample_commands": {
+      "source": "docker/README.md 运行示例 + docker/example_run.sh",
+      "value": "docker run --runtime nvidia --gpus all -v ~/.cache/huggingface:/root/.cache/huggingface -p 8000:8000 --ipc=host lmcache/vllm-openai:latest serve Qwen/Qwen3-0.6B --kv-transfer-config '{\"kv_connector\":\"LMCacheConnectorV1\",\"kv_role\":\"kv_both\"}'; 独立模式: docker run -it lmcache/standalone:latest /opt/venv/bin/python3 -m lmcache.v1.multiprocess.server --cpu-buffer-size 60 --max-workers 4 --port 6555"
+    },
+    "special_dependencies": {
+      "source": "installation.rst + requirements/cuda.txt + setup.py",
+      "value": [
+        "NVIDIA GPU (compute capability 7.0+, 如 V100/T4/A100/H100/B200)",
+        "CUDA 12.1+ (开发需 12.8+)",
+        "uv 包管理器 (curl -LsSf https://astral.sh/uv/install.sh | sh)",
+        "vLLM (LMCache 集成运行时依赖)",
+        "NIXL (ai-dynamo/nixl, PD 分离测试需要, 需单独安装)",
+        "NVIDIA Container Toolkit (Docker GPU 运行时)"
+      ]
+    },
+    "ut_commands": {
+      "source": ".github/workflows/test.yml + .buildkite/pipeline.yml + contributing.rst 单元测试章节",
+      "value": "pytest --ignore=tests/disagg --ignore=tests/v1/test_nixl_storage.py --ignore=tests/v1/multiprocess/test_cache_server.py --ignore=tests/skipped --ignore=tests/v1/storage_backend/test_eic.py (需先 pip install vllm + requirements/test.txt + requirements/common.txt); Buildkite CI 额外忽略 tests/v1/test_pos_kernels.py"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "README.md 和 installation.rst 均要求 NVIDIA GPU (compute capability 7.0+) 和 CUDA 12.1+; 文档未提供无 GPU 环境下的构建指引 (如 NO_CUDA_EXT=1 环境变量仅在 setup.py 代码中存在, 文档未提及); 文档未说明哪些功能在无 CUDA 扩展时可用/不可用",
+      "source": "README.md + installation.rst + setup.py",
+      "time": "2026-09-01T03:55:11",
+      "title": "文档未说明无 GPU 环境下的构建和运行支持"
+    },
+    {
+      "body": "pyproject.toml 中 [tool.cibuildwheel] build = 'cp3*-manylinux_x86_64', 仅构建 x86_64 架构 wheel; aarch64 用户无法从 PyPI 安装预编译 wheel, 需从源码构建; 文档未说明 aarch64 支持情况",
+      "source": "pyproject.toml",
+      "time": "2026-09-01T03:55:11",
+      "title": "cibuildwheel 仅构建 x86_64 wheel, 无 aarch64 支持"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "git clone LMCache 仓库到本地, 读取 README.md 提取项目定位和安装入口",
+      "command": "git clone --depth 1 --branch benchmarks-main https://gitcode.com/boostkit/LMCache.git /tmp/opencode/LMCache",
+      "details": {
+        "branch": "benchmarks-main",
+        "file": "README.md",
+        "repo_url": "https://gitcode.com/boostkit/LMCache.git"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "LMCache 是 LLM 服务引擎扩展, 通过存储 KV cache 降低 TTFT; 安装: pip install lmcache; 工作平台: Linux NVIDIA GPU; 文档: docs.lmcache.ai; 示例: examples/ 目录",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-01T02:44:10"
+    },
+    {
+      "action": "读取 CONTRIBUTING.md 贡献指南, 跟进链接到 developer_guide/contributing.rst",
+      "command": "cat /tmp/opencode/LMCache/CONTRIBUTING.md \u0026\u0026 cat docs/source/developer_guide/contributing.rst",
+      "details": {
+        "file": "CONTRIBUTING.md",
+        "links_followed": [
+          "https://docs.lmcache.ai/developer_guide/contributing.html"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "贡献指南指向在线文档; contributing.rst 含开发环境设置: pip install -e ., pip install -r requirements/test.txt; UT: pytest; 部分 UT 需要 NVIDIA GPU, 无 GPU 会跳过; NIXL 测试需单独安装 NIXL",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-01T02:44:10"
+    },
+    {
+      "action": "读取 docker/Dockerfile, docker/Dockerfile.standalone, docker/Dockerfile.lightweight, docker/README.md 提取镜像构建信息",
+      "command": "cat docker/Dockerfile docker/Dockerfile.standalone docker/Dockerfile.lightweight docker/README.md",
+      "details": {
+        "files": [
+          "docker/Dockerfile",
+          "docker/Dockerfile.standalone",
+          "docker/Dockerfile.lightweight",
+          "docker/README.md"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Dockerfile FROM nvcr.io/nvidia/cuda-dl-base:25.03-cuda12.8-devel-ubuntu24.04 (NVIDIA CUDA 基础镜像, 非纯 OS); standalone 同基础镜像无 vLLM; lightweight FROM vllm/vllm-openai:latest; Docker Hub 预构建: lmcache/vllm-openai:latest, lmcache/standalone:latest; 运行需 --runtime nvidia --gpus all",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-01T02:44:10"
+    },
+    {
+      "action": "读取 installation.rst 安装指南提取安装命令和前置条件",
+      "command": "cat docs/source/getting_started/installation.rst",
+      "details": {
+        "file": "docs/source/getting_started/installation.rst"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "前置: Linux, Python 3.9-3.13, NVIDIA GPU 7.0+, CUDA 12.1+, uv; PyPI: uv pip install lmcache vllm; 源码: uv pip install -r requirements/build.txt + uv pip install torch + uv pip install -e . --no-build-isolation; Docker: docker pull lmcache/vllm-openai; ROCm: BUILD_WITH_HIP=1",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-01T02:44:10"
+    },
+    {
+      "action": "读取 setup.py 和 pyproject.toml 提取构建系统和 CUDA 扩展信息",
+      "command": "cat setup.py pyproject.toml",
+      "details": {
+        "files": [
+          "setup.py",
+          "pyproject.toml"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "构建系统: setuptools; 构建依赖: torch==2.8.0, ninja, packaging, setuptools, setuptools_scm, wheel; setup.py 构建 CUDAExtension(c_ops) + CppExtension(native_storage_ops); NO_CUDA_EXT=1 跳过 CUDA 编译; BUILD_WITH_HIP=1 走 ROCm; cibuildwheel 仅 x86_64",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-01T02:44:10"
+    },
+    {
+      "action": "读取 requirements/*.txt 提取依赖列表",
+      "command": "cat requirements/common.txt requirements/cuda.txt requirements/build.txt requirements/test.txt",
+      "details": {
+        "files": [
+          "requirements/common.txt",
+          "requirements/cuda.txt",
+          "requirements/build.txt",
+          "requirements/test.txt"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "common: torch(不固定), transformers, aiofile, fastapi, redis, cupy-cuda12x, nixl(\u003c3.13), numpy\u003c=2.2.6 等; cuda: ray\u003e=2.9, nvidia-ml-py, torchvision, xformers; build: ninja, packaging, setuptools, wheel; test: pytest\u003e=7.0,\u003c9.1, pytest-asyncio, pytest-benchmark, pytest-cov, pytest-html",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-01T02:44:10"
+    },
+    {
+      "action": "读取 .github/workflows/test.yml 和 .buildkite/pipeline.yml 提取 CI UT 执行命令",
+      "command": "cat .github/workflows/test.yml .buildkite/pipeline.yml",
+      "details": {
+        "files": [
+          ".github/workflows/test.yml",
+          ".buildkite/pipeline.yml"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "GitHub CI: pip install vllm + requirements/test.txt + requirements/common.txt, 然后 pytest --ignore=tests/disagg --ignore=tests/v1/test_nixl_storage.py --ignore=tests/v1/multiprocess/test_cache_server.py --ignore=tests/skipped --ignore=tests/v1/storage_backend/test_eic.py; Buildkite: uv venv + uv pip install + pytest --maxfail=1 --cov; CI 在 ubuntu-latest (x86_64) 运行",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-01T02:44:10"
+    },
+    {
+      "action": "读取 tests/conftest.py 和 tests/pytest.ini 提取测试框架配置",
+      "command": "cat tests/conftest.py tests/pytest.ini",
+      "details": {
+        "files": [
+          "tests/conftest.py",
+          "tests/pytest.ini"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "conftest.py 导入 torch 和 lmcache.v1.cache_engine; pytest-benchmark 缺失时 skip; 有 MixedMemoryAllocator mock (pin_memory); pytest.ini: log_cli=true, markers: no_shared_allocator",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-01T02:44:10"
+    },
+    {
+      "action": "镜像信号探测汇总: 判定 Tier 优先级和 NPU 需求",
+      "command": "grep -r 'docker pull\\|CANN\\|Ascend\\|torch_npu\\|davinci\\|910\\|310' README.md docker/ docs/ requirements/",
+      "details": {
+        "gpu_required": true,
+        "machine_has_gpu": false,
+        "npu_required": false,
+        "tier1_candidates": [
+          "lmcache/vllm-openai:latest",
+          "lmcache/standalone:latest",
+          "lmcache/vllm-openai:latest-nightly"
+        ],
+        "tier2_dockerfile": "docker/Dockerfile.standalone",
+        "tier3_fallback": "ubuntu:22.04 + NO_CUDA_EXT=1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "发现 docker pull lmcache/vllm-openai (installation.rst); 无 CANN/Ascend/torch_npu/davinci 关键词; 项目为 CUDA/NVIDIA GPU; 远程机器 aarch64 无 GPU",
+      "result": "Tier 1 候选: Docker Hub 预构建镜像 lmcache/vllm-openai:latest / lmcache/standalone:latest; Tier 2: 仓库 Dockerfile (FROM NVIDIA CUDA 基础镜像); Tier 3 回退: ubuntu:22.04 + NO_CUDA_EXT=1; npu_required=false (项目为 CUDA/NVIDIA, 无 CANN/Ascend/torch_npu 关键词)",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-01T02:44:10"
+    },
+    {
+      "action": "Tier 1: 尝试拉取 Docker Hub 预构建镜像 lmcache/standalone:latest",
+      "command": "docker pull lmcache/standalone:latest",
+      "details": {
+        "image": "lmcache/standalone:latest",
+        "image_arch": "amd64",
+        "machine_arch": "aarch64",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 600,
+      "error": "",
+      "output": "镜像拉取成功 (14GB), docker inspect 显示 Architecture: amd64, OS: linux; 但远程机器为 aarch64, 架构不匹配",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-09-01T03:47:13"
+    },
+    {
+      "action": "Tier 1: 尝试在 aarch64 机器上运行 amd64 镜像 lmcache/standalone:latest",
+      "command": "docker run --rm lmcache/standalone:latest echo test",
+      "details": {
+        "error_type": "exec format error",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 3,
+      "error": "exec format error: amd64 镜像无法在 aarch64 上运行, Docker 18.09 无 QEMU 多架构模拟",
+      "output": "exec format error; libcontainer: container start initialization failed",
+      "result": "失败",
+      "returncode": 1,
+      "step": "image_selection",
+      "success": false,
+      "timestamp": "2026-09-01T03:47:13"
+    },
+    {
+      "action": "Tier 1: 通过 Docker Hub API 查询 lmcache/standalone 和 lmcache/vllm-openai 的可用 tag 和架构",
+      "command": "curl -s https://hub.docker.com/v2/repositories/lmcache/standalone/tags/",
+      "details": {
+        "api": "https://hub.docker.com/v2/repositories/lmcache/standalone/tags/",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 30,
+      "error": "网络无法访问 Docker Hub API, 已通过 docker inspect 确认镜像为 amd64 only",
+      "output": "本地和远程机器均无法访问 hub.docker.com API (Connection reset/timeout)",
+      "result": "失败",
+      "returncode": 1,
+      "step": "image_selection",
+      "success": false,
+      "timestamp": "2026-09-01T03:47:13"
+    },
+    {
+      "action": "Tier 2: 检查 Dockerfile 基础镜像 nvcr.io/nvidia/cuda-dl-base 架构兼容性",
+      "command": "docker pull nvcr.io/nvidia/cuda-dl-base:25.03-cuda12.8-devel-ubuntu24.04",
+      "details": {
+        "base_image": "nvcr.io/nvidia/cuda-dl-base:25.03-cuda12.8-devel-ubuntu24.04",
+        "buildkit_required": true,
+        "docker_version": "18.09.0",
+        "dockerfile": "docker/Dockerfile.standalone",
+        "tier": "Tier 2"
+      },
+      "duration_seconds": 10,
+      "error": "架构不匹配 + Docker 版本过低不支持 BuildKit + 无 NVIDIA GPU",
+      "output": "NVIDIA CUDA 基础镜像仅提供 amd64 架构 (datacenter GPU); Docker 18.09 不支持 BuildKit --mount=type=cache 语法; 且无 NVIDIA GPU",
+      "result": "失败",
+      "returncode": 1,
+      "step": "image_selection",
+      "success": false,
+      "timestamp": "2026-09-01T03:47:13"
+    },
+    {
+      "action": "Tier 3 回退: 选择 ubuntu:24.04 基础镜像 + NO_CUDA_EXT=1 跳过 CUDA 扩展编译",
+      "command": "docker run -d --privileged --name LMCache-ttfhw -v /home/workspace/LMCache-verify:/workspace ubuntu:24.04 sleep infinity",
+      "details": {
+        "base_image": "ubuntu:24.04",
+        "no_cuda_ext": true,
+        "reason": "远程机器 aarch64 无 GPU, CUDA 扩展无法编译; NO_CUDA_EXT=1 使 setup.py 跳过 CUDAExtension 构建, 仅安装 Python 包",
+        "tier": "Tier 3"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "容器启动成功, Ubuntu 24.04.4 LTS, aarch64",
+      "result": "Tier 3 基础 OS 从零安装",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-09-01T03:47:13"
+    },
+    {
+      "action": "容器内安装系统工具链: python3, python3-dev, python3-venv, python3-pip, gcc, g++, git, curl, ccache 等",
+      "command": "apt-get update -y \u0026\u0026 apt-get install -y python3 python3-dev python3-venv python3-pip build-essential ccache git curl sudo tzdata libxcb1-dev software-properties-common",
+      "details": {
+        "packages": [
+          "python3",
+          "python3-dev",
+          "python3-venv",
+          "python3-pip",
+          "build-essential",
+          "ccache",
+          "git",
+          "curl",
+          "sudo",
+          "tzdata",
+          "libxcb1-dev",
+          "software-properties-common"
+        ]
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "系统包安装成功, Python 3.12.3",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-09-01T03:47:13"
+    },
+    {
+      "action": "安装 uv 包管理器 (curl -LsSf https://astral.sh/uv/install.sh | sh)",
+      "command": "curl -LsSf https://astral.sh/uv/install.sh | sh",
+      "details": {
+        "arch": "aarch64-unknown-linux-gnu",
+        "uv_version": "0.12.7"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "uv 0.12.7 (aarch64-unknown-linux-gnu) 安装成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-09-01T03:47:13"
+    },
+    {
+      "action": "创建 Python 3.12 虚拟环境 (uv venv --python 3.12 /opt/venv)",
+      "command": "uv venv --python 3.12 /opt/venv",
+      "details": {
+        "python_version": "3.12.3",
+        "venv_path": "/opt/venv"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "虚拟环境创建成功, Python 3.12.3",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-09-01T03:47:13"
+    },
+    {
+      "action": "安装构建依赖 requirements/build.txt (ninja, packaging, setuptools, setuptools_scm, wheel)",
+      "command": "uv pip install -r requirements/build.txt",
+      "details": {
+        "packages_installed": [
+          "ninja",
+          "packaging==26.3",
+          "setuptools==80.10.2",
+          "setuptools-scm==10.2.1",
+          "wheel==0.48.0"
+        ]
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "构建依赖安装成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-09-01T03:47:13"
+    },
+    {
+      "action": "安装 torch==2.8.0 (aarch64 CPU-only wheel, 无 CUDA)",
+      "command": "uv pip install torch==2.8.0",
+      "details": {
+        "arch": "aarch64",
+        "cuda": false,
+        "torch_version": "2.8.0+cpu"
+      },
+      "duration_seconds": 70,
+      "error": "",
+      "output": "torch 2.8.0+cpu 安装成功 (aarch64 CPU-only, PyPI 默认无 CUDA)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-09-01T03:47:13"
+    },
+    {
+      "action": "安装运行时依赖 requirements/common.txt (过滤 CUDA 专用包: cufile-python, cupy-cuda12x, nixl, nvtx)",
+      "command": "grep -v -E 'cufile-python|cupy-cuda|nixl|nvtx' requirements/common.txt \u003e /tmp/common_filtered.txt \u0026\u0026 uv pip install -r /tmp/common_filtered.txt",
+      "details": {
+        "filtered_packages": [
+          "cufile-python",
+          "cupy-cuda12x",
+          "nixl",
+          "nvtx"
+        ],
+        "installed_packages": [
+          "aiofile",
+          "aiofiles",
+          "aiohttp",
+          "awscrt",
+          "fastapi",
+          "httpx",
+          "msgspec",
+          "numpy\u003c=2.2.6",
+          "prometheus_client",
+          "psutil",
+          "py-cpuinfo",
+          "pyyaml",
+          "pyzmq",
+          "redis",
+          "safetensors",
+          "setuptools",
+          "setuptools_scm",
+          "sortedcontainers",
+          "torch",
+          "transformers\u003e=4.51.1",
+          "uvicorn",
+          "httptools"
+        ]
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "运行时依赖安装成功 (transformers==5.16.1, redis==8.1.0, pyzmq==27.2.0 等)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-09-01T03:47:13"
+    },
+    {
+      "action": "安装测试依赖 requirements/test.txt (pytest, pytest-asyncio, pytest-benchmark, pytest-cov, pytest-html 等)",
+      "command": "uv pip install -r requirements/test.txt",
+      "details": {
+        "packages_installed": [
+          "pytest==9.0.3",
+          "pytest-asyncio==1.4.0",
+          "pytest-benchmark==5.3.0",
+          "pytest-cov==7.1.0",
+          "pytest-html==4.2.0",
+          "python-multipart==0.0.32"
+        ]
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "测试依赖安装成功",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-09-01T03:47:13"
+    },
+    {
+      "action": "尝试安装 vllm (CI 测试需要, 但 vllm 294MB wheel 下载超时)",
+      "command": "uv pip install vllm --no-deps",
+      "details": {
+        "reason": "vllm wheel 294MB 下载多次超时, aarch64 网络下载 PyPI 大包缓慢",
+        "tests_collected_without_vllm": 939,
+        "vllm_installed": false
+      },
+      "duration_seconds": 600,
+      "error": "vllm wheel 294MB 下载超时, 测试在无 vllm 环境下运行",
+      "output": "vllm 下载超时, 但 pytest --co 确认 939 个测试可在无 vllm 环境下收集",
+      "result": "部分成功",
+      "returncode": 124,
+      "step": "dependency_installation",
+      "success": false,
+      "timestamp": "2026-09-01T03:47:13"
+    },
+    {
+      "action": "收集容器规格信息 (OS, 架构, CPU, 内存)",
+      "command": "docker exec LMCache-ttfhw uname -m \u0026\u0026 docker exec LMCache-ttfhw cat /etc/os-release",
+      "details": {
+        "container_arch": "aarch64",
+        "container_cpu": 608,
+        "container_memory": "1.0Ti",
+        "container_os": "Ubuntu 24.04.4 LTS",
+        "startup_command_source": "default (非 README 命令, 无 NPU)"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "Ubuntu 24.04.4 LTS, aarch64, 608核, 1.0Ti 内存",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-09-01T03:47:13"
+    },
+    {
+      "action": "使用 NO_CUDA_EXT=1 python3 setup.py bdist_wheel 构建 LMCache wheel (跳过 CUDA 扩展)",
+      "command": "export NO_CUDA_EXT=1 \u0026\u0026 python3 setup.py bdist_wheel --dist-dir=dist_lmcache",
+      "details": {
+        "artifact": "lmcache-0.1.dev1-py3-none-any.whl (586KB)",
+        "build_command": "NO_CUDA_EXT=1 python3 setup.py bdist_wheel --dist-dir=dist_lmcache",
+        "build_deps": [
+          "ninja",
+          "packaging",
+          "setuptools==80.10.2",
+          "setuptools_scm==10.2.1",
+          "wheel",
+          "torch==2.8.0+cpu"
+        ],
+        "max_jobs": 182,
+        "no_cuda_ext": true,
+        "nvcc_threads": "N/A (无 CUDA)",
+        "reason": "远程机器 aarch64 无 NVIDIA GPU, 无法编译 CUDAExtension; NO_CUDA_EXT=1 使 setup.py 使用 source_dist_extension() 返回空 ext_modules, 跳过 CUDA 编译"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "构建成功, 生成 lmcache-0.1.dev1-py3-none-any.whl (586KB, py3-none-any 表示纯 Python wheel 无平台特定二进制)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-09-01T03:48:24"
+    },
+    {
+      "action": "验证构建产物: 安装 wheel 并测试 import",
+      "command": "uv pip install dist_lmcache/lmcache-0.1.dev1-py3-none-any.whl --no-deps \u0026\u0026 python3 -c 'import lmcache; from lmcache.v1.cache_engine import LMCacheEngine'",
+      "details": {
+        "c_ops_error": "ModuleNotFoundError: No module named 'lmcache.c_ops' (预期, NO_CUDA_EXT=1 跳过 CUDA 扩展)",
+        "c_ops_import": false,
+        "cache_engine_import": true,
+        "lmcache_import": true,
+        "wheel_installed": true
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "lmcache 包安装成功; import lmcache 成功; from lmcache.v1.cache_engine import LMCacheEngine 成功; lmcache.c_ops 不可用 (预期, 无 CUDA 扩展)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-09-01T03:48:24"
+    },
+    {
+      "action": "执行非 CUDA 单元测试 (按 CI test.yml 和 buildkite/pipeline.yml 命令)",
+      "command": "cd /workspace \u0026\u0026 LMCACHE_TRACK_USAGE=false pytest --ignore=tests/disagg --ignore=tests/v1/test_nixl_storage.py --ignore=tests/v1/multiprocess/test_cache_server.py --ignore=tests/skipped --ignore=tests/v1/storage_backend/test_eic.py --ignore=tests/v1/test_pos_kernels.py -q --tb=line",
+      "details": {
+        "duration": "143.31s",
+        "failed": 0,
+        "passed": 733,
+        "skipped": 209,
+        "skipped_reason": "无 NVIDIA GPU (CUDA 测试自动跳过), 无 vllm (vllm 相关测试跳过), 无 nixl (NIXL 测试跳过), 无 cupy-cuda12x (CUDA 相关测试跳过)",
+        "test_command": "LMCACHE_TRACK_USAGE=false pytest --ignore=tests/disagg --ignore=tests/v1/test_nixl_storage.py --ignore=tests/v1/multiprocess/test_cache_server.py --ignore=tests/skipped --ignore=tests/v1/storage_backend/test_eic.py --ignore=tests/v1/test_pos_kernels.py -q --tb=line",
+        "total": 942,
+        "warning_types": [
+          "RuntimeWarning: coroutine was never awaited",
+          "DeprecationWarning: fork() in multi-threaded process",
+          "PytestUnknownMarkWarning: no_shared_allocator"
+        ],
+        "warnings": 66
+      },
+      "duration_seconds": 143,
+      "error": "",
+      "output": "733 passed, 209 skipped, 66 warnings in 143.31s (0:02:23)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-09-01T03:53:04"
+    },
+    {
+      "action": "执行 basic_check test_storage_manager 样例 (examples/basic_check/README.md 提供的命令)",
+      "command": "LMCACHE_CONFIG_PATH=examples/basic_check/example_config.yaml python3 -m lmcache.v1.basic_check --mode test_storage_manager",
+      "details": {
+        "command": "python -m lmcache.v1.basic_check --mode test_storage_manager",
+        "config": "examples/basic_check/example_config.yaml (chunk_size=256, local_cpu=False, max_local_cpu_size=1)",
+        "performance": {
+          "EXISTS_avg_ms": 0.19,
+          "GET_avg_ms": 0.18,
+          "PUT_avg_ms": 0.41
+        },
+        "results": {
+          "EXISTS_exist": "5/5 passed",
+          "EXISTS_nonexist": "5/5 passed",
+          "GET": "5/5 passed",
+          "PUT": "5/5 passed"
+        },
+        "sample_source": "examples/basic_check/README.md"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "5/5 通过 (100%); EXISTS/PUT/GET 操作在 CPU 模式下正常工作; GET 平均 0.18ms, PUT 平均 0.41ms",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-09-01T03:55:11"
+    },
+    {
+      "action": "执行 basic_check gen key 生成样例 (examples/basic_check/README.md 提供的命令)",
+      "command": "LMCACHE_CONFIG_PATH=examples/basic_check/example_config.yaml python3 -m lmcache.v1.basic_check --mode gen --num-keys 10 --concurrency 2",
+      "details": {
+        "command": "python -m lmcache.v1.basic_check --mode gen --num-keys 10 --concurrency 2",
+        "concurrency": 2,
+        "keys_generated": 10,
+        "sample_source": "examples/basic_check/README.md",
+        "storage_manager": "初始化成功, LRUCachePolicy 正常, 关闭成功",
+        "throughput": "16.7k keys/s"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "生成 10 个 key 成功, 16.7k keys/s; StorageManager 初始化和关闭正常",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-09-01T03:55:11"
+    },
+    {
+      "action": "尝试启动 LMCache 独立服务器 (docker/README.md standalone 运行示例)",
+      "command": "/opt/venv/bin/python3 -m lmcache.v1.multiprocess.server --cpu-buffer-size 1 --max-workers 2 --port 6555",
+      "details": {
+        "command": "/opt/venv/bin/python3 -m lmcache.v1.multiprocess.server --cpu-buffer-size 1 --max-workers 2 --port 6555",
+        "error_type": "ModuleNotFoundError",
+        "missing_module": "cupy",
+        "reason": "独立服务器依赖 cupy (CUDA 专用包), 无 CUDA 环境下无法启动; requirements/common.txt 中 cupy-cuda12x 被 Tier 3 过滤",
+        "sample_source": "docker/README.md standalone 运行示例"
+      },
+      "duration_seconds": 1,
+      "error": "独立服务器依赖 cupy (CUDA 专用包), 无 CUDA 环境下无法启动",
+      "output": "ModuleNotFoundError: No module named 'cupy'",
+      "result": "失败",
+      "returncode": 1,
+      "step": "sample_execution",
+      "success": false,
+      "timestamp": "2026-09-01T03:55:11"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "lmcache-0.1.dev1-py3-none-any.whl",
+          "path": "/workspace/dist_lmcache/lmcache-0.1.dev1-py3-none-any.whl",
+          "size": "586KB",
+          "type": "python_wheel"
+        }
+      ],
+      "duration_seconds": 30,
+      "status": "success"
+    },
+    "sample": {
+      "duration_seconds": 45,
+      "results": [
+        {
+          "execution_status": "success",
+          "execution_time": "15s",
+          "output_summary": "测试 EXISTS/PUT/GET 操作, 5/5 通过 (100%); GET 平均 0.18ms, PUT 平均 0.41ms, EXISTS 平均 0.19ms; 验证存储管理器在 CPU 模式下正常工作",
+          "sample_name": "basic_check test_storage_manager (存储管理器测试)"
+        },
+        {
+          "execution_status": "success",
+          "execution_time": "1s",
+          "output_summary": "生成 10 个 KV cache key, 并发 2 worker, 速率 16.7k keys/s; StorageManager 初始化和关闭均成功; LRUCachePolicy 正常工作",
+          "sample_name": "basic_check gen (KV cache key 生成)"
+        },
+        {
+          "execution_status": "failed",
+          "execution_time": "1s",
+          "output_summary": "启动失败: ModuleNotFoundError: No module named 'cupy'; 独立服务器依赖 cupy (CUDA 专用包), 无 CUDA 环境下无法启动; docker/README.md 的运行示例需 --runtime nvidia --gpus all",
+          "sample_name": "standalone server (LMCache 独立服务器)"
+        }
+      ],
+      "status": "partial_success"
+    },
+    "ut": {
+      "duration_seconds": 143,
+      "failed": 0,
+      "failures": [],
+      "passed": 733,
+      "status": "success",
+      "total": 942
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "cpu_cores": 608,
+      "memory": "1.0Ti",
+      "os": "Ubuntu 24.04.4 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 608,
+      "cpu_model": "Kunpeng 920 (HiSilicon, 2 socket x 304核, 2000MHz)",
+      "disk": "492G (196G 可用)",
+      "docker_version": "18.09.0",
+      "memory": "1.0Ti"
+    },
+    "image_source": {
+      "image_name": "ubuntu:24.04",
+      "selection_reason": "Tier 1 预构建镜像 lmcache/standalone:latest 拉取成功但架构为 amd64, 在 aarch64 机器上运行报 exec format error; Docker Hub 无 aarch64 变体; Tier 2 Dockerfile 基础镜像 nvcr.io/nvidia/cuda-dl-base 为 NVIDIA CUDA amd64 only, 且 Docker 18.09 不支持 BuildKit --mount=type=cache; 回退 Tier 3 基础 OS ubuntu:24.04 + NO_CUDA_EXT=1 跳过 CUDA 扩展编译",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "benchmarks-main",
+    "commit": "771807943",
+    "duration_seconds": 4403,
+    "end_time": "2026-09-01T03:55:11",
+    "environment": "Ubuntu 24.04.4 LTS aarch64, Kunpeng 920 608核, 1.0Ti内存, 无GPU, Docker 18.09.0, Python 3.12.3, torch 2.8.0+cpu",
+    "repo_url": "https://gitcode.com/boostkit/LMCache.git",
+    "start_time": "2026-09-01T02:41:48",
+    "total_steps": 5,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "vllm (294MB wheel) 下载多次超时, aarch64 机器下载 PyPI 大包缓慢; 无 vllm 时部分测试自动跳过",
+      "solution": "使用 --no-deps 后台下载; 单元测试在无 vllm 环境下运行, 733 个非 CUDA 测试全部通过, 209 个依赖 CUDA/vllm/nixl 的测试自动跳过",
+      "source": "requirements/common.txt + .github/workflows/test.yml",
+      "timestamp": "2026-09-01T03:53:04"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "火山AI网关/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}
