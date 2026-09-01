@@ -139,6 +139,10 @@ const REPO_URL_MAP = {
   'amct': 'https://gitcode.com/cann/amct.git',
 }
 
+const REPO_URL_COMMUNITY_MAP = {
+  'https://gitcode.com/boostkit/omnistatestore.git': 'BoostKit',
+}
+
 function normalizeRepoKey(name) {
   return name.toLowerCase().replace(/[-_]/g, '-')
 }
@@ -167,12 +171,12 @@ function normalizeRepoName(name) {
 function deriveRepoIdentity(source) {
   const rawName = source.repoInfoName || source.fallbackName
   const repoName = normalizeRepoName(rawName)
-  const community = REPO_COMMUNITY_MAP[normalizeRepoKey(repoName)]
   const repoPathUrl = source.repoPath && /^https?:\/\//.test(source.repoPath) ? source.repoPath : undefined
   const url = (source.repoUrl && /^https?:\/\//.test(source.repoUrl) ? source.repoUrl : undefined)
     || (source.repoInfoUrl && /^https?:\/\//.test(source.repoInfoUrl) ? source.repoInfoUrl : undefined)
     || repoPathUrl
     || REPO_URL_MAP[normalizeRepoKey(repoName)]
+  const community = (url && REPO_URL_COMMUNITY_MAP[url]) || REPO_COMMUNITY_MAP[normalizeRepoKey(repoName)]
   return { repoName, community, url }
 }
 
@@ -350,8 +354,10 @@ async function processBatch(batchDir, batchId) {
       const data = JSON.parse(content)
       const summary = normalizeToSummary(filename, data)
 
-      // Dedup: keep highest-scored file per repo
-      const key = summary.displayName.toLowerCase().replace(/[-_]/g, '-')
+      // Dedup: keep highest-scored file per repo.
+      // Use URL when available so same-name repos from different orgs don't collide;
+      // fall back to displayName for reports without a URL.
+      const key = (summary.url || summary.displayName).toLowerCase().replace(/[-_]/g, '-')
       let score = 0
       if (filename.startsWith('verification_report_WSL_')) score += 2000
       else if (filename.startsWith('verification_report_Ubuntu_')) score += 1000

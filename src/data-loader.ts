@@ -136,6 +136,10 @@ const REPO_URL_MAP: Record<string, string> = {
   'amct': 'https://gitcode.com/cann/amct.git',
 }
 
+const REPO_URL_COMMUNITY_MAP: Record<string, string> = {
+  'https://gitcode.com/boostkit/omnistatestore.git': 'BoostKit',
+}
+
 function normalizeRepoKey(name: string): string {
   return name.toLowerCase().replace(/[-_]/g, '-')
 }
@@ -184,12 +188,12 @@ function deriveRepoIdentity(source: {
 }): RepoIdentity {
   const rawName = source.repoInfoName || source.fallbackName
   const repoName = normalizeRepoName(rawName)
-  const community = getRepoCommunity(repoName)
   const repoPathUrl = source.repoPath && /^https?:\/\//.test(source.repoPath) ? source.repoPath : undefined
   const url = (source.repoUrl && /^https?:\/\//.test(source.repoUrl) ? source.repoUrl : undefined)
     || (source.repoInfoUrl && /^https?:\/\//.test(source.repoInfoUrl) ? source.repoInfoUrl : undefined)
     || repoPathUrl
     || getRepoUrl(repoName)
+  const community = (url && REPO_URL_COMMUNITY_MAP[url]) || getRepoCommunity(repoName)
   return { repoName, community, url }
 }
 
