@@ -1682,60 +1682,46 @@
     "result": "success",
     "buildStatus": "success",
     "utStatus": "success",
-    "sampleStatus": "success",
-    "totalDuration": 3242,
-    "environmentDuration": 2251,
-    "buildDuration": 840,
-    "utDuration": 116,
-    "sampleDuration": 35,
-    "testPassed": 1322,
+    "sampleStatus": "unknown",
+    "totalDuration": 2342,
+    "environmentDuration": 820,
+    "buildDuration": 1380,
+    "utDuration": 142,
+    "testPassed": 1325,
     "testFailed": 0,
-    "testTotal": 1322,
-    "testSkipped": 0,
-    "generatedAt": "2026-08-29T22:54:07",
+    "testTotal": 1325,
+    "generatedAt": "2026-09-02T17:28:31",
     "environment": "unknown",
     "url": "https://gitcode.com/Ascend/mssanitizer.git",
     "category": "MindStudio",
     "hasStaticAnalysis": false,
-    "file": "verification_report_mssanitizer_20260829.json",
+    "file": "verification_report_mssanitizer_20260902.json",
     "issues": [
       {
-        "problem": "容器默认用户为 mindstudio（uid=20001），但仓库文件由 root 所有，导致 git submodule update 时 .git/config 权限不足",
-        "solution": "所有 docker exec 命令使用 --user root 参数以 root 身份执行",
-        "source": "步骤2 容器启动",
-        "timestamp": "2026-08-29T23:48:09"
-      },
-      {
-        "problem": "样例编译时 bisheng 编译器找不到 libsanitizer_api.so（未安装 mssanitizer 工具时）",
-        "solution": "安装构建产物 mindstudio-sanitizer_26.0.0_aarch64.run 到 CANN 目录，libsanitizer_api.so 安装到 /usr/local/Ascend/cann-9.1.0/tools/mssanitizer/lib64/",
-        "source": "步骤5 样例编译",
-        "timestamp": "2026-08-29T23:48:09"
-      },
-      {
-        "problem": "样例链接阶段 ld.lld 报 __stack_chk_guard 未定义（glibc217-sysroot 的 libc.a 缺少此符号）和 _dl_find_object 未定义（系统 GCC 12 的 libgcc_eh.a 引用了 glibc 2.35+ 函数）",
-        "solution": "在 link.txt 中添加 -L/opt/gcc11-glibc2.17/lib/gcc/aarch64-unknown-linux-gnu/11.2.0（优先使用 GCC 11.2 的 libgcc_eh.a）和 -L/usr/lib64 -L CANN libssp 路径 -lssp -lc（从系统 libc 获取 __stack_chk_guard）",
-        "source": "步骤5 样例链接",
-        "timestamp": "2026-08-29T23:48:09"
-      },
-      {
-        "problem": "demo 二进制运行时找不到 libssp.so.0（动态链接依赖）",
-        "solution": "创建符号链接 ln -sf /usr/local/Ascend/cann-9.1.0/tools/hcc/aarch64-target-linux-gnu/lib64/libssp.so.0 /usr/lib64/libssp.so.0 并执行 ldconfig",
-        "source": "步骤5 样例运行",
-        "timestamp": "2026-08-29T23:48:09"
+        "timestamp": "2026-09-02T18:03:58",
+        "problem": "容器内mindstudio用户(UID 20001)无权写入宿主avada用户(UID 1043)克隆的.git/config文件，导致git submodule update失败",
+        "solution": "使用 docker exec -u root 以root用户执行构建命令，root用户对所有文件有写权限",
+        "source": "build.py 首次执行: git submodule update --init 报错 could not lock config file .git/config: Permission denied"
       }
     ],
     "documentationGaps": [
       {
-        "body": "sample_memcheck 的 CMakeLists.txt 假设链接器能自动找到 libssp 和正确的 libgcc_eh，但在 MindStudio 构建镜像（glibc217-sysroot）中，链接器默认使用旧版 sysroot，缺少 __stack_chk_guard 和 _dl_find_object 符号，需要手动添加 -L 和 -l 参数才能链接成功。",
-        "source": "example/sample_memcheck/CMakeLists.txt + 构建镜像环境",
-        "time": "2026-08-29T23:48:09",
-        "title": "样例 CMakeLists.txt 未提供构建镜像内链接所需的库路径配置"
+        "time": "2026-09-02T18:07:33",
+        "title": "容器内用户权限问题未在文档中说明",
+        "body": "dev_env_setup.md 要求使用 ctr_in.py 启动容器并自动处理用户映射，但当直接使用 docker run 启动预构建镜像时，容器内 mindstudio 用户(UID 20001)无权写入宿主用户克隆的 .git/config 文件，导致 git submodule update 失败。文档未说明直接使用 docker run 时的权限处理方式。",
+        "source": "dev_env_setup.md 第5章 + build.py 首次执行报错"
       },
       {
-        "body": "dev_env_setup.md 第5节明确标注镜像\"仅用于编译，不支持 NPU 程序运行\"，但实际验证中发现，只要正确配置 LD_LIBRARY_PATH 和 libssp.so.0 符号链接，样例可以在该镜像中成功运行并检测出内存越界。",
-        "source": "msot/docs/zh/common/dev_env_setup.md 第5节",
-        "time": "2026-08-29T23:48:09",
-        "title": "dev_env_setup.md 声明镜像不支持 NPU 运行，但实际样例可运行"
+        "time": "2026-09-02T18:07:33",
+        "title": "构建镜像不支持NPU运行的说明可能引起误解",
+        "body": "dev_env_setup.md 第5章注明本镜像仅用于编译不支持NPU程序运行，但未说明UT使用stub/mock方式不依赖实际NPU硬件。这可能导致开发者误以为无法在编译镜像中执行单元测试。",
+        "source": "dev_env_setup.md 第5章注意事项"
+      },
+      {
+        "time": "2026-09-02T18:07:33",
+        "title": "install_guide.md 要求使用 ctr_in.py 启动容器，未提供非交互式替代方案",
+        "body": "安装指南明确要求必须使用统一镜像制作指南第7章给出的 ctr_in.py 命令在交互式终端中启动并进入容器，不得使用普通 docker run 创建容器。但自动化验证场景无法使用交互式 TTY，文档未提供非交互式替代方案。",
+        "source": "docs/zh/install_guide/mssanitizer_install_guide.md 源码安装章节"
       }
     ]
   },
