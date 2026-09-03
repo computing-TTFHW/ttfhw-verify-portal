@@ -1809,43 +1809,62 @@
   {
     "name": "oGRAC",
     "displayName": "oGRAC",
-    "result": "failed",
-    "buildStatus": "unknown",
-    "utStatus": "unknown",
+    "result": "partial_success",
+    "buildStatus": "success",
+    "utStatus": "partial_success",
     "sampleStatus": "unknown",
-    "totalDuration": 0,
-    "buildDuration": 0,
-    "utDuration": 0,
-    "sampleDuration": 0,
-    "testPassed": 0,
-    "testFailed": 0,
-    "testTotal": 0,
-    "generatedAt": "2026-09-01T00:35:06",
+    "totalDuration": 6937,
+    "environmentDuration": 6424,
+    "buildDuration": 240,
+    "utDuration": 273,
+    "testPassed": 273,
+    "testFailed": 7,
+    "testTotal": 280,
+    "testSkipped": 0,
+    "generatedAt": "2026-09-03T14:25:34",
     "environment": "unknown",
     "url": "https://gitcode.com/openGauss/oGRAC.git",
     "category": "openGauss",
     "hasStaticAnalysis": false,
-    "file": "verification_report_oGRAC_20260901.json",
+    "file": "verification_report_oGRAC_20260903.json",
     "issues": [
       {
-        "problem": "local_install.sh 报 getopt: command not found 无法运行",
-        "solution": "基础镜像缺 util-linux,先 dnf install -y util-linux 提供 getopt 后再执行 local_install.sh prepare",
-        "source": "build/local_install.sh parse_params",
-        "timestamp": "2026-09-01T01:04:08"
+        "timestamp": "2026-09-03T15:58:37",
+        "problem": "构建编译到14%时报错 fatal error: numa.h: No such file or directory（pkg/src/protocol/cs_tcp.c:28 #include <numa.h>）。README 和 local_install.sh prepare() 的依赖列表中均未列出 numactl-devel 包",
+        "solution": "执行 yum install -y numactl-devel 安装系统包，并在 library/numactl/ 下创建 include 和 lib 符号链接指向系统路径，使 CMakeLists.txt 中引用的 library/numactl/include 和 library/numactl/lib 路径可用。重试构建成功",
+        "source": "build/Makefile.sh package-release 编译 cs_tcp.c"
       },
       {
-        "problem": "Tier 2 docker build Dockerfile_ARM64 失败",
-        "solution": "Dockerfile 依赖已废弃的 boostorg.jfrog.io 源(返回 reactivation 页面非 tar.gz),降级 Tier 3 用 openEuler 22.03 LTS SP1 基础镜像 + local_install.sh prepare 安装依赖",
-        "source": "docker/Dockerfile_ARM64 Step 15",
-        "timestamp": "2026-09-01T01:04:08"
+        "timestamp": "2026-09-03T15:58:37",
+        "problem": "Docker Hub registry-1.docker.io 不可达，无法拉取 openeuler/openeuler:22.03-lts-sp1 基础镜像进行 Tier 2 docker build",
+        "solution": "降级 Tier 3：从 repo.openeuler.org 下载 openEuler 22.03-LTS-SP1 官方 docker 镜像 (openEuler-docker.aarch64.tar.xz) 并 docker load 加载，容器内 yum 安装系统依赖",
+        "source": "docker build -f docker/Dockerfile_ARM64"
+      },
+      {
+        "timestamp": "2026-09-03T16:19:54",
+        "problem": "UT 安装步骤失败：install.py 中 chownDataDir() 在 createDbDirs() 之前调用，导致 gcc_home 目录创建后属主为 root 而非 ogracdba，installdb.sh 以 ogracdba 用户运行时 dd 命令权限拒绝",
+        "solution": "预创建 /home/regress/ograc_data/data 和 /home/regress/ograc_data/gcc_home 目录并设置属主为 ogracdba:ogracdba，使 chownDataDir() 能正确设置权限。使用 Release 构建产物（而非 Debug 构建）执行 UT",
+        "source": "pkg/install/install.py chownDataDir() vs createDbDirs() 调用顺序"
       }
     ],
     "documentationGaps": [
       {
-        "body": "README UT章节要求安装 lcov 做代码覆盖率收集,但 openEuler 22.03 LTS-SP1 官方源无 lcov 包,源码安装又缺 perl 模块 Capture::Tiny。UT 执行时跳过覆盖率收集部分",
-        "source": "README 单元测试章节 + pkg/test/og_regress/do_all_test.sh",
-        "time": "2026-09-01T01:04:08",
-        "title": "lcov 在 openEuler 22.03 LTS-SP1 源中不可用"
+        "time": "2026-09-03T16:19:54",
+        "title": "README 依赖列表缺失 numactl-devel",
+        "body": "README.md 安装系统依赖章节和 build/local_install.sh prepare() 函数均未列出 numactl-devel 包，但 pkg/src/protocol/cs_tcp.c 中 #include <numa.h> 需要此包。编译到 14% 时报 fatal error: numa.h: No such file or directory",
+        "source": "README.md + build/local_install.sh prepare()"
+      },
+      {
+        "time": "2026-09-03T16:19:54",
+        "title": "UT 安装步骤 install.py 存在权限 bug",
+        "body": "install.py 中 chownDataDir() 方法在 createDbDirs() 之前调用，当 in_container=True 时 DOCKER_GCC_DIR 目录在 chown 之后才创建，导致属主为 root，installdb.sh 以 ogracdba 用户运行 dd 命令时权限拒绝。需在 createDbDirs() 后再次 chown 或调整调用顺序",
+        "source": "pkg/install/install.py line 1698-1705 (chownDataDir) vs line 3210-3216 (createDbDirs)"
+      },
+      {
+        "time": "2026-09-03T16:19:54",
+        "title": "lcov 包在 openEuler 22.03 LTS SP1 仓库中不可用",
+        "body": "do_all_test.sh 和 Dev_ograc_regress.sh 中调用 yum install lcov -y，但 openEuler 22.03 LTS SP1 仓库中无 lcov 包。lcov 仅用于覆盖率报告生成，不影响测试本身，gen_lcov_report() 函数已有 lcov not found 检查会跳过",
+        "source": "pkg/test/og_regress/do_all_test.sh + CI/script/Dev_ograc_regress.sh"
       }
     ]
   },
