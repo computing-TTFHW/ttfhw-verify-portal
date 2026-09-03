@@ -1575,63 +1575,55 @@
   {
     "name": "msmonitor",
     "displayName": "msmonitor",
-    "result": "partial_success",
+    "result": "success",
     "buildStatus": "success",
-    "utStatus": "partial_success",
-    "sampleStatus": "failed",
-    "totalDuration": 3035,
-    "environmentDuration": 2724,
-    "buildDuration": 193,
-    "utDuration": 58,
-    "sampleDuration": 60,
-    "testPassed": 44,
-    "testFailed": 9,
+    "utStatus": "success",
+    "sampleStatus": "unknown",
+    "totalDuration": 1089,
+    "environmentDuration": 655,
+    "buildDuration": 310,
+    "utDuration": 124,
+    "testPassed": 53,
+    "testFailed": 0,
     "testTotal": 53,
-    "testSkipped": 0,
-    "generatedAt": "2026-08-31T18:17:46",
+    "generatedAt": "2026-09-02T18:51:10",
     "environment": "unknown",
     "url": "https://gitcode.com/Ascend/msmonitor.git",
     "category": "MindStudio",
     "hasStaticAnalysis": false,
-    "file": "verification_report_msmonitor_20260831.json",
+    "file": "verification_report_msmonitor_20260902.json",
     "issues": [
       {
-        "problem": "whl构建时 libmspti.so: Permission denied：容器以 mindstudio 用户运行，/workspace 挂载目录属 root，mindstudio 无写权限",
-        "solution": "改用 docker exec -u root 以 root 用户执行构建命令",
-        "source": "build_attempt whl 第一次",
-        "timestamp": "2026-08-31T18:35:48"
+        "timestamp": "2026-09-02T18:59:09",
+        "problem": "容器用户 mindstudio(uid=20001) 无法写入挂载目录（属主 avada uid=1043），导致 ld 链接器和 setuptools 报 Permission denied",
+        "solution": "以 root 身份在容器内执行构建（docker exec -u root），同时重置目录权限为 755 以通过 download_opensource.sh 的安全检查",
+        "source": "plugin/build.sh + plugin/setup.py 构建阶段"
       },
       {
-        "problem": "setup.py bdist_wheel 报 'invalid command: bdist_wheel'：镜像未预装 wheel 包",
-        "solution": "pip install wheel 安装 wheel-0.48.0",
-        "source": "build_attempt whl 第一次",
-        "timestamp": "2026-08-31T18:35:48"
-      },
-      {
-        "problem": "cmake 编译报 fatal error: Python.h: No such file or directory：python3-devel 未安装（devcontainer post-create.sh 应自动安装但未执行）",
-        "solution": "dnf install -y python3-devel 安装 Python 开发头文件",
-        "source": "build_attempt whl 第二次",
-        "timestamp": "2026-08-31T18:35:48"
-      },
-      {
-        "problem": "test_RotateLogger 卡死：mockcpp MOCKER_CPP 未拦截 GetRankId() 函数，真实函数调用 pybind11::gil_scoped_acquire 在 Python 未初始化时死锁；LD_PRELOAD 初始化 Python 后 9/10 测试因 IPCMonitor_C 扩展(cp311)无法在 Python 3.13 加载而失败",
-        "solution": "记录为环境限制：aarch64 工具链下 mockcpp 对含 static 局部变量的函数 mock 失效；4/5 测试文件(43个测试)全部通过，仅 RotateLogger 受影响",
-        "source": "ut_execution test_RotateLogger",
-        "timestamp": "2026-08-31T19:05:24"
+        "timestamp": "2026-09-02T19:00:21",
+        "problem": "清理构建缓存时 rm -rf plugin/third_party 误删了仓库自带的 securec 源码目录，导致 CMake 编译报 fatal error: securec.h: No such file or directory",
+        "solution": "使用 git restore plugin/third_party/securec/ 从版本控制恢复被误删的源文件，后续清理只删除 build/dist/egg-info 等构建产物，不删除 third_party",
+        "source": "plugin/CMakeLists.txt include_directories + test/cmake/download_opensource.sh"
       }
     ],
     "documentationGaps": [
       {
-        "body": "run_ut.sh 的 cmake 自动选择最高版本 Python(3.13)，但 whl 构建使用 Python 3.11(cp311)；mockcpp 在 aarch64 下对含 static 局部变量的函数(GetRankId) mock 可能失效；文档未说明 UT 需要特定 Python 版本或 IPCMonitor_C 扩展",
-        "source": "scripts/run_ut.sh + test/ut/plugin/ipc_monitor/CMakeLists.txt",
-        "time": "2026-08-31T19:05:24",
-        "title": "UT 环境要求未说明 Python 版本与 mockcpp 限制"
+        "time": "2026-09-02T18:56:00",
+        "title": "安装指南未说明容器用户与挂载目录的权限匹配要求",
+        "body": "安装指南推荐使用 ctr_in.py 启动容器，但未说明 ctr_in.py 如何处理用户映射和目录权限。使用普通 docker run 挂载代码目录时，容器用户 mindstudio(uid=20001) 与宿主机目录属主 avada(uid=1043) 不匹配，导致构建时 Permission denied。文档应补充 docker run 的权限处理说明或提供 chmod/chown 指引。",
+        "source": "docs/zh/install_guide/msmonitor_install_guide.md 2.3.1 环境准备 + dev_env_setup.md 第5节"
       },
       {
-        "body": "dev_env_setup.md 说明构建镜像仅用于编译不支持 NPU 运行（裁剪了运行库），建议双终端模式（编译镜像+CANN运行容器）；但 run_presmoke.sh 直接在当前容器执行，未提供切换运行容器的机制",
-        "source": "dev_env_setup.md + scripts/run_presmoke.sh",
-        "time": "2026-08-31T19:08:21",
-        "title": "pre_smoke 冒烟测试需 NPU 运行环境但构建镜像不支持"
+        "time": "2026-09-02T18:57:00",
+        "title": "devcontainer.json 镜像版本与 dev_env_setup.md 推荐版本不一致",
+        "body": "devcontainer.json 中 image 为 mindstudio-build:26.1.0-0701，而 dev_env_setup.md 推荐使用 26.2.0-0801。两个版本号差异可能导致开发者困惑，建议统一或注明版本兼容性说明。",
+        "source": ".devcontainer/devcontainer.json image 字段 + msot 仓库 dev_env_setup.md 第3节"
+      },
+      {
+        "time": "2026-09-02T19:00:00",
+        "title": "构建脚本 download_opensource.sh 安全检查对目录权限过于严格",
+        "body": "test/cmake/download_opensource.sh 和 plugin 的 cmake 依赖下载逻辑会检查 third_party 目录权限，拒绝 other 用户有写权限的目录。当使用 chmod 777 解决权限问题时会触发安全检查失败，文档未说明此限制和正确的权限配置方式。",
+        "source": "test/cmake/download_opensource.sh 第55-58行 + plugin/CMakeLists.txt Findglog.cmake"
       }
     ]
   },
