@@ -438,89 +438,46 @@
     "result": "partial_success",
     "buildStatus": "success",
     "utStatus": "partial_success",
-    "sampleStatus": "success",
-    "totalDuration": 3309,
-    "environmentDuration": 2453,
-    "buildDuration": 257,
-    "utDuration": 586,
-    "sampleDuration": 13,
-    "testPassed": 118,
-    "testFailed": 16,
-    "testTotal": 134,
-    "generatedAt": "2026-08-30T01:32:40",
+    "sampleStatus": "unknown",
+    "totalDuration": 1803,
+    "environmentDuration": 877,
+    "buildDuration": 130,
+    "utDuration": 796,
+    "testPassed": 438,
+    "testFailed": 4,
+    "testTotal": 442,
+    "generatedAt": "2026-09-03T16:08:56",
     "environment": "unknown",
     "url": "https://gitcode.com/Ascend/IndexSDK.git",
     "category": "MindSDK",
     "hasStaticAnalysis": false,
-    "file": "verification_report_IndexSDK_20260830.json",
+    "file": "verification_report_IndexSDK_20260903.json",
     "issues": [
       {
-        "problem": "首次构建 CMake Error: /usr/local/AscendMiniOs does not exist",
-        "solution": "按 docs/zh/04_installation_guide.md 源码安装章节对非 ILFlat 构建 sed 设置 BUILD_ASCENDDEVICE=OFF 并注释 ASCEND_MINIOS_HOME 第38行后重新构建",
-        "source": "feature_retrieval/src/ascendfaiss/CMakeLists.txt:42",
-        "timestamp": "2026-08-30T01:48:00"
+        "timestamp": "2026-09-03T16:22:38",
+        "problem": "首次构建报错 CMake Error: /usr/local/AscendMiniOs does not exist, 因为 BUILD_ASCENDDEVICE 默认为 ON, 需要 AscendMiniOS（开放态场景包）但预构建镜像中未安装",
+        "solution": "按安装指南文档说明, 对 feature_retrieval/src/ascendfaiss/CMakeLists.txt 执行: 1) 将 BUILD_ASCENDDEVICE 从 ON 改为 OFF; 2) 从 FOREACH 路径检查列表中移除 ASCEND_MINIOS_HOME。修复后重新构建成功",
+        "source": "安装指南 docs/zh/04_installation_guide.md 源码安装章节"
       },
       {
-        "problem": "vsa_hpp 3rdparty 缺失 huawei_secure_c(非子模块、仓库未包含)",
-        "solution": "按 build/install_deps.sh 记录的来源 git clone -b v1.1.16 libboundscheck 到 vsa_hpp/3rdparty/hcps/3rdparty/huawei_secure_c",
-        "source": "build/install_deps.sh install_ut_deps + vsa_hpp/3rdparty/hcps/buildscript/build_3rdparty.sh",
-        "timestamp": "2026-08-30T01:45:00"
-      },
-      {
-        "problem": "顶层 build.sh 默认 FAISS_HOME=/usr/local/faiss/faiss1.10.0 与镜像 /usr/local/faiss 不匹配",
-        "solution": "export FAISS_110_HOME=/usr/local/faiss FAISS_HOME=/usr/local/faiss 复用镜像内 Faiss1.10.0",
-        "source": "build/build.sh + build/install_deps.sh",
-        "timestamp": "2026-08-30T01:50:00"
-      },
-      {
-        "problem": "UT 16 个设备类用例失败(APP_ERR_ACL_SET_DEVICE_FAILED / ACL error 100001)",
-        "solution": "根因为 0 号卡 npu-smi Health=Critical；尝试将健康 1 号卡 remap 到 device 0 但 DCMI 初始化失败(ret=-8020 设备号不一致)，且用例硬编码 aclrtSetDevice(0) 无法切换；属环境硬件问题，记录为 partial_success",
-        "source": "feature_retrieval/ut/TestAscendIndexUTILFlat.cpp:56 + npu-smi(0号卡 Critical)",
-        "timestamp": "2026-08-30T01:58:00"
-      },
-      {
-        "problem": "flat_generate_model.py -t 910B 报 invalid npu_type",
-        "solution": "改用 -t 910B3(对应 npu-smi Name 910B3)成功生成算子",
-        "source": "flat_generate_model.py 报错 supported list",
-        "timestamp": "2026-08-30T02:12:00"
-      },
-      {
-        "problem": "examples/CMakeLists.txt FAISS_HOME=/usr/local/faiss/faiss1.10.0 找不到 faiss/IndexFlat.h",
-        "solution": "创建 symlink ln -s /usr/local/faiss /usr/local/faiss/faiss1.10.0 使硬编码路径解析到镜像内 faiss",
-        "source": "examples/CMakeLists.txt:6",
-        "timestamp": "2026-08-30T02:24:00"
+        "timestamp": "2026-09-03T16:38:07",
+        "problem": "4个UT测试失败, 均在TestAscendIndexUTIVFSQT套件: 3个报'Virtual method address should be odd'虚方法地址错误(涉及faiss::ScalarQuantizer), 1个报ACL addPageVectors failed:2009",
+        "solution": "分析: 'Virtual method address should be odd'是Faiss/AscendCl Mock框架的虚方法注册问题, 可能与Faiss 1.10.0源码补丁或mock环境有关; addPageVectors failed:2009是ACL运行时错误, 可能与BUILD_ASCENDDEVICE=OFF关闭了设备侧构建有关。这些失败属于IVFSQT(IVF标量量化训练)特定功能, 不影响核心检索功能验证",
+        "source": "feature_retrieval/ut/build/test_detail.xml"
       }
     ],
     "documentationGaps": [
       {
-        "body": "CONTRIBUTING.md 5.3 写 `cd feature_retrieval/build && bash build.sh ut`，但 feature_retrieval/build/build.sh 不识别 ut 参数(仅按 gcc_version 处理)；真实 UT 入口为顶层 build/build.sh ut(install_deps ut + run_ut: ci_run.sh -c on -a on)，文档与实际入口不一致易误导",
-        "source": "CONTRIBUTING.md 5.3 + build/build.sh + feature_retrieval/build/build.sh",
-        "time": "2026-08-30T01:40:00",
-        "title": "CONTRIBUTING.md UT 命令路径有歧义"
+        "time": "2026-09-03T16:22:38",
+        "title": "CONTRIBUTING.md 构建命令路径与实际目录结构不一致",
+        "body": "CONTRIBUTING.md 第5步说'进入feature_retrieval/build子目录'但代码示例为'cd build', 实际仓库根目录下有 build/ 目录, feature_retrieval/ 下也有 build/ 子目录, 两者均有 build.sh 但功能不同",
+        "source": "CONTRIBUTING.md"
       },
       {
-        "body": "Tier1 镜像将 Faiss 安装在 /usr/local/faiss(lib/include)，但 mxIndex faiss_versions.info 与 examples/CMakeLists.txt(FAISS_HOME=/usr/local/faiss/faiss1.10.0) 引用 faiss1.10.0 子目录，需手动 symlink 才能编译样例",
-        "source": "examples/CMakeLists.txt:6 + 镜像 /usr/local/faiss 布局 + mxIndex faiss_versions.info",
-        "time": "2026-08-30T01:50:00",
-        "title": "镜像内 Faiss 安装路径与引用路径不一致"
-      },
-      {
-        "body": "docs/zh/04_installation_guide.md 源码安装章节要求对非 ILFlat 构建手动 sed BUILD_ASCENDDEVICE=OFF 并注释 ASCEND_MINIOS_HOME 第38行，但 build/build.sh 未自动处理该场景，直接构建会 CMake Error: AscendMiniOS does not exist",
-        "source": "docs/zh/04_installation_guide.md + feature_retrieval/src/ascendfaiss/CMakeLists.txt:42",
-        "time": "2026-08-30T01:48:00",
-        "title": "源码安装非 ILFlat 需手动改 CMakeLists 但 build.sh 未自动化"
-      },
-      {
-        "body": "docs/zh/03_quick_start.md 示例用 `flat_generate_model.py -t 910B`，但工具仅支持 910B1/910B2/910B3/910B4 等精确型号，910B 无效，需根据 npu-smi 的 Name(910B3)精确指定",
-        "source": "docs/zh/03_quick_start.md 步骤3 + flat_generate_model.py 报错",
-        "time": "2026-08-30T02:12:00",
-        "title": "quick_start flat_generate_model npu_type 参数不准确"
-      },
-      {
-        "body": "镜像文档要求 Docker 版本不低于 24.0.x，但未说明 18.09.0 是否可用(实测可拉取运行)，可能导致用户误判环境不可用",
-        "source": "docker/OVERVIEW.md 3.1.1 + 宿主机 Docker 18.09.0",
-        "time": "2026-08-30T01:55:00",
-        "title": "docker/OVERVIEW.md 要求 docker>=24.0.x 但未说明低版本兼容性"
+        "time": "2026-09-03T16:22:38",
+        "title": "ci/config/config.ini 文件缺失导致版本号为空",
+        "body": "build.sh 和 feature_retrieval/build/build.sh 均尝试从 ci/config/config.ini 读取版本号, 但该文件在仓库中不存在, 导致输出的 run 包名为 Ascend-mindxsdk-mxindex__linux-aarch64.run (版本号为空)",
+        "source": "build/build.sh + feature_retrieval/build/build.sh"
       }
     ]
   },
