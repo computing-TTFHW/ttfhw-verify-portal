@@ -1630,57 +1630,49 @@
   {
     "name": "msopprof",
     "displayName": "msopprof",
-    "result": "partial_success",
+    "result": "success",
     "buildStatus": "success",
-    "utStatus": "partial_success",
-    "sampleStatus": "partial_success",
-    "totalDuration": 1938,
-    "environmentDuration": 1473,
-    "buildDuration": 189,
-    "utDuration": 261,
-    "sampleDuration": 15,
-    "testPassed": 68,
-    "testFailed": 14,
+    "utStatus": "success",
+    "sampleStatus": "unknown",
+    "totalDuration": 1358,
+    "environmentDuration": 558,
+    "buildDuration": 463,
+    "utDuration": 337,
+    "testPassed": 671,
+    "testFailed": 0,
     "testTotal": 671,
-    "testSkipped": 589,
-    "generatedAt": "2026-08-31T19:20:07",
+    "generatedAt": "2026-09-02T18:25:05",
     "environment": "unknown",
     "url": "https://gitcode.com/Ascend/msopprof.git",
     "category": "MindStudio",
     "hasStaticAnalysis": false,
-    "file": "verification_report_msopprof_20260831.json",
+    "file": "verification_report_msopprof_20260902.json",
     "issues": [
       {
-        "problem": "单元测试二进制 msopt_test 在第 83 个测试 HalHelperTest.DcmiInit_Return_False 处 SIGSEGV 崩溃, 导致后续 589 个测试无法运行",
-        "solution": "根因: mindstudio-build 镜像文档明确标注\"仅用于编译不支持 NPU 程序运行\", DCMI 运行库被裁剪; 13 个 ArgChecker 测试也因缺少 NPU 设备/soc 版本环境而失败; 建议: 需在 CANN 运行环境容器(swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.12)中运行完整测试",
-        "source": "build.py test / HalHelperTest.DcmiInit_Return_False",
-        "timestamp": "2026-08-31T19:48:07"
-      },
-      {
-        "problem": "样例算子构建链接失败: ld.lld: error: unable to find library -lruntime_camodel / -lnpu_drv_camodel",
-        "solution": "根因: mindstudio-build 镜像裁剪了 NPU 运行库(仅保留编译工具链); 解决方案: 需在 CANN 运行环境容器(如 swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.12)中构建和运行样例, 或采用 dev_env_setup.md 推荐的\"双终端模式\"(编译镜像+CANN运行镜像)",
-        "source": "example/sample_sim_analysis/build.sh",
-        "timestamp": "2026-08-31T19:52:25"
+        "timestamp": "2026-09-02T18:40:58",
+        "problem": "容器内mindstudio用户(uid=20001)无法写入宿主机avada用户(uid=1043)克隆的仓库目录，git submodule update报Permission denied",
+        "solution": "重建容器添加--user root参数，以root用户运行容器，通过bash -lc加载CANN/GCC/Python环境。根因：devcontainer.json的remoteUser机制在非VS Code环境下不自动映射UID",
+        "source": ".devcontainer/devcontainer.json remoteUser配置 + 容器内whoami/id检查"
       }
     ],
     "documentationGaps": [
       {
-        "body": "dev_env_setup.md (msot 仓库) 明确标注 mindstudio-build 镜像\"仅用于编译不支持 NPU 程序运行\", 但 msopprof 仓库的 README.md 和 install_guide.md 未直接说明此限制, 导致用户可能在编译镜像中尝试运行 UT 和样例时遇到 SIGSEGV 或链接错误",
-        "source": "docs/zh/install_guide/msopprof_install_guide.md → msot/docs/zh/common/dev_env_setup.md",
-        "time": "2026-08-31T19:52:25",
-        "title": "构建镜像不支持 NPU 程序运行的限制未在仓库 README 中说明"
+        "time": "2026-09-02T18:47:43",
+        "title": "install_guide.md 要求使用 ctr_in.py 启动容器，但未提供自动化场景的替代方案",
+        "body": "安装指南明确要求必须使用 ctr_in.py 命令启动容器，不得使用普通 docker run 或 docker exec。但 ctr_in.py 创建交互式 Shell，不适合自动化验证场景（CI/CD、TTFHW验证等）。文档未提供非交互式自动化启动的替代方案，导致自动化工具需要自行通过 docker run + bash -lc 实现。",
+        "source": "docs/zh/install_guide/msopprof_install_guide.md 第2.3.1节 + dev_env_setup.md 第5章"
       },
       {
-        "body": "HalHelperTest.DcmiInit_Return_False 和 DcmiInit_Return_True 在缺少 NPU 运行库的环境中直接 SIGSEGV 崩溃, 而非优雅返回失败; 建议对 DCMI 初始化测试增加环境检测或 try-catch 保护",
-        "source": "test/ut/op_profiling/ (build.py test 运行结果)",
-        "time": "2026-08-31T19:52:25",
-        "title": "UT 崩溃测试 HalHelperTest.DcmiInit 未做环境保护"
+        "time": "2026-09-02T18:47:43",
+        "title": "devcontainer.json remoteUser 机制在非 VS Code 环境下不自动映射 UID",
+        "body": "devcontainer.json 配置 remoteUser 为 mindstudio (UID 20001) 并启用 updateRemoteUserUID。在 VS Code Dev Containers 环境下，UID 会自动映射为宿主机用户 UID。但在纯命令行 docker run 场景下，此机制不生效，导致容器内 mindstudio 用户无法写入宿主机用户克隆的仓库目录（Permission denied），需要手动指定 --user root 或匹配 UID。",
+        "source": ".devcontainer/devcontainer.json remoteUser/updateRemoteUserUID 配置"
       },
       {
-        "body": "example/ 目录下的样例为性能调优案例(README + .asc + optimize.diff), build.sh 仅构建算子但缺少完整的\"构建→运行→采集→解析\"一键脚本; 用户需参考 quick_start.md 在完整 CANN 运行环境中手动操作",
-        "source": "example/ 目录结构",
-        "time": "2026-08-31T19:52:25",
-        "title": "样例缺少独立运行脚本"
+        "time": "2026-09-02T18:47:43",
+        "title": "构建镜像明确不支持 NPU 运行，但仓库 npu_required 信号强烈",
+        "body": "dev_env_setup.md 明确说明构建镜像仅用于编译，不支持 NPU 程序运行（深度裁剪了运行库）。但仓库本身是昇腾AI算子调优工具，README、devcontainer.json、CMakeLists.txt 中充满 CANN/davinci/910B 等信号。文档未明确说明 UT 测试是否需要 NPU 硬件（实际验证发现 UT 为 host-side gtest，不需要 NPU）。",
+        "source": "dev_env_setup.md 第5章注意 + README.md + .devcontainer/devcontainer.json"
       }
     ]
   },
