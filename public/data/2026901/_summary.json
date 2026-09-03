@@ -1527,48 +1527,40 @@
     "result": "success",
     "buildStatus": "success",
     "utStatus": "success",
-    "sampleStatus": "success",
-    "totalDuration": 2412,
-    "environmentDuration": 1643,
-    "buildDuration": 134,
-    "utDuration": 632,
-    "sampleDuration": 3,
-    "testPassed": 3865,
+    "sampleStatus": "unknown",
+    "totalDuration": 1716,
+    "environmentDuration": 736,
+    "buildDuration": 146,
+    "utDuration": 834,
+    "testPassed": 3870,
     "testFailed": 0,
-    "testTotal": 3902,
-    "testSkipped": 37,
-    "generatedAt": "2026-08-31T19:53:37",
+    "testTotal": 3906,
+    "generatedAt": "2026-09-02T15:02:47",
     "environment": "unknown",
     "url": "https://gitcode.com/Ascend/msmodelslim.git",
     "category": "MindStudio",
     "hasStaticAnalysis": false,
-    "file": "verification_report_msmodelslim_20260831.json",
+    "file": "verification_report_msmodelslim_20260903.json",
     "issues": [
       {
-        "problem": "容器内执行 python3 build.py 报 Permission denied，无法创建 msmodelslim.egg-info 和写入 /workspace",
-        "solution": "容器以 mindstudio(uid=20001) 用户运行，但 /workspace 挂载目录属主为 root。在宿主机执行 chown -R 20001:20001 /home/workspace/msmodelslim-verify 修复权限后重试构建成功",
-        "source": "构建步骤 build.py",
-        "timestamp": "2026-08-31T20:04:12"
-      },
-      {
-        "problem": "python3 build.py test 执行时间较长（约 10.5 分钟），SSH 连接 20 分钟超时；其中 install.sh 重新安装依赖 + run_ut.sh processor 模块耗时 439 秒",
-        "solution": "UT 实际已成功完成（UT_EXIT=0），SSH 超时仅为连接等待；通过后台日志文件 /workspace/ut.log 确认结果",
-        "source": "UT 步骤 build.py test",
-        "timestamp": "2026-08-31T20:10:45"
+        "timestamp": "2026-09-03T09:18:10",
+        "problem": "容器以 mindstudio 用户运行, 对挂载的 /workspace 目录无写权限, pip install 报 'could not create msmodelslim.egg-info: Permission denied'",
+        "solution": "重启容器时添加 --user root 参数, 以 root 身份执行构建命令, bash -lc 确保 Python/GCC/CANN 环境正确初始化",
+        "source": "docker exec 输出: error: could not create 'msmodelslim.egg-info': Permission denied"
       }
     ],
     "documentationGaps": [
       {
-        "body": "install_guide.md 的源码安装环境准备引用了 msot 仓库的 dev_env_setup.md 和 docker_image_build_guide.md，msmodelslim 仓库本身未自包含构建环境说明，新手需跨仓库查找镜像制作指南",
-        "source": "docs/zh/install_guide/install_guide.md 2.3.1 节",
-        "time": "2026-08-31T19:56:25",
-        "title": "构建/测试环境文档跨仓库依赖"
+        "time": "2026-09-03T09:18:10",
+        "title": "install_guide.md 要求使用 ctr_in.py 启动容器, 未提供普通 docker run 命令",
+        "body": "安装指南明确要求'必须使用统一镜像制作指南第7章给出的 ctr_in.py 命令, 在交互式终端中启动并进入容器, 不得使用普通 docker run 创建容器, 也不得使用 docker exec 替代交互式环境'。但自动化验证场景无法使用交互式 TTY, 本次验证使用 docker run --user root + bash -lc 方式替代, 通过 login shell 加载 /etc/profile.d/ 环境初始化脚本, 验证 Python/GCC/CANN 环境均正确激活。",
+        "source": "docs/zh/install_guide/install_guide.md 源码安装章节"
       },
       {
-        "body": "example/ 下所有量化实践均需下载 50GB+ 大模型权重并需真实 NPU 运行环境，无适合 CI/快速验证的轻量冒烟样例；README 仅提供 msmodelslim --help 作为验证命令",
-        "source": "example/README.md + README.md 验证安装章节",
-        "time": "2026-08-31T19:56:25",
-        "title": "example/ 缺少可快速验证的轻量样例"
+        "time": "2026-09-03T09:18:10",
+        "title": "容器以非 root 用户运行时对挂载目录无写权限",
+        "body": "MindStudio 构建镜像默认以 mindstudio 用户 (uid=20001) 运行, 但宿主机挂载的 /workspace 目录属于 avada 用户 (uid=1043), mindstudio 用户仅有读和执行权限, 无法写入, 导致 pip install 报 'could not create msmodelslim.egg-info: Permission denied'。文档未说明如何处理此权限问题, 本次验证通过 --user root 重启容器解决。",
+        "source": "容器内 pip install 报错 + docker exec whoami 输出"
       }
     ]
   },
