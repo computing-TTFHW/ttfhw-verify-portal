@@ -1104,47 +1104,58 @@
     "result": "partial_success",
     "buildStatus": "success",
     "utStatus": "partial_success",
-    "sampleStatus": "success",
-    "totalDuration": 3692,
-    "environmentDuration": 2792,
-    "buildDuration": 600,
+    "sampleStatus": "unknown",
+    "totalDuration": 1558,
+    "environmentDuration": 986,
+    "buildDuration": 392,
     "utDuration": 180,
-    "sampleDuration": 120,
-    "testPassed": 3487,
-    "testFailed": 21,
-    "testTotal": 3508,
-    "generatedAt": "2026-08-30T04:11:55",
+    "testPassed": 4407,
+    "testFailed": 19,
+    "testTotal": 4426,
+    "generatedAt": "2026-09-04T10:14:01",
     "environment": "unknown",
     "url": "https://gitcode.com/Ascend/mind-cluster.git",
     "category": "MindCluster",
     "hasStaticAnalysis": false,
-    "file": "verification_report_mind-cluster_20260830.json",
+    "file": "verification_report_mind-cluster_20260904.json",
     "issues": [
       {
-        "problem": "clusterd 组件构建失败：build.sh 设置 GOTOOLCHAIN=go1.21.13 触发 Go toolchain 自动下载，但 GOSUMDB=off 禁用了校验数据库导致下载验证失败",
-        "solution": "将 GOSUMDB 从 off 改为 sum.golang.google.cn（中国校验镜像，与 .devcontainer/Dockerfile 一致），配合 GONOSUMDB=* 跳过路径校验，toolchain 下载成功",
-        "source": "component/clusterd/build/build.sh: export GOTOOLCHAIN=go1.21.13 + .devcontainer/Dockerfile: ENV GOSUMDB=sum.golang.google.cn",
-        "timestamp": "2026-08-30T04:49:00"
+        "timestamp": "2026-09-04T10:39:59",
+        "problem": "部分 Go 组件 UT 失败（共19个），主要与 NPU 硬件状态、DPU 设备、Kubernetes 集群环境、时间戳断言相关。例如 ascend-device-plugin 的 TestCheckNodeResetInfo 期望 true 实际 false，dpu-exporter 的 TestNewHwDpuManager 因无 DPU 设备失败。",
+        "solution": "这些失败属于环境依赖型，非代码逻辑错误。在容器化 UT 环境中无法完全模拟 NPU/DPU/K8s 运行时状态，4个组件完全通过，7个组件有少量环境相关失败，ascend-faultdiag Python UT 646/647通过。",
+        "source": "Go 组件 test.sh 执行结果"
       },
       {
-        "problem": "ascend-faultdiag UT 在 /go/ 副本中执行失败：ModuleNotFoundError: No module named 'ascend_fd.pkg'。build.sh 的 clean 函数清理了 /go/ascend-faultdiag/src/ascend_fd/ 下的源文件，仅保留 configuration 目录",
-        "solution": "从 /workspace/component/ascend-faultdiag/ 原始源码目录执行 run_dt.sh，src/ascend_fd/pkg/ 目录完整存在，647 个测试全部通过",
-        "source": "component/ascend-faultdiag/build/build.sh clean 函数 + test/run_dt.sh",
-        "timestamp": "2026-08-30T05:05:00"
+        "timestamp": "2026-09-04T10:39:59",
+        "problem": "clusterd test.sh 中 GOTOOLCHAIN=\"go1.21.13\" 与预构建镜像 Go 1.26.5 冲突",
+        "solution": "通过 export GOTOOLCHAIN=local 覆盖 test.sh 中的设置，强制使用本地已安装的 Go 1.26.5，避免自动下载旧版本工具链。",
+        "source": "component/clusterd/build/test.sh"
       }
     ],
     "documentationGaps": [
       {
-        "body": "build/README.md 建议 export GOSUMDB=off，但 .devcontainer/Dockerfile 使用 ENV GOSUMDB=sum.golang.google.cn。GOSUMDB=off 会导致 Go toolchain 下载验证失败（组件 build.sh 设置 GOTOOLCHAIN=go1.21.13 时触发），应使用 sum.golang.google.cn 中国校验镜像。",
-        "source": "build/README.md 步骤2 + .devcontainer/Dockerfile 第102行",
-        "time": "2026-08-30T04:49:00",
-        "title": "build/README.md GOSUMDB 建议值与 .devcontainer/Dockerfile 不一致"
+        "time": "2026-09-04T10:39:59",
+        "title": ".devcontainer/Dockerfile 仅支持 x86 架构",
+        "body": "Dockerfile 中下载 Go（go1.26.4.linux-amd64.tar.gz）和 cmake（cmake-3.20.5-linux-x86_64.tar.gz）的 x86 二进制包，aarch64 架构无法直接使用。虽有 ARM 版 devcontainer.json 预构建镜像，但缺少 ARM 版 Dockerfile 供 Tier 2 构建使用。",
+        "source": ".devcontainer/Dockerfile"
       },
       {
-        "body": "CONTRIBUTING.md 指出 ascend-faultdiag 执行 'bash component/ascend-faultdiag/test/run_dt.sh'，但未说明应在原始源码目录（非 build 副本）执行。build.sh 的 clean 函数会清理 src/ascend_fd/ 下的源文件，导致 /go/ 副本中 run_dt.sh 因 ModuleNotFoundError 失败。",
-        "source": "CONTRIBUTING.md 单元测试最佳实践 + component/ascend-faultdiag/build/build.sh",
-        "time": "2026-08-30T05:05:00",
-        "title": "CONTRIBUTING.md UT 执行说明未提示 ascend-faultdiag 需从原始源码目录执行"
+        "time": "2026-09-04T10:39:59",
+        "title": "部分组件 test.sh 中 GOTOOLCHAIN 版本与镜像不一致",
+        "body": "clusterd/build/test.sh 中 export GOTOOLCHAIN=\"go1.21.13\"，但预构建镜像和 go.mod 要求 Go 1.26。虽然可通过 GOTOOLCHAIN=local 覆盖，但可能导致新开发者困惑。",
+        "source": "component/clusterd/build/test.sh"
+      },
+      {
+        "time": "2026-09-04T10:39:59",
+        "title": "build/ 目录无顶层 test.sh 脚本",
+        "body": "CONTRIBUTING.md 提到'在对应组件的 build 目录下执行测试脚本 cd build && ./test.sh'，但顶层 build/ 目录只有 build_all.sh 和 build_each.sh，无 test.sh。UT 需逐个进入各组件的 build/ 目录执行，缺少统一入口。",
+        "source": "CONTRIBUTING.md + build/ 目录"
+      },
+      {
+        "time": "2026-09-04T10:39:59",
+        "title": "taskd 组件缺少标准 build/test.sh",
+        "body": "taskd 组件在 build/ 目录下只有 build.sh 和 build_backend.sh，无 test.sh。其测试脚本位于 tests/ut/run_test.sh，与 CONTRIBUTING.md 描述的'在 build 目录下执行 test.sh'不一致。",
+        "source": "component/taskd/build/ 目录"
       }
     ]
   },
