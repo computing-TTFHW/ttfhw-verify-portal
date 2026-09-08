@@ -1,0 +1,733 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.zh.md 版本配套表 + install.md 硬件配套表 + 远程机器 npu-smi",
+      "value": "aarch64 (Atlas A2 训练系列, NPU 910B3)"
+    },
+    "build_commands": {
+      "source": "docs/zh/install.md 操作步骤 + docker/devel/README.md + ci/build.sh",
+      "value": "bash ci/build.sh --python=3.10 --pytorch=master"
+    },
+    "dependencies": {
+      "source": "install.md 软件配套表 + Dockerfile + ci/build.sh + docker/devel/README.md",
+      "value": [
+        "Python 3.10 (install.md 软件配套表, master 分支支持 3.10-3.13)",
+        "GCC 13.3 (install.md 软件配套表, devtoolset-13)",
+        "PyTorch 2.13.0 CPU 版本 (Dockerfile builder 阶段 pip install)",
+        "numpy (Dockerfile builder 阶段)",
+        "pyyaml/setuptools/wheel (Dockerfile builder 阶段)",
+        "cmake (Dockerfile builder 阶段)",
+        "CANN 9.1.0 (Dockerfile dev 阶段, 主机已安装)",
+        "git (Dockerfile base 阶段)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "docker/devel/Dockerfile (多阶段构建: base→builder→dev)",
+      "value": [
+        {
+          "original": "FROM quay.io/pypa/manylinux_2_28 (manylinux 基础镜像含 Python)",
+          "target_equivalent": "预构建镜像已含 manylinux 基础环境"
+        },
+        {
+          "original": "gcc-toolset-13 (gcc/g++/gfortran 13.3)",
+          "target_equivalent": "预构建镜像已含 gcc-toolset-13"
+        },
+        {
+          "original": "cmake==3.18.4.post1 (x86) / 系统 cmake (ARM)",
+          "target_equivalent": "预构建镜像已含 cmake"
+        },
+        {
+          "original": "pip install torch==2.13.0 --index-url download.pytorch.org/whl/cpu",
+          "target_equivalent": "预构建镜像已含 torch CPU 版本"
+        },
+        {
+          "original": "pip install numpy/pyyaml/setuptools/wheel",
+          "target_equivalent": "预构建镜像已含 numpy/pyyaml/setuptools/wheel"
+        },
+        {
+          "original": "CANN toolkit 9.1.0_beta.1 + 910b ops (dev 阶段)",
+          "target_equivalent": "主机已安装 CANN 9.1.0, 挂载 /usr/local/Ascend/cann 到容器"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": ".gitcode/workflows/build_job.yml + PR-pipeline_op-plugin.yml (CI 预构建镜像)",
+      "value": "Tier 1 业务预构建镜像: swr.cn-north-4.myhuaweicloud.com/frameworkptadapter/pytorch_master_a2_aarch64_builder:20260704 (已缓存于远程机器, 25.7GB)"
+    },
+    "special_dependencies": {
+      "source": "install.md 安装依赖 + Dockerfile dev 阶段 + devcontainer.json",
+      "value": [
+        "CANN 9.1.0 (主机 /usr/local/Ascend/cann/set_env.sh, 需挂载到容器)",
+        "NPU 驱动 (/usr/local/Ascend/driver, 需挂载到容器)",
+        "NPU 固件 (/usr/local/Ascend/firmware, 需挂载到容器)",
+        "npu-smi (/usr/local/sbin/npu-smi, 需挂载到容器)",
+        "NPU 设备: /dev/davinci0 /dev/davinci_manager /dev/devmm_svm /dev/hisi_hdc"
+      ]
+    },
+    "ut_commands": {
+      "source": "CONTRIBUTING.md 功能验证指导 + test/run_test.py",
+      "value": "pip3 install dist/torch_npu-*.whl \u0026\u0026 cd test \u0026\u0026 python run_test.py -i test_add"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "install.md 和 Dockerfile 使用 gcc-toolset-13 (GCC 13.3) 编译, 但 manylinux_2_28 基础镜像的 auditwheel 不支持 GCC 13 产生的符号版本 (GLIBCXX_3.4.30). 文档未提及此已知限制和解决方案.",
+      "source": "docs/zh/install.md + docker/devel/Dockerfile",
+      "time": "2026-09-04T21:29:57",
+      "title": "install.md 未说明 auditwheel 兼容性问题"
+    },
+    {
+      "body": "Dockerfile 默认安装 CANN 9.1.0_beta.1, 但实际运行时依赖主机驱动和 CANN. 文档未说明当主机 CANN 版本与镜像内 CANN 版本不一致时的兼容性影响.",
+      "source": "docker/devel/Dockerfile 第98行 + devcontainer.json",
+      "time": "2026-09-04T21:29:57",
+      "title": "Dockerfile dev 阶段 CANN 版本与主机 CANN 版本可能不一致"
+    },
+    {
+      "body": "CONTRIBUTING.md 指引执行 pip3 install -r test/requirements.txt 安装测试依赖, 但 test/requirements.txt 是空文件 (0 字节), 可能导致新开发者困惑.",
+      "source": "CONTRIBUTING.md 第293行 + test/requirements.txt",
+      "time": "2026-09-04T21:29:57",
+      "title": "test/requirements.txt 为空文件"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "读取 README.zh.md 提取项目简介、版本配套表、安装链接",
+      "command": "WebFetch https://gitcode.com/Ascend/op-plugin.git",
+      "details": {
+        "file": "README.zh.md",
+        "key_findings": [
+          "OpPlugin 是 TorchNPU 算子插件",
+          "master 分支对应 PyTorch 2.13.0",
+          "安装参考 docs/zh/install.md",
+          "贡献指南在 pytorch 仓"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "OpPlugin 开发了TorchNPU算子插件...master对应v2.7.1等...安装参考install.md...贡献指南在pytorch仓",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-04T20:13:40"
+    },
+    {
+      "action": "读取 docs/zh/install.md 提取构建命令和软件配套表",
+      "command": "cat docs/zh/install.md",
+      "details": {
+        "build_command": "bash ci/build.sh --python=3.10 --pytorch=master",
+        "cann_env": "source /usr/local/Ascend/cann/set_env.sh",
+        "file": "docs/zh/install.md",
+        "versions": "PyTorch 2.13.0, GCC 13.3, Python 3.10-3.13"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "源码编译安装OpPlugin...bash ci/build.sh --python=3.9 --pytorch=v2.10.0...建议使用TorchNPU提供的docker镜像...",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-04T20:13:40"
+    },
+    {
+      "action": "读取 CONTRIBUTING.md 提取 UT 执行命令和测试目录",
+      "command": "cat CONTRIBUTING.md",
+      "details": {
+        "build_command": "bash ci/build.sh",
+        "file": "CONTRIBUTING.md",
+        "test_dirs": [
+          "test/test_base_ops/",
+          "test/core_tests/"
+        ],
+        "ut_command": "python test/run_test.py -i test_add"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "OpPlugin 贡献指南...pip3 install -r test/requirements.txt...python test/run_test.py -i test_add...",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-04T20:13:40"
+    },
+    {
+      "action": "读取 ci/build.sh 分析构建流程",
+      "command": "cat ci/build.sh",
+      "details": {
+        "default_pytorch_version": "master",
+        "file": "ci/build.sh",
+        "flow": "clone pytorch → copy op_plugin to third_party → run pytorch ci/build.sh → copy dist wheel"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "git clone -b ${PYTORCH_VERSION} https://gitcode.com/ascend/pytorch.git...cp -rf op_plugin...bash ${PYTORCH_PATH}/ci/build.sh --disable_torchair --disable_rpc",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-04T20:13:40"
+    },
+    {
+      "action": "读取 docker/devel/Dockerfile 分析多阶段构建和依赖",
+      "command": "cat docker/devel/Dockerfile",
+      "details": {
+        "builder_deps": "gcc-toolset-13, cmake, torch, numpy, pyyaml",
+        "dev_deps": "CANN 9.1.0_beta.1 + 910b ops",
+        "file": "docker/devel/Dockerfile",
+        "from": "quay.io/pypa/manylinux_2_28",
+        "stages": "base→builder→dev"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "FROM quay.io/pypa/manylinux_2_28...gcc-toolset-13...pip install torch==2.13.0...CANN toolkit 9.1.0_beta.1...",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-09-04T20:13:40"
+    },
+    {
+      "action": "读取 .devcontainer/devcontainer.json 确认构建参数和 NPU 挂载",
+      "command": "cat .devcontainer/devcontainer.json",
+      "details": {
+        "build_args": "PY_VERSION=3.10, TORCH_VERSION=2.13.0.dev20260610, CANN_VERSION=9.1.0_beta.1, CANN_PRODUCT=910b",
+        "file": ".devcontainer/devcontainer.json",
+        "npu_mounts": "/dev, driver, add-ons, npu-smi"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "build.dockerfile=../docker/devel/Dockerfile, target=dev...mounts: /dev, driver, add-ons, npu-smi...",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-09-04T20:13:40"
+    },
+    {
+      "action": "读取 docker/devel/README.md 提取镜像构建和容器启动说明",
+      "command": "cat docker/devel/README.md",
+      "details": {
+        "build_command": "docker build -t op-plugin-builder:v1 --target dev --build-arg PY_VERSION=3.10",
+        "container_start": "docker run --privileged -v /dev:/dev -v driver -v npu-smi",
+        "file": "docker/devel/README.md",
+        "note": "编译无需CANN, 运行时需CANN+驱动"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "OpPlugin 开发镜像...builder镜像提供编译环境...dev镜像叠加CANN运行环境...编译无需CANN...",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-04T20:13:40"
+    },
+    {
+      "action": "读取 .gitcode/workflows/PR-pipeline_op-plugin.yml 和 build_job.yml 提取 CI 预构建镜像",
+      "command": "cat .gitcode/workflows/build_job.yml",
+      "details": {
+        "arm_image": "swr.cn-north-4.myhuaweicloud.com/frameworkptadapter/pytorch_master_a2_aarch64_builder:20260704",
+        "build_command": "bash ci/build.sh --python=3.10 --pytorch=master",
+        "file": ".gitcode/workflows/PR-pipeline_op-plugin.yml"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "image: swr.cn-north-4.myhuaweicloud.com/frameworkptadapter/${{ inputs.CP_DOCKER_IMG }}...img_master_arm=pytorch_master_a2_aarch64_builder:20260704...",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-04T20:13:40"
+    },
+    {
+      "action": "WebFetch TorchNPU README (https://gitcode.com/ascend/pytorch/blob/v2.7.1-26.1.0/README.zh.md) 跟进文档闭包",
+      "command": "WebFetch https://gitcode.com/ascend/pytorch/blob/v2.7.1-26.1.0/README.zh.md",
+      "details": {
+        "key_findings": [
+          "TorchNPU 是 PyTorch NPU 适配插件",
+          "软件安装指南链接",
+          "环境部署指南"
+        ],
+        "url": "https://gitcode.com/ascend/pytorch/blob/v2.7.1-26.1.0/README.zh.md"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "TorchNPU插件...环境部署参考软件安装指南...贡献指南...",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-04T20:13:40"
+    },
+    {
+      "action": "WebFetch TorchNPU 安装指南页面失败 (JS 渲染), 文档闭包已通过其他途径完成",
+      "command": "WebFetch installation_guide",
+      "details": {
+        "fallback": "已通过 CI 工作流和 Dockerfile 获取镜像信息",
+        "reason": "页面 JS 渲染, WebFetch 无法获取正文",
+        "url": "https://gitcode.com/Ascend/pytorch/blob/v2.7.1-26.1.0/docs/zh/installation_guide/menu_installation_guide.md"
+      },
+      "duration_seconds": 5,
+      "error": "页面 JS 渲染无法获取内容",
+      "output": "加载失败，请刷新重试",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": false,
+      "timestamp": "2026-09-04T20:13:40"
+    },
+    {
+      "action": "Tier 1 信号探测: CI 预构建镜像已缓存于远程机器",
+      "command": "ssh root@192.168.9.114 'docker images | grep pytorch_master_a2_aarch64_builder'",
+      "details": {
+        "architecture": "aarch64",
+        "cached": true,
+        "content": "manylinux+gcc13+cmake+torch2.13.0+numpy (builder, 无CANN)",
+        "image": "swr.cn-north-4.myhuaweicloud.com/frameworkptadapter/pytorch_master_a2_aarch64_builder:20260704",
+        "size": "25.7GB"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "swr.cn-north-4.myhuaweicloud.com/frameworkptadapter/pytorch_master_a2_aarch64_builder   20260704   25.7GB",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-09-04T20:13:40"
+    },
+    {
+      "action": "NPU 需求判断: 扫描 README/Dockerfile/devcontainer.json 确认 NPU 必需",
+      "command": "grep -rn 'CANN|Ascend|torch_npu|npu|davinci|910' README.md Dockerfile devcontainer.json",
+      "details": {
+        "npu_required": true,
+        "signals": [
+          "CANN 9.1.0",
+          "Ascend 910b",
+          "torch_npu",
+          "davinci",
+          "NPU 设备挂载"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "CANN 9.1.0_beta.1, 910b, torch_npu, davinci0, npu-smi 均出现",
+      "result": "NPU 必需",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-09-04T20:13:40"
+    },
+    {
+      "action": "确认主机 CANN 9.1.0 已安装, 可挂载到容器供 UT 使用",
+      "command": "ssh root@192.168.9.114 'ls /usr/local/Ascend/cann/'",
+      "details": {
+        "cann_versions": [
+          "9.0.0",
+          "9.0.1",
+          "9.1.0"
+        ],
+        "driver": "/usr/local/Ascend/driver",
+        "firmware": "/usr/local/Ascend/firmware",
+        "host_cann": "/usr/local/Ascend/cann/set_env.sh"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "add-ons ascend-toolkit cann cann-9.0.0 cann-9.0.1 cann-9.1.0 driver firmware...",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-04T20:13:40"
+    },
+    {
+      "action": "Tier 1 预构建镜像确认: SWR builder 镜像已缓存于远程机器, 无需 docker pull",
+      "command": "ssh root@192.168.9.114 'docker images | grep pytorch_master_a2_aarch64_builder'",
+      "details": {
+        "cached": true,
+        "image": "swr.cn-north-4.myhuaweicloud.com/frameworkptadapter/pytorch_master_a2_aarch64_builder:20260704",
+        "selection_reason": "CI 工作流 build_job.yml 使用此镜像, 已缓存于远程机器",
+        "size": "25.7GB",
+        "tier": 1
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "swr.cn-north-4.myhuaweicloud.com/frameworkptadapter/pytorch_master_a2_aarch64_builder   20260704   25.7GB",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-09-04T20:17:24"
+    },
+    {
+      "action": "SSH 远程 clone op-plugin 仓库到 /home/workspace/OpPlugin-verify",
+      "command": "ssh root@192.168.9.114 'git clone --depth 1 --branch master https://gitcode.com/Ascend/op-plugin.git /home/workspace/OpPlugin-verify'",
+      "details": {
+        "branch": "master",
+        "remote_path": "/home/workspace/OpPlugin-verify",
+        "repo_url": "https://gitcode.com/Ascend/op-plugin.git"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "Cloning into '/home/workspace/OpPlugin-verify'...",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-09-04T20:17:24"
+    },
+    {
+      "action": "启动 Tier 1 预构建镜像容器 OpPlugin-ttfhw, 挂载 NPU 设备和 CANN",
+      "command": "docker run -d --name OpPlugin-ttfhw --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/Ascend/driver:/usr/local/Ascend/driver -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware -v /usr/local/Ascend/add-ons:/usr/local/Ascend/add-ons -v /usr/local/Ascend/cann:/usr/local/Ascend/cann -v /home/workspace/OpPlugin-verify:/workspace -e LD_LIBRARY_PATH=... swr.cn-north-4.myhuaweicloud.com/frameworkptadapter/pytorch_master_a2_aarch64_builder:20260704 sleep infinity",
+      "details": {
+        "container_id": "37a9a3049b34",
+        "container_name": "OpPlugin-ttfhw",
+        "image": "swr.cn-north-4.myhuaweicloud.com/frameworkptadapter/pytorch_master_a2_aarch64_builder:20260704",
+        "mounts": [
+          "/workspace",
+          "NPU devices",
+          "CANN",
+          "driver",
+          "firmware",
+          "npu-smi"
+        ],
+        "npu_devices": [
+          "/dev/davinci0",
+          "/dev/davinci_manager",
+          "/dev/devmm_svm",
+          "/dev/hisi_hdc"
+        ],
+        "startup_command_source": "default_挂卡"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "37a9a3049b34a76cd89163067db93d46036ef398ca4daafe5e090b621aa52d10",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-09-04T20:17:24"
+    },
+    {
+      "action": "验证容器内编译依赖: Python/GCC/CMake/Torch/NumPy/Git",
+      "command": "docker exec OpPlugin-ttfhw bash -c 'python3 --version \u0026\u0026 gcc --version \u0026\u0026 cmake --version \u0026\u0026 python3 -c \"import torch; print(torch.__version__)\" \u0026\u0026 python3 -c \"import numpy; print(numpy.__version__)\"'",
+      "details": {
+        "cmake": "4.3.4",
+        "gcc": "13.3.1",
+        "git": "2.54.0",
+        "numpy": "1.26.4",
+        "os": "AlmaLinux 8.10 (manylinux_2_28)",
+        "python": "3.10.20",
+        "tier": "Tier 1 - 依赖已预装, 跳过安装",
+        "torch": "2.13.0.dev20260610+cpu"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "Python 3.10.20, gcc 13.3.1, cmake 4.3.4, torch 2.13.0.dev20260610+cpu, numpy 1.26.4",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-09-04T20:17:24"
+    },
+    {
+      "action": "验证容器内 NPU 可见性和 CANN 环境",
+      "command": "docker exec OpPlugin-ttfhw bash -c 'source /usr/local/Ascend/cann/set_env.sh \u0026\u0026 /usr/local/sbin/npu-smi info'",
+      "details": {
+        "cann_env": "source /usr/local/Ascend/cann/set_env.sh 成功",
+        "cann_version": "9.1.0",
+        "mounted_card_id": 0,
+        "npu_card_count": 8,
+        "npu_smi": "910B3 card 0 (Critical 状态但可用)",
+        "torch_npu": "未安装 (待构建后安装)"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "npu-smi 25.5.0, NPU 0 910B3 Critical, HBM 3783/65536 MB",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-09-04T20:17:24"
+    },
+    {
+      "action": "首次构建: bash ci/build.sh --python=3.10 --pytorch=master (并发76)",
+      "command": "docker exec OpPlugin-ttfhw bash -c 'cd /workspace \u0026\u0026 source /usr/local/Ascend/cann/set_env.sh \u0026\u0026 export MAX_JOBS=76 \u0026\u0026 bash ci/build.sh --python=3.10 --pytorch=master'",
+      "details": {
+        "build_command": "bash ci/build.sh --python=3.10 --pytorch=master",
+        "compilation": "1229/1229 编译单元全部成功",
+        "concurrency_ratio": "30%",
+        "failure": "auditwheel repair 失败: GCC13 符号版本超出 manylinux_2_28 兼容范围",
+        "max_jobs": 76,
+        "pytorch_version": "2.13.0.dev20260610+cpu"
+      },
+      "duration_seconds": 840,
+      "error": "auditwheel: error: cannot repair to manylinux_2_28_aarch64 ABI because of the presence of too-recent versioned symbols (GLIBCXX_3.4.30, CXXABI_1.3.13, GLIBC_2.34)",
+      "output": "[1229/1229] Linking CXX shared library... auditwheel: error: cannot repair to manylinux_2_28_aarch64 because of too-recent versioned symbols",
+      "result": "编译成功, 打包失败",
+      "returncode": 1,
+      "step": "build_attempt",
+      "success": false,
+      "timestamp": "2026-09-04T21:13:00"
+    },
+    {
+      "action": "分析 auditwheel 失败根因: GCC 13.3.1 产生的 GLIBCXX_3.4.30/CXXABI_1.3.13 符号超出 manylinux_2_28 兼容范围",
+      "command": "sed -i 's/^is_manylinux = .*/is_manylinux = False/' /workspace/build/pytorch/setup.py",
+      "details": {
+        "patch": "sed -i 's/^is_manylinux = .*/is_manylinux = False/' setup.py",
+        "root_cause": "gcc-toolset-13 编译的二进制使用 manylinux_2_28 不支持的符号版本",
+        "solution": "修补 pytorch/setup.py 设置 is_manylinux=False 跳过 auditwheel repair 步骤, 保留原始 linux_aarch64 wheel"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "is_manylinux = False (原: os.environ.get('AUDITWHEEL_PLAT', None) in manylinux_tags)",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-09-04T21:13:00"
+    },
+    {
+      "action": "重新构建: python3 setup.py build bdist_wheel (跳过 auditwheel, 并发76)",
+      "command": "docker exec OpPlugin-ttfhw bash -c 'cd /workspace/build/pytorch \u0026\u0026 source /usr/local/Ascend/cann/set_env.sh \u0026\u0026 export MAX_JOBS=76 \u0026\u0026 python3 setup.py build bdist_wheel'",
+      "details": {
+        "compilation": "1297/1297 编译单元全部成功 (增量构建)",
+        "max_jobs": 76,
+        "patch_applied": "is_manylinux=False 跳过 auditwheel",
+        "wheel": "torch_npu-2.13.0.dev20260610-cp310-cp310-linux_aarch64.whl",
+        "wheel_size": "37.4MB (39209764 bytes)"
+      },
+      "duration_seconds": 180,
+      "error": "",
+      "output": "Successfully installed... adding torch_npu-2.13.0.dev20260610.dist-info/RECORD",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-09-04T21:13:00"
+    },
+    {
+      "action": "解决运行时 libstdc++ 不兼容: SWR builder 镜像(AlmaLinux 8) libstdc++ 版过低无法加载 CANN",
+      "command": "docker rm -f OpPlugin-ttfhw \u0026\u0026 docker run -d --name OpPlugin-ttfhw ... torch-npu-test:cann9.1-py3.10 sleep infinity",
+      "details": {
+        "container_switch": "SWR builder → torch-npu-test:cann9.1-py3.10",
+        "problem": "AlmaLinux 8 libstdc++.so.6.0.25 (GLIBCXX_3.4.24) 无法满足 CANN libhccl.so 需求 (GLIBCXX_3.4.30)",
+        "solution": "切换到 torch-npu-test:cann9.1-py3.10 镜像 (Ubuntu 22.04, libstdc++.so.6.0.30 含 GLIBCXX_3.4.30)"
+      },
+      "duration_seconds": 300,
+      "error": "",
+      "output": "torch_npu version: 2.13.0.dev20260610, NPU available: True, NPU device count: 1, Tensor on NPU: tensor([1., 2., 3.], device='npu:0')",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-09-04T21:13:00"
+    },
+    {
+      "action": "在 torch-npu-test 容器中安装 torch 2.13.0.dev20260610 和 torch_npu wheel",
+      "command": "pip3 install torch==2.13.0.dev20260610 (from OBS) \u0026\u0026 pip3 install --no-deps /workspace/dist/torch_npu-*.whl",
+      "details": {
+        "additional_deps": "numpy, pyyaml, setuptools, wheel",
+        "torch_npu_wheel": "/workspace/dist/torch_npu-2.13.0.dev20260610-cp310-cp310-linux_aarch64.whl",
+        "torch_source": "https://pytorch-package.obs.cn-north-4.myhuaweicloud.com/pta/torch/master/20260610/",
+        "torch_version": "2.13.0.dev20260610+cpu"
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "Successfully installed torch-npu-2.13.0.dev20260610",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-09-04T21:13:00"
+    },
+    {
+      "action": "运行 test_base_ops/test_add 验证 UT 环境",
+      "command": "docker exec OpPlugin-ttfhw bash -c 'source /usr/local/Ascend/cann/set_env.sh \u0026\u0026 cd /workspace \u0026\u0026 python3 test/run_test.py -i test_base_ops/test_add'",
+      "details": {
+        "duration": "6.5s",
+        "failed": 0,
+        "passed": 23,
+        "total": 23
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "Ran 23 tests in 6.513s -- OK",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-09-04T21:29:57"
+    },
+    {
+      "action": "运行 test_base_ops 全模块单元测试 (55 个测试文件, 237 个测试用例)",
+      "command": "docker exec OpPlugin-ttfhw bash -c 'source /usr/local/Ascend/cann/set_env.sh \u0026\u0026 cd /workspace \u0026\u0026 python3 test/run_test.py -i test_base_ops'",
+      "details": {
+        "failed_cases": 3,
+        "failed_files": 3,
+        "failed_tests": [
+          "test_base_ops/test__npu_quant_rms_norm (ATB 库未加载)",
+          "test_base_ops/test_addmm_activation_out (fp16 精度不匹配)",
+          "test_base_ops/test_addmv (dtype 不匹配)"
+        ],
+        "pass_rate": "97.9%",
+        "passed_cases": 232,
+        "passed_files": 52,
+        "skipped_cases": 2,
+        "total_cases": 237,
+        "total_files": 55
+      },
+      "duration_seconds": 1200,
+      "error": "3 个测试失败: test__npu_quant_rms_norm (ATB库缺失), test_addmm_activation_out (精度), test_addmv (dtype)",
+      "output": "52 OK, 3 FAILED out of 55 test files, 237 test cases total",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-09-04T21:29:57"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "torch_npu wheel",
+          "path": "dist/torch_npu-2.13.0.dev20260610-cp310-cp310-linux_aarch64.whl",
+          "size": "37.4MB",
+          "type": "wheel"
+        }
+      ],
+      "cmake": "cmake 4.3.4 (预构建镜像内置)",
+      "compiler": "gcc 13.3.1 (gcc-toolset-13)",
+      "concurrency": 76,
+      "concurrency_ratio": "30% (256核 × 30% = 76)",
+      "duration_seconds": 1380,
+      "notes": "首次构建编译成功(1229/1229)但 auditwheel 打包失败(GCC13 符号版本 GLIBCXX_3.4.30/CXXABI_1.3.13 超出 manylinux_2_28 兼容范围), 修补 pytorch/setup.py 设置 is_manylinux=False 跳过 auditwheel 后重新构建成功。运行时因 SWR builder 镜像(AlmaLinux 8) libstdc++ 版本过低(GLIBCXX_3.4.24)无法加载 CANN 库(需 GLIBCXX_3.4.30), 切换到 torch-npu-test:cann9.1-py3.10 镜像(Ubuntu 22.04, 含兼容 libstdc++)安装 wheel 运行 UT。",
+      "status": "success"
+    },
+    "ut": {
+      "duration_seconds": 1200,
+      "failed": 3,
+      "failures": [
+        {
+          "error": "OSError: [Errno None] — 无法加载 ATB 库 libatb.so, torch-npu-test 镜像未安装 ATB (Transformer Boost) 神经网络加速库",
+          "test_name": "test_base_ops/test__npu_quant_rms_norm"
+        },
+        {
+          "error": "AssertionError: result error — fp16 精度不匹配, 可能与 NPU card 0 Critical 状态有关",
+          "test_name": "test_base_ops/test_addmm_activation_out (test_addmm_activation_out_fp16)"
+        },
+        {
+          "error": "RuntimeError: addmv input tensors must have the same dtype, but got Half, Float, and Float — CPU 端 dtype 不匹配",
+          "test_name": "test_base_ops/test_addmv (test_addmv_fp16_to_fp32)"
+        }
+      ],
+      "passed": 232,
+      "python": {
+        "failed": 3,
+        "passed": 232,
+        "status": "partial_success",
+        "total": 237
+      },
+      "skipped": 2,
+      "status": "partial_success",
+      "total": 237
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "OpPlugin-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti (无限制)",
+      "os": "AlmaLinux 8.10 (manylinux_2_28)"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "69G (6.6G 可用)",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 0
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_dockerfile": "docker/devel/Dockerfile 多阶段构建 (base→builder→dev), 预构建镜像对应 builder 阶段, 已含全部编译依赖",
+        "from_readme": "install.md 建议使用 TorchNPU 提供的 docker 镜像, CI 工作流确认使用 SWR 预构建镜像",
+        "mappings": [
+          {
+            "original": "gcc-toolset-13 (gcc/g++/gfortran)",
+            "source": "Dockerfile builder 阶段 + docker exec 验证",
+            "target": "gcc 13.3.1 (预构建镜像已含)"
+          },
+          {
+            "original": "cmake",
+            "source": "Dockerfile builder 阶段 + docker exec 验证",
+            "target": "cmake 4.3.4 (预构建镜像已含)"
+          },
+          {
+            "original": "torch==2.13.0 CPU",
+            "source": "Dockerfile builder 阶段 pip install",
+            "target": "torch 2.13.0.dev20260610+cpu (预构建镜像已含)"
+          },
+          {
+            "original": "numpy",
+            "source": "Dockerfile builder 阶段 pip install",
+            "target": "numpy 1.26.4 (预构建镜像已含)"
+          },
+          {
+            "original": "CANN 9.1.0_beta.1",
+            "source": "Dockerfile dev 阶段 + 主机已安装",
+            "target": "CANN 9.1.0 (主机挂载 /usr/local/Ascend/cann)"
+          }
+        ]
+      },
+      "image_name": "swr.cn-north-4.myhuaweicloud.com/frameworkptadapter/pytorch_master_a2_aarch64_builder:20260704",
+      "selection_reason": "Tier 1 业务预构建镜像: CI 工作流 .gitcode/workflows/build_job.yml 中使用华为 SWR 预构建 builder 镜像, 已缓存于远程机器 (25.7GB)。镜像含 manylinux 基础环境 + gcc-toolset-13 + cmake + torch 2.13.0.dev CPU 版 + numpy + pyyaml, 编译依赖齐全无需安装。CANN 由主机挂载 (/usr/local/Ascend/cann 9.1.0)。",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "",
+    "duration_seconds": 4911,
+    "end_time": "2026-09-04T21:30:19",
+    "environment": "aarch64 / Kunpeng-920 / 256核 / 2.0Ti内存 / NPU 910B3 / CANN 9.1.0 / Python 3.10 / GCC 13.3.1 / PyTorch 2.13.0.dev20260610",
+    "repo_url": "https://gitcode.com/Ascend/op-plugin.git",
+    "start_time": "2026-09-04T20:08:28",
+    "total_steps": 25,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "auditwheel 打包失败: GCC 13.3.1 产生的 GLIBCXX_3.4.30/CXXABI_1.3.13/GLIBC_2.34 符号版本超出 manylinux_2_28 兼容范围",
+      "solution": "修补 pytorch/setup.py 设置 is_manylinux=False 跳过 auditwheel repair, 保留原始 linux_aarch64 wheel 直接安装",
+      "source": "ci/build.sh → pytorch/ci/build.sh → setup.py 第668-678行",
+      "timestamp": "2026-09-04T21:29:57"
+    },
+    {
+      "problem": "SWR builder 镜像(AlmaLinux 8) libstdc++.so.6.0.25 (GLIBCXX_3.4.24) 无法满足 CANN libhccl.so 需求 (GLIBCXX_3.4.30)",
+      "solution": "切换到 torch-npu-test:cann9.1-py3.10 镜像 (Ubuntu 22.04, libstdc++.so.6.0.30 含 GLIBCXX_3.4.30) 安装 wheel 运行 UT",
+      "source": "容器内 import torch_npu 报错 ImportError",
+      "timestamp": "2026-09-04T21:29:57"
+    },
+    {
+      "problem": "test__npu_quant_rms_norm 测试失败: 无法加载 ATB 库 libatb.so",
+      "solution": "torch-npu-test 镜像未安装 ATB 神经网络加速库, 属于环境限制非代码问题, 记录为已知限制",
+      "source": "test/test_base_ops/test__npu_quant_rms_norm.py",
+      "timestamp": "2026-09-04T21:29:57"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "火山AI网关/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

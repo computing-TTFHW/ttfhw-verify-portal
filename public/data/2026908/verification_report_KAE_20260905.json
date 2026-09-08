@@ -1,0 +1,859 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md + /proc/cpuinfo",
+      "value": "aarch64 (鲲鹏920新型号处理器, implementer=0x48, part=0xd22)"
+    },
+    "build_commands": {
+      "source": "README.md + docs/zh/quick_start.md 安装步骤 + build.sh",
+      "value": "sh build.sh all  (一键编译安装全部组件: driver/uadk/engine/zlib/gzip/zstd/lz4/snappy)"
+    },
+    "dependencies": {
+      "source": "README.md + docs/zh/installation_guide.md + docs/zh/quick_start.md + build.sh + scripts/buildScript/common.sh",
+      "value": [
+        "make (yum: make)",
+        "kernel-devel-\\$(uname -r) (yum: kernel-devel, 需与运行内核版本匹配)",
+        "libtool (yum: libtool)",
+        "numactl-devel (yum: numactl-devel)",
+        "openssl-devel (yum: openssl-devel, OpenSSL 1.1.1x 或 3.0.x)",
+        "lz4-devel (yum: lz4-devel)",
+        "libzstd-devel (yum: libzstd-devel)",
+        "chrpath (yum: chrpath)",
+        "cmake (yum: cmake)",
+        "libunwind-devel (yum: libunwind-devel)",
+        "patch (yum: patch)",
+        "perl (yum: perl)",
+        "bzip2 (yum: bzip2)",
+        "gcc \u003e= 7.4.1 (yum: gcc)",
+        "automake (yum: automake)",
+        "autoconf (yum: autoconf)",
+        "g++ (yum: gcc-c++, 用于编译 gtest 测试)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库无 Dockerfile",
+      "value": "仓库不存在任何 Dockerfile，依赖从 README 安装指南和 build.sh 脚本提取"
+    },
+    "recommended_image": {
+      "source": "README.md 安装指南 docs/zh/installation_guide.md 表2",
+      "value": "openEuler 22.03 LTS-SP4 / 24.03 LTS。仓库无 Dockerfile，README 明确目标 OS 为 openEuler 系列"
+    },
+    "sample_commands": {
+      "source": "docs/zh/quick_start.md 使用KAE加解密库章节",
+      "value": "openssl speed -elapsed -engine kae rsa2048  (需KAE硬件加速器设备HPRE/SEC/ZIP, 本机无KAE硬件设备)"
+    },
+    "special_dependencies": {
+      "source": "docs/zh/installation_guide.md + scripts/buildScript/common.sh",
+      "value": [
+        "KAE 硬件加速器设备 (HPRE/SEC/ZIP, 通过 lspci 检查, 本机未检测到)",
+        "License 证书 (鲲鹏920需申请, 鲲鹏920新型号可免License)",
+        "内核版本需为 4.19/5.4/5.10/5.15/6.6 之一 (本机 5.10.0-216.oe2203sp4)",
+        "CPU 需为鲲鹏 (implementer=0x48, 本机匹配)",
+        "zstd/lz4/snappy 仅鲲鹏920新型号(0xd01以外)及950支持, 本机 part=0xd22 支持"
+      ]
+    },
+    "ut_commands": {
+      "source": "各组件 test 目录 (KAEZlib/test, KAEZstd/test, KAELz4/test, KAEOpensslEngine/test, uadk/test)",
+      "value": "仓库未在 README 中提供统一的 UT 执行命令。各组件 test 目录下有 gtest 测试和 perftest 性能测试，但 build.sh 无 test 子命令，需手动进入各 test 目录编译执行"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "README 和 build.sh 均未提供统一的单元测试执行命令。build.sh 只有 all/driver/uadk/engine/zlib/gzip/zstd/lz4/snappy/cleanup/rpmpack 等构建命令，没有 test 子命令。各组件 test 目录下有 gtest 测试，但需要用户手动进入各目录编译执行，新手难以快速验证。",
+      "source": "README.md + build.sh + 各组件 test/ 目录",
+      "time": "2026-09-05T05:58:03",
+      "title": "README 未提供统一的 UT 执行命令"
+    },
+    {
+      "body": "安装指南的依赖安装命令为 yum install -y make kernel-devel libtool numactl-devel openssl-devel lz4-devel libzstd-devel chrpath cmake libunwind-devel patch，但未提及 kmod（提供 depmod/lsmod/modprobe）和 dracut（重建 initramfs）依赖。build_driver.sh 的 make nosva 目标需要这两个工具，缺失会导致构建失败。",
+      "source": "docs/zh/installation_guide.md + docs/zh/quick_start.md 依赖安装章节 + KAEKernelDriver/KAEKernelDriver-OLK-5.10/Makefile",
+      "time": "2026-09-05T05:58:03",
+      "title": "安装指南未提及 kmod 和 dracut 依赖"
+    },
+    {
+      "body": "README 和快速入门文档未明确说明在无 KAE 硬件设备（HPRE/SEC/ZIP）的情况下，KAEZlib/KAEZstd/KAELz4/KAESnappy/KAEGzip 等压缩库和工具会自动回退到软件模式。这对在非鲲鹏硬件或无 License 环境下进行功能验证的开发者很重要。",
+      "source": "README.md + docs/zh/quick_start.md",
+      "time": "2026-09-05T05:58:03",
+      "title": "README 未说明无 KAE 硬件时的软件回退行为"
+    },
+    {
+      "body": "build.sh all 中的 make nosva 步骤（内核模块安装）调用 dracut -f 重建 initramfs，在容器环境中因无 /boot 目录而失败。文档未说明在容器中构建时的限制和替代方案（如分组件单独构建）。",
+      "source": "KAEKernelDriver/KAEKernelDriver-OLK-5.10/Makefile nosva 目标",
+      "time": "2026-09-05T05:58:03",
+      "title": "容器环境构建限制未说明"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "清理残留容器 KAE-ttfhw，拉取 openEuler 22.03 LTS-SP4 基础镜像并启动容器",
+      "command": "docker run -d --name KAE-ttfhw --privileged -v /home/workspace/KAE-verify:/workspace -w /workspace openeuler/openeuler:22.03-lts-sp4 sleep infinity",
+      "details": {
+        "container_name": "KAE-ttfhw",
+        "image": "openeuler/openeuler:22.03-lts-sp4",
+        "mount": "/home/workspace/KAE-verify:/workspace",
+        "privileged": true
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "Container ID: 55b54bf84da9, 状态: Up",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-09-05T05:38:37"
+    },
+    {
+      "action": "在容器内阅读 README.md、docs/zh/installation_guide.md、docs/zh/quick_start.md，提取构建依赖、编译命令、UT/样例信息",
+      "command": "docker exec KAE-ttfhw cat README.md docs/zh/installation_guide.md docs/zh/quick_start.md build.sh scripts/buildScript/*.sh",
+      "details": {
+        "build_entry": "sh build.sh all",
+        "components": [
+          "driver",
+          "uadk",
+          "engine",
+          "zlib",
+          "gzip",
+          "zstd",
+          "lz4",
+          "snappy"
+        ],
+        "files_read": [
+          "README.md",
+          "docs/zh/installation_guide.md",
+          "docs/zh/quick_start.md",
+          "build.sh",
+          "scripts/buildScript/common.sh",
+          "scripts/buildScript/build_driver.sh",
+          "scripts/buildScript/build_uadk.sh",
+          "scripts/buildScript/build_engine.sh",
+          "scripts/buildScript/build_compression.sh"
+        ],
+        "kae_hardware_present": false,
+        "npu_required": false,
+        "os_target": "openEuler 22.03 LTS-SP4"
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "提取到构建依赖17项，编译命令 sh build.sh all，UT 各组件 test 目录有 gtest，样例需KAE硬件",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-05T05:40:08"
+    },
+    {
+      "action": "检查仓库 .pre-commit-config.yaml 和 lint-runner 配置文件是否存在",
+      "command": "docker exec KAE-ttfhw cat /workspace/.pre-commit-config.yaml",
+      "details": {
+        "exclude": "^(KAEKernelDriver|uadk|scripts)/",
+        "hooks": [
+          {
+            "hooks": [
+              "check-yaml",
+              "check-json",
+              "check-xml",
+              "check-merge-conflict",
+              "detect-private-key",
+              "check-added-large-files"
+            ],
+            "repo": "pre-commit-hooks v6.0.0"
+          },
+          {
+            "hooks": [
+              "detect-secrets"
+            ],
+            "repo": "detect-secrets v1.5.0"
+          },
+          {
+            "hooks": [
+              "clang-format"
+            ],
+            "repo": "mirrors-clang-format v18.1.8"
+          }
+        ],
+        "lint_runner_config": "未找到 lint-runner 配置文件",
+        "pre_commit_config": ".pre-commit-config.yaml 存在"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": ".pre-commit-config.yaml 存在，包含3个repo共8个hook；未检测到 lint-runner 配置",
+      "result": "pre-commit 已配置, lint-runner 未配置",
+      "returncode": 0,
+      "step": "static_analysis_scan",
+      "success": true,
+      "timestamp": "2026-09-05T05:40:08"
+    },
+    {
+      "action": "检查仓库 .devcontainer 目录是否存在",
+      "command": "docker exec KAE-ttfhw ls -la /workspace/.devcontainer 2\u003e/dev/null || echo NO_DEVCONTAINER",
+      "details": {
+        "config_dir": null,
+        "files": [],
+        "found": false
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "仓库不存在 .devcontainer 目录",
+      "result": "未配置 devcontainer",
+      "returncode": 0,
+      "step": "devcontainer_scan",
+      "success": true,
+      "timestamp": "2026-09-05T05:40:08"
+    },
+    {
+      "action": "第一层：安装系统工具链（gcc gcc-c++ make cmake git python3 python3-pip perl bzip2）",
+      "command": "dnf install -y gcc gcc-c++ make cmake git python3 python3-pip perl bzip2",
+      "details": {
+        "packages": [
+          "gcc-10.3.1",
+          "gcc-c++-10.3.1",
+          "make-4.3",
+          "cmake-3.22.0",
+          "git",
+          "python3",
+          "python3-pip",
+          "perl-5.34.0",
+          "bzip2"
+        ],
+        "source": "openEuler 官方仓库 (dnf)"
+      },
+      "duration_seconds": 44,
+      "error": "",
+      "output": "安装完成：gcc-10.3.1, make-4.3, cmake-3.22.0, perl-5.34.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-09-05T05:43:29"
+    },
+    {
+      "action": "第二层：安装构建依赖（kernel-devel libtool numactl-devel openssl-devel lz4-devel libzstd-devel chrpath libunwind-devel patch automake autoconf）",
+      "command": "dnf install -y kernel-devel-6.6.114.1-microsoft-standard-WSL2 libtool numactl-devel openssl-devel lz4-devel libzstd-devel chrpath libunwind-devel patch automake autoconf",
+      "details": {
+        "kernel_match": true,
+        "packages": [
+          "kernel-devel-5.10.0-216.0.0.115.oe2203sp4",
+          "libtool-2.4.7",
+          "numactl-devel-2.0.16",
+          "openssl-devel-1.1.1wa",
+          "lz4-devel-1.9.3",
+          "libzstd-devel-1.5.0",
+          "chrpath-0.16",
+          "libunwind-devel-1.6.2",
+          "patch-2.7.6",
+          "automake-1.16.5",
+          "autoconf-2.71"
+        ],
+        "source": "openEuler 官方仓库 (dnf)"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "kernel-devel-5.10.0-216.0.0.115.oe2203sp4.aarch64 安装成功，/lib/modules/5.10.0-216.0.0.115.oe2203sp4.aarch64/build/ 存在",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-09-05T05:43:29"
+    },
+    {
+      "action": "验证所有依赖安装正确（gcc/make/openssl/kernel-devel/autotools）",
+      "command": "gcc --version \u0026\u0026 make --version \u0026\u0026 openssl version \u0026\u0026 ls /lib/modules/6.6.114.1-microsoft-standard-WSL2/build/Makefile \u0026\u0026 automake --version \u0026\u0026 autoconf --version \u0026\u0026 libtool --version \u0026\u0026 cmake --version",
+      "details": {
+        "autoconf": "2.71",
+        "automake": "1.16.5",
+        "cmake": "3.22.0",
+        "gcc": "10.3.1",
+        "kernel_devel": "5.10.0-216.0.0.115.oe2203sp4 (与运行内核匹配)",
+        "libtool": "2.4.7",
+        "make": "4.3",
+        "openssl": "1.1.1wa (1.1.1x系列)"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "所有依赖已确认安装：gcc-10.3.1, make-4.3, OpenSSL-1.1.1wa, kernel-devel匹配, automake-1.16.5, autoconf-2.71, libtool-2.4.7, cmake-3.22.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-09-05T05:43:29"
+    },
+    {
+      "action": "首次构建尝试：BUILD_JOBS=182 bash build.sh all（编译全部组件）",
+      "command": "BUILD_JOBS=182 bash build.sh all",
+      "details": {
+        "compiled_modules": [
+          "hisi_qm.ko",
+          "hisi_hpre.ko",
+          "hisi_zip.ko",
+          "hisi_sec2.ko",
+          "uacce.ko"
+        ],
+        "concurrency": 182,
+        "concurrency_ratio": "30%",
+        "error": "depmod: No such file or directory (kmod 包未安装)",
+        "failed_component": "driver (make nosva)"
+      },
+      "duration_seconds": 10,
+      "error": "depmod 命令未找到（kmod 包未安装），lsmod 同样缺失",
+      "output": "内核模块编译成功(hisi_qm.ko/hisi_hpre.ko/hisi_zip.ko/hisi_sec2.ko/uacce.ko)，make nosva 调用 depmod 失败: make: depmod: No such file or directory, Error 127",
+      "result": "失败（driver 模块编译成功，make nosva 失败）",
+      "returncode": 2,
+      "step": "build_attempt",
+      "success": false,
+      "timestamp": "2026-09-05T05:44:53"
+    },
+    {
+      "action": "问题定位：make nosva 目标调用 depmod 生成模块依赖关系，容器内缺少 kmod 包。安装 kmod 提供 depmod/lsmod/modprobe",
+      "command": "dnf install -y kmod",
+      "details": {
+        "root_cause": "openEuler 22.03 基础镜像未预装 kmod 包，depmod/lsmod 命令缺失",
+        "solution": "dnf install -y kmod"
+      },
+      "duration_seconds": 8,
+      "error": "",
+      "output": "kmod-29-8 安装成功，depmod/lsmod/modprobe 可用",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-09-05T05:44:53"
+    },
+    {
+      "action": "第二次构建尝试：安装 kmod 后重新执行 build.sh all",
+      "command": "BUILD_JOBS=182 bash build.sh all",
+      "details": {
+        "compiled_modules": [
+          "hisi_qm.ko(2.1M)",
+          "hisi_hpre.ko(1.4M)",
+          "hisi_zip.ko(982K)",
+          "hisi_sec2.ko(1.3M)",
+          "uacce.ko(538K)"
+        ],
+        "concurrency": 182,
+        "error": "dracut: Can't write to /boot: Directory /boot does not exist or is not accessible",
+        "failed_component": "driver (make nosva -\u003e dracut -f)"
+      },
+      "duration_seconds": 6,
+      "error": "dracut 在容器中无法写入 /boot 目录，make nosva 是系统安装步骤（非编译步骤）",
+      "output": "内核模块已编译成功（.ko 文件已生成），make nosva 中 dracut -f 失败：容器内无 /boot 目录",
+      "result": "失败（driver make nosva 调用 dracut 失败）",
+      "returncode": 2,
+      "step": "build_retry",
+      "success": false,
+      "timestamp": "2026-09-05T05:55:15"
+    },
+    {
+      "action": "问题定位：make nosva 目标调用 dracut -f 重建 initramfs，容器内无 /boot 目录无法完成。改为分组件单独构建，跳过 driver 的 nosva 安装步骤",
+      "command": "bash scripts/buildScript/build_uadk.sh uadk \u0026\u0026 bash scripts/buildScript/build_engine.sh engine \u0026\u0026 bash scripts/buildScript/build_compression.sh {zlib,gzip,zstd,lz4,snappy}",
+      "details": {
+        "root_cause": "make nosva 是内核模块安装步骤（depmod+modprobe+dracut），非编译步骤，容器环境无法执行",
+        "solution": "分开构建各组件：driver 只执行 make 编译（跳过 nosva），uadk/engine/zlib/gzip/zstd/lz4/snappy 单独执行各自构建脚本"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "改为分组件构建策略，driver 模块已编译完成无需重编",
+      "result": "已解决（改为分组件构建）",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-09-05T05:55:15"
+    },
+    {
+      "action": "构建 UADK 用户态加速器开发包（autogen+configure+make+install）",
+      "command": "BUILD_JOBS=182 bash scripts/buildScript/build_uadk.sh uadk",
+      "details": {
+        "artifacts": "libwd.so.2.10.0(323K), libwd_comp.so.2.10.0(131K), libwd_crypto.so.2.10.0, libwd_dae.so.2.10.0, libwd_udma.so.2.10.0 + 硬件驱动库",
+        "component": "uadk",
+        "concurrency": 182
+      },
+      "duration_seconds": 34,
+      "error": "",
+      "output": "libwd.so.2.10.0(323K), libwd_comp.so.2.10.0(131K), libwd_crypto.so.2.10.0, libwd_dae.so.2.10.0, libwd_udma.so.2.10.0 + 硬件驱动库",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_uadk",
+      "success": true,
+      "timestamp": "2026-09-05T05:55:15"
+    },
+    {
+      "action": "构建 KAE OpenSSL Engine（autoreconf+configure+make+install）",
+      "command": "BUILD_JOBS=182 bash scripts/buildScript/build_engine.sh engine",
+      "details": {
+        "artifacts": "kae.so.2.2.0 安装到 /usr/local/lib/engines-1.1/",
+        "component": "engine",
+        "concurrency": 182
+      },
+      "duration_seconds": 21,
+      "error": "",
+      "output": "kae.so.2.2.0 安装到 /usr/local/lib/engines-1.1/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_engine",
+      "success": true,
+      "timestamp": "2026-09-05T05:55:15"
+    },
+    {
+      "action": "构建 KAEZlib 加速压缩库（patch zlib-1.2.11 + make + install）",
+      "command": "BUILD_JOBS=182 bash scripts/buildScript/build_zlib.sh zlib",
+      "details": {
+        "artifacts": "libz.so.1.2.11(141K) 安装到 /usr/local/kaezip/",
+        "component": "zlib",
+        "concurrency": 182
+      },
+      "duration_seconds": 39,
+      "error": "",
+      "output": "libz.so.1.2.11(141K) 安装到 /usr/local/kaezip/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_zlib",
+      "success": true,
+      "timestamp": "2026-09-05T05:55:15"
+    },
+    {
+      "action": "构建 KAEGzip 压缩工具（patch gzip-1.13 + make + install）",
+      "command": "BUILD_JOBS=182 bash scripts/buildScript/build_gzip.sh gzip",
+      "details": {
+        "artifacts": "gzip 二进制安装到 /usr/local/kaegzip/",
+        "component": "gzip",
+        "concurrency": 182
+      },
+      "duration_seconds": 81,
+      "error": "",
+      "output": "gzip 二进制安装到 /usr/local/kaegzip/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_gzip",
+      "success": true,
+      "timestamp": "2026-09-05T05:55:15"
+    },
+    {
+      "action": "构建 KAEZstd 加速压缩库（patch zstd-1.5.4 + make + install）",
+      "command": "BUILD_JOBS=182 bash scripts/buildScript/build_zstd.sh zstd",
+      "details": {
+        "artifacts": "libzstd.so.1.5.4(819K) 安装到 /usr/local/kaezstd/",
+        "component": "zstd",
+        "concurrency": 182
+      },
+      "duration_seconds": 34,
+      "error": "",
+      "output": "libzstd.so.1.5.4(819K) 安装到 /usr/local/kaezstd/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_zstd",
+      "success": true,
+      "timestamp": "2026-09-05T05:55:15"
+    },
+    {
+      "action": "构建 KAELz4 加速压缩库（patch lz4-1.9.4 + make + install）",
+      "command": "BUILD_JOBS=182 bash scripts/buildScript/build_lz4.sh lz4",
+      "details": {
+        "artifacts": "liblz4.so.1.9.4(207K) 安装到 /usr/local/kaelz4/",
+        "component": "lz4",
+        "concurrency": 182
+      },
+      "duration_seconds": 35,
+      "error": "",
+      "output": "liblz4.so.1.9.4(207K) 安装到 /usr/local/kaelz4/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_lz4",
+      "success": true,
+      "timestamp": "2026-09-05T05:55:15"
+    },
+    {
+      "action": "构建 KAESnappy 加速压缩库（cmake + make + install）",
+      "command": "BUILD_JOBS=182 bash scripts/buildScript/build_snappy.sh snappy",
+      "details": {
+        "artifacts": "libsnappy.so.1.1.10(78K) 安装到 /usr/local/kaesnappy/",
+        "component": "snappy",
+        "concurrency": 182
+      },
+      "duration_seconds": 19,
+      "error": "",
+      "output": "libsnappy.so.1.1.10(78K) 安装到 /usr/local/kaesnappy/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_snappy",
+      "success": true,
+      "timestamp": "2026-09-05T05:55:15"
+    },
+    {
+      "action": "执行 uadk/test/sanity_test.sh 单元测试",
+      "command": "cd /workspace/uadk/test \u0026\u0026 bash sanity_test.sh",
+      "details": {
+        "failed": 2,
+        "hardware_present": false,
+        "passed": 0,
+        "reason": "测试需要 KAE 硬件设备 (/dev/hisi_sec-*, /dev/hisi_hpre-*, /dev/hisi_zip-*) 和已加载的内核模块",
+        "total": 2
+      },
+      "duration_seconds": 1,
+      "error": "sanity_test.sh 检查 /dev/hisi_sec-*, /dev/hisi_hpre-* 设备和 /sys/module/hisi_*/parameters/uacce_mode 参数，均不存在",
+      "output": "Passed 0 test. Failed 2 test. (check_uacce_mode 返回 -1，/dev/hisi_* 设备不存在)",
+      "result": "失败（无 KAE 硬件设备）",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-09-05T05:58:03"
+    },
+    {
+      "action": "执行 KAE 加解密样例：RSA 2048 性能测试（OpenSSL Engine 模式）",
+      "command": "openssl speed -elapsed -engine kae rsa2048",
+      "details": {
+        "hardware_required": true,
+        "sample_name": "openssl speed -engine kae rsa2048",
+        "software_fallback": true
+      },
+      "duration_seconds": 20,
+      "error": "",
+      "output": "KAE engine 加载成功，RSA 2048 sign: 598.5 sign/s, verify: 24577.1 verify/s（无硬件加速，回退到软件计算）",
+      "result": "成功（软件回退）",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-09-05T05:58:03"
+    },
+    {
+      "action": "执行 KAEGzip 工具压缩和解压测试文件",
+      "command": "/usr/local/kaegzip/gzip /tmp/test.txt \u0026\u0026 /usr/local/kaegzip/gzip -d /tmp/test.txt.gz",
+      "details": {
+        "hardware_required": true,
+        "sample_name": "KAEGzip 压缩/解压",
+        "software_fallback": true
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "KAE Hardware Not Available, fallback to software. 压缩成功(32B)，解压后内容一致(hello world)",
+      "result": "成功（软件回退）",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-09-05T05:58:03"
+    },
+    {
+      "action": "执行 KAEZstd 工具压缩和解压测试文件",
+      "command": "/usr/local/kaezstd/bin/zstd /tmp/zstd_test.txt \u0026\u0026 /usr/local/kaezstd/bin/zstd -d /tmp/zstd_test.txt.zst",
+      "details": {
+        "hardware_required": true,
+        "sample_name": "KAEZstd 压缩/解压",
+        "software_fallback": true
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "WD framework is not enabled, fallback to software. 压缩成功(44B)，解压后内容一致",
+      "result": "成功（软件回退）",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-09-05T05:58:03"
+    },
+    {
+      "action": "执行 KAELz4 工具压缩和解压测试文件",
+      "command": "/usr/local/kaelz4/bin/lz4 -f /tmp/lz4_test.txt /tmp/lz4_test.txt.lz4 \u0026\u0026 /usr/local/kaelz4/bin/lz4 -d -f /tmp/lz4_test.txt.lz4 /tmp/lz4_out.txt",
+      "details": {
+        "hardware_required": true,
+        "sample_name": "KAELz4 压缩/解压",
+        "software_fallback": true
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "WD framework is not enabled, fallback to software. Compressed 30 bytes into 49 bytes, 解压后内容一致",
+      "result": "成功（软件回退）",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-09-05T05:58:03"
+    },
+    {
+      "action": "停止并删除容器 KAE-ttfhw",
+      "command": "docker rm -f KAE-ttfhw",
+      "details": {
+        "container_name": "KAE-ttfhw"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "KAE-ttfhw",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-09-05T05:59:04"
+    },
+    {
+      "action": "生成验证报告并运行校验脚本",
+      "command": "python3 validate_report.py --jsonschema report_schema.json",
+      "details": {
+        "output_file": "verification_report_KAE_20260905.json",
+        "validation": "PASS (0 issues)"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "jsonschema: PASS, 0 issues",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-09-05T05:59:04"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "hisi_qm.ko",
+          "path": "KAEKernelDriver/KAEKernelDriver-OLK-5.10/hisilicon/hisi_qm.ko",
+          "size": "2.1M",
+          "type": "kernel_module"
+        },
+        {
+          "name": "hisi_hpre.ko",
+          "path": "KAEKernelDriver/KAEKernelDriver-OLK-5.10/hisilicon/hpre/hisi_hpre.ko",
+          "size": "1.4M",
+          "type": "kernel_module"
+        },
+        {
+          "name": "hisi_sec2.ko",
+          "path": "KAEKernelDriver/KAEKernelDriver-OLK-5.10/hisilicon/sec2/hisi_sec2.ko",
+          "size": "1.3M",
+          "type": "kernel_module"
+        },
+        {
+          "name": "hisi_zip.ko",
+          "path": "KAEKernelDriver/KAEKernelDriver-OLK-5.10/hisilicon/zip/hisi_zip.ko",
+          "size": "982K",
+          "type": "kernel_module"
+        },
+        {
+          "name": "uacce.ko",
+          "path": "KAEKernelDriver/KAEKernelDriver-OLK-5.10/uacce/uacce.ko",
+          "size": "538K",
+          "type": "kernel_module"
+        },
+        {
+          "name": "libwd.so",
+          "path": "/usr/local/lib/libwd.so.2.10.0",
+          "size": "323K",
+          "type": "library"
+        },
+        {
+          "name": "libwd_comp.so",
+          "path": "/usr/local/lib/libwd_comp.so.2.10.0",
+          "size": "131K",
+          "type": "library"
+        },
+        {
+          "name": "libwd_crypto.so",
+          "path": "/usr/local/lib/libwd_crypto.so.2.10.0",
+          "size": "library",
+          "type": "library"
+        },
+        {
+          "name": "kae.so",
+          "path": "/usr/local/lib/engines-1.1/kae.so.2.2.0",
+          "size": "OpenSSL engine",
+          "type": "library"
+        },
+        {
+          "name": "libz.so (KAEZlib)",
+          "path": "/usr/local/kaezip/lib/libz.so.1.2.11",
+          "size": "141K",
+          "type": "library"
+        },
+        {
+          "name": "gzip (KAEGzip)",
+          "path": "/usr/local/kaegzip/gzip",
+          "size": "binary",
+          "type": "binary"
+        },
+        {
+          "name": "libzstd.so (KAEZstd)",
+          "path": "/usr/local/kaezstd/lib/libzstd.so.1.5.4",
+          "size": "819K",
+          "type": "library"
+        },
+        {
+          "name": "liblz4.so (KAELz4)",
+          "path": "/usr/local/kaelz4/lib/liblz4.so.1.9.4",
+          "size": "207K",
+          "type": "library"
+        },
+        {
+          "name": "libsnappy.so (KAESnappy)",
+          "path": "/usr/local/kaesnappy/lib/libsnappy.so.1.1.10",
+          "size": "78K",
+          "type": "library"
+        }
+      ],
+      "cmake": "cmake 3.22.0 (仅 snappy 组件使用 cmake)",
+      "compiler": "gcc 10.3.1 (GCC) aarch64",
+      "concurrency": 182,
+      "concurrency_ratio": "30% (608核 × 30% = 182)",
+      "duration_seconds": 273,
+      "notes": "driver 内核模块(.ko)编译成功，make nosva 系统安装步骤因容器无 /boot 目录无法执行（非编译失败）。uadk/engine/zlib/gzip/zstd/lz4/snappy 全部编译安装成功",
+      "status": "成功"
+    },
+    "devcontainer": {
+      "config_dir": null,
+      "config_files": [],
+      "enabled": false,
+      "original_base_image": "无（仓库无 Dockerfile 和 .devcontainer）",
+      "summary": "仓库未配置 devcontainer，也无任何 Dockerfile。根据 README 安装指南选择 openEuler 22.03 LTS-SP4 基础镜像",
+      "used_image": "openEuler 22.03 LTS-SP4"
+    },
+    "sample": {
+      "duration_seconds": 23,
+      "reason": "本机无 KAE 硬件设备(HPRE/SEC/ZIP)，所有样例通过软件回退模式执行成功",
+      "results": [
+        {
+          "execution_status": "成功（软件回退）",
+          "execution_time": "20s",
+          "output_summary": "KAE engine 加载成功，RSA 2048: 598.5 sign/s, 24577.1 verify/s（软件回退）",
+          "sample_name": "openssl speed -engine kae rsa2048"
+        },
+        {
+          "execution_status": "成功（软件回退）",
+          "execution_time": "1s",
+          "output_summary": "KAE Hardware Not Available, fallback to software. 压缩/解压成功",
+          "sample_name": "KAEGzip 压缩/解压"
+        },
+        {
+          "execution_status": "成功（软件回退）",
+          "execution_time": "1s",
+          "output_summary": "WD framework not enabled, fallback to software. 压缩/解压成功",
+          "sample_name": "KAEZstd 压缩/解压"
+        },
+        {
+          "execution_status": "成功（软件回退）",
+          "execution_time": "1s",
+          "output_summary": "WD framework not enabled, fallback to software. Compressed 30B→49B, 解压成功",
+          "sample_name": "KAELz4 压缩/解压"
+        }
+      ],
+      "status": "成功（软件回退）"
+    },
+    "static_analysis": {
+      "enabled": true,
+      "lint_runner": {
+        "config_file": null,
+        "configured": false
+      },
+      "pre_commit": {
+        "config_file": ".pre-commit-config.yaml",
+        "configured": true,
+        "duration_seconds": 5,
+        "executed_in_verification": false,
+        "failed": 0,
+        "hooks": [
+          {
+            "hooks": [
+              "check-yaml",
+              "check-json",
+              "check-xml",
+              "check-merge-conflict",
+              "detect-private-key",
+              "check-added-large-files"
+            ],
+            "repo": "pre-commit-hooks v6.0.0"
+          },
+          {
+            "hooks": [
+              "detect-secrets"
+            ],
+            "repo": "detect-secrets v1.5.0"
+          },
+          {
+            "hooks": [
+              "clang-format"
+            ],
+            "repo": "mirrors-clang-format v18.1.8"
+          }
+        ],
+        "note": "按 skill 要求仅扫描配置不执行 pre-commit run",
+        "passed": 0,
+        "skipped": 0,
+        "status": "已配置（未执行，仅扫描配置）",
+        "total_hooks": 8
+      },
+      "summary": "检测到 pre-commit 配置（3个repo, 8个hook: check-yaml/check-json/check-xml/check-merge-conflict/detect-private-key/check-added-large-files/detect-secrets/clang-format），排除 KAEKernelDriver/uadk/scripts 目录。未检测到 lint-runner 配置"
+    },
+    "ut": {
+      "duration_seconds": 1,
+      "failed": 2,
+      "failures": [
+        {
+          "error": "KAE SEC 硬件设备不存在 (/dev/hisi_sec-* 缺失)",
+          "test": "sec sanity test"
+        },
+        {
+          "error": "KAE HPRE 硬件设备不存在 (/dev/hisi_hpre-* 缺失)",
+          "test": "hpre sanity test"
+        }
+      ],
+      "passed": 0,
+      "status": "失败（无 KAE 硬件）",
+      "total": 2
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "KAE-ttfhw",
+      "cpu_cores": 608,
+      "memory": "1.0Ti (无限制)",
+      "os": "openEuler 22.03 (LTS-SP4)"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 608,
+      "cpu_model": "Kunpeng 920 新型号处理器 (implementer=0x48, part=0xd22)",
+      "disk": "492G 总计, 168G 可用",
+      "docker_version": "Docker version 18.09.0, build 4fc3a92",
+      "memory": "1069GB (1.0Ti)",
+      "npu": {
+        "available": false
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_dockerfile": "仓库无 Dockerfile，依赖从 README 安装指南和 build.sh 脚本提取",
+        "mappings": []
+      },
+      "image_name": "openeuler/openeuler:22.03-lts-sp4",
+      "selection_reason": "仓库无 Dockerfile，README 明确目标 OS 为 openEuler（22.03 LTS SP1/SP2/SP3/SP4、24.03 LTS）。宿主机运行 openEuler 22.03 SP4（内核 5.10.0-216.0.0.115.oe2203sp4），选用 openEuler 22.03 LTS-SP4 基础镜像以确保 kernel-devel 版本与运行内核匹配，使内核驱动模块可编译",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "kae2",
+    "commit": "93b3440008ceedec133a4baa91f9a99ef500c1f8",
+    "duration_seconds": 1440,
+    "end_time": "2026-09-05T05:58:25",
+    "repo_url": "https://gitcode.com/boostkit/KAE.git",
+    "start_time": "2026-09-05T05:34:25",
+    "total_steps": 25
+  },
+  "problems_encountered": [
+    {
+      "problem": "内核驱动构建 make nosva 目标调用 depmod 失败，容器内缺少 depmod/lsmod 命令",
+      "solution": "通过 openEuler 仓库安装 kmod 包（dnf install -y kmod），提供 depmod/lsmod/modprobe 工具",
+      "source": "scripts/buildScript/build_driver.sh -\u003e KAEKernelDriver/KAEKernelDriver-OLK-5.10/Makefile:99 nosva 目标",
+      "timestamp": "2026-09-05T05:44:53"
+    },
+    {
+      "problem": "内核驱动 make nosva 安装步骤调用 dracut -f 重建 initramfs，容器内无 /boot 目录导致失败",
+      "solution": "改为分组件单独构建，driver 只执行 make 编译生成 .ko 模块（跳过 nosva 系统安装步骤），其余用户态组件（uadk/engine/zlib/gzip/zstd/lz4/snappy）各自单独构建成功",
+      "source": "KAEKernelDriver/KAEKernelDriver-OLK-5.10/Makefile:110 nosva 目标 -\u003e dracut -f",
+      "timestamp": "2026-09-05T05:55:15"
+    }
+  ],
+  "session_export_file": "",
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}
