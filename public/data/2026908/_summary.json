@@ -238,61 +238,60 @@
     "displayName": "KAE",
     "result": "partial_success",
     "buildStatus": "success",
-    "utStatus": "failed",
-    "sampleStatus": "success",
-    "totalDuration": 1440,
-    "environmentDuration": 1143,
-    "buildDuration": 273,
-    "utDuration": 1,
-    "sampleDuration": 23,
-    "testPassed": 0,
-    "testFailed": 2,
-    "testTotal": 2,
-    "generatedAt": "2026-09-05T05:34:25",
+    "utStatus": "partial_success",
+    "sampleStatus": "unknown",
+    "totalDuration": 3055,
+    "environmentDuration": 2619,
+    "buildDuration": 316,
+    "utDuration": 120,
+    "testPassed": 24,
+    "testFailed": 20,
+    "testTotal": 57,
+    "testSkipped": 13,
+    "generatedAt": "2026-09-08T11:53:23",
     "environment": "unknown",
     "url": "https://gitcode.com/boostkit/KAE.git",
     "category": "BoostKit",
-    "hasStaticAnalysis": true,
-    "hasDevcontainer": false,
-    "file": "verification_report_KAE_20260905.json",
+    "hasStaticAnalysis": false,
+    "file": "verification_report_KAE_20260908.json",
     "issues": [
       {
-        "problem": "内核驱动构建 make nosva 目标调用 depmod 失败，容器内缺少 depmod/lsmod 命令",
-        "solution": "通过 openEuler 仓库安装 kmod 包（dnf install -y kmod），提供 depmod/lsmod/modprobe 工具",
-        "source": "scripts/buildScript/build_driver.sh -> KAEKernelDriver/KAEKernelDriver-OLK-5.10/Makefile:99 nosva 目标",
-        "timestamp": "2026-09-05T05:44:53"
+        "problem": "构建驱动模块时 make nosva 步骤失败：depmod 命令未找到，后续 dracut 命令也未找到",
+        "solution": "安装 kmod 包（提供 depmod/lsmod/modprobe）和 dracut 包，并创建 /boot 目录让 dracut 在容器中正常运行",
+        "source": "KAEKernelDriver-OLK-5.10/Makefile nosva 目标",
+        "timestamp": "2026-09-08T12:11:00"
       },
       {
-        "problem": "内核驱动 make nosva 安装步骤调用 dracut -f 重建 initramfs，容器内无 /boot 目录导致失败",
-        "solution": "改为分组件单独构建，driver 只执行 make 编译生成 .ko 模块（跳过 nosva 系统安装步骤），其余用户态组件（uadk/engine/zlib/gzip/zstd/lz4/snappy）各自单独构建成功",
-        "source": "KAEKernelDriver/KAEKernelDriver-OLK-5.10/Makefile:110 nosva 目标 -> dracut -f",
-        "timestamp": "2026-09-05T05:55:15"
+        "problem": "KAEZlib LargeCase 测试在无 KAE 硬件环境下超时（>5分钟未完成）；KAELz4 16 个异步测试和 KAEOpensslEngine 4 个 RSA 测试因 WD framework 未启用而失败",
+        "solution": "属环境限制：宿主机无 KAE 硬件加速引擎（HPRE/SEC/ZIP），UADK WD framework 无法初始化。测试框架本身正常工作，KAEZstd 全部 3 个测试通过，KAEZlib SmallCase 通过，KAELz4 14 个同步/参数校验测试通过。完整功能验证需在配备 KAE 硬件的鲲鹏服务器上执行",
+        "source": "uadk/test/sanity_test.sh + KAELz4/test/gtest/run.sh + KAEOpensslEngine/test/func_test/src/kaetest",
+        "timestamp": "2026-09-08T12:20:00"
       }
     ],
     "documentationGaps": [
       {
-        "body": "README 和 build.sh 均未提供统一的单元测试执行命令。build.sh 只有 all/driver/uadk/engine/zlib/gzip/zstd/lz4/snappy/cleanup/rpmpack 等构建命令，没有 test 子命令。各组件 test 目录下有 gtest 测试，但需要用户手动进入各目录编译执行，新手难以快速验证。",
-        "source": "README.md + build.sh + 各组件 test/ 目录",
-        "time": "2026-09-05T05:58:03",
-        "title": "README 未提供统一的 UT 执行命令"
+        "body": "docs/zh/quick_start.md 的依赖列表中未列出 autoconf、automake、pkg-config，但 UADK 的 autogen.sh 和 KAEOpensslEngine 的 autoreconf -i 均依赖这些工具。新开发者按照快速入门安装依赖后，构建 UADK 和 Engine 组件时会因缺少 autoreconf 而失败。",
+        "source": "docs/zh/quick_start.md 前提条件 + scripts/buildScript/build_uadk.sh autogen.sh + scripts/buildScript/build_engine.sh autoreconf",
+        "time": "2026-09-08T12:08:00",
+        "title": "快速入门未列出 autoconf/automake/pkg-config 依赖"
       },
       {
-        "body": "安装指南的依赖安装命令为 yum install -y make kernel-devel libtool numactl-devel openssl-devel lz4-devel libzstd-devel chrpath cmake libunwind-devel patch，但未提及 kmod（提供 depmod/lsmod/modprobe）和 dracut（重建 initramfs）依赖。build_driver.sh 的 make nosva 目标需要这两个工具，缺失会导致构建失败。",
-        "source": "docs/zh/installation_guide.md + docs/zh/quick_start.md 依赖安装章节 + KAEKernelDriver/KAEKernelDriver-OLK-5.10/Makefile",
-        "time": "2026-09-05T05:58:03",
-        "title": "安装指南未提及 kmod 和 dracut 依赖"
+        "body": "KAEKernelDriver 的 Makefile nosva 目标需要 depmod（来自 kmod 包）和 dracut 命令，但安装指南和快速入门均未提及这两个依赖。在容器环境或最小化安装的系统上构建驱动时会失败。",
+        "source": "KAEKernelDriver/KAEKernelDriver-OLK-5.10/Makefile nosva 目标 + docs/zh/installation_guide.md",
+        "time": "2026-09-08T12:11:00",
+        "title": "构建驱动未提及 kmod 和 dracut 依赖"
       },
       {
-        "body": "README 和快速入门文档未明确说明在无 KAE 硬件设备（HPRE/SEC/ZIP）的情况下，KAEZlib/KAEZstd/KAELz4/KAESnappy/KAEGzip 等压缩库和工具会自动回退到软件模式。这对在非鲲鹏硬件或无 License 环境下进行功能验证的开发者很重要。",
-        "source": "README.md + docs/zh/quick_start.md",
-        "time": "2026-09-05T05:58:03",
-        "title": "README 未说明无 KAE 硬件时的软件回退行为"
+        "body": "KAEZstd/test/gtest/CMakeLists.txt.in 使用 ExternalProject_Add 从 GitHub (https://github.com/google/googletest.git) 下载 GoogleTest，在国内网络环境下 git clone 经常超时。KAELz4 的 download.sh 已提供 Gitee 镜像回退，但 KAEZstd 未提供。建议统一使用 Gitee 镜像或本地缓存。",
+        "source": "KAEZstd/test/gtest/CMakeLists.txt.in",
+        "time": "2026-09-08T12:20:00",
+        "title": "KAEZstd 测试 GoogleTest 下载使用 GitHub 源，国内网络易超时"
       },
       {
-        "body": "build.sh all 中的 make nosva 步骤（内核模块安装）调用 dracut -f 重建 initramfs，在容器环境中因无 /boot 目录而失败。文档未说明在容器中构建时的限制和替代方案（如分组件单独构建）。",
-        "source": "KAEKernelDriver/KAEKernelDriver-OLK-5.10/Makefile nosva 目标",
-        "time": "2026-09-05T05:58:03",
-        "title": "容器环境构建限制未说明"
+        "body": "安装指南中的 UT 章节（如 KAEZlib 压缩库测试、KAELz4 压缩库测试）未说明在无 KAE 硬件的环境下运行测试的预期行为。实际测试中，依赖硬件的测试用例会因 WD framework is not enabled 而失败，但部分测试（如 KAEZstd、参数校验类测试）可正常通过。建议在文档中注明哪些测试需要硬件支持。",
+        "source": "docs/zh/installation_guide.md 安装后测试章节",
+        "time": "2026-09-08T12:25:00",
+        "title": "安装指南未说明无 KAE 硬件时 UT 的预期行为"
       }
     ]
   },
