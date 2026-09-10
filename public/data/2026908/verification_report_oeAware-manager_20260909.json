@@ -1,0 +1,680 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md 软件架构章节",
+      "value": "支持 arm 和 X86（aarch64/x86_64），远程机器为 aarch64"
+    },
+    "build_commands": {
+      "source": "README.md 安装教程 + rpm/oeAware.spec %build + build.sh",
+      "value": "yum-builddep oeAware.spec 安装依赖后执行 bash build.sh（内部 mkdir build \u0026\u0026 cd build \u0026\u0026 cmake .. \u0026\u0026 make -j$(nproc)）；带 -t 参数构建单元测试"
+    },
+    "dependencies": {
+      "source": "rpm/oeAware.spec BuildRequires + build.sh 注释",
+      "value": [
+        "cmake",
+        "make",
+        "gcc-c++",
+        "curl-devel",
+        "yaml-cpp-devel",
+        "log4cplus-devel",
+        "gtest-devel",
+        "gmock-devel",
+        "libboundscheck",
+        "numactl-devel",
+        "git",
+        "libnl3",
+        "libnl3-devel",
+        "kernel-devel",
+        "libbpf-devel",
+        "clang",
+        "bpftool"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库根目录扫描结果",
+      "value": "无 Dockerfile"
+    },
+    "recommended_image": {
+      "source": "README.md + rpm/oeAware.spec + build.sh",
+      "value": "Tier 3 基础 OS 从零安装：仓库无 Dockerfile、无 .devcontainer、无业务预构建镜像，README 与 spec 全程使用 yum，目标 OS 为 openEuler，选用 hub.oepkgs.net/openeuler/openeuler:24.03-lts"
+    },
+    "special_dependencies": {
+      "source": "build.sh + rpm/oeAware.spec",
+      "value": [
+        "libkperf（aarch64 时 build.sh 从 https://atomgit.com/openeuler/libkperf.git clone v1.3.0 源码构建并安装到 /usr/include/libkperf 与 /usr/lib64）",
+        "kernel-devel（eBPF 与内核模块 smc_acc.ko 构建依赖，需匹配运行内核版本）"
+      ]
+    },
+    "ut_commands": {
+      "source": "build.sh (-t 选项) + tests/CMakeLists.txt + docs/dev_guide/dev_rule.md 8-2 节",
+      "value": "bash build.sh -t 开启 WITH_TEST=ON 构建 GTest 用例，产物在 build/output/tests/ 下（serialize_test/logger_test/safe_queue_test/pmu_count_test/utils_test/data_register_test/table_test/analysis_report_test/realtime_tune_test），逐个执行；tests/ci_test.sh 仅做头文件引用检查"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "其余 8 个测试均 set_target_properties RUNTIME_OUTPUT_DIRECTORY 到 output/tests/，唯独 pmu_count_test 未设置，导致其输出到默认 build/tests/，与文档描述的 build/output/tests/ 不一致",
+      "source": "tests/CMakeLists.txt",
+      "time": "2026-09-09T19:47:16",
+      "title": "tests/CMakeLists.txt 输出目录配置遗漏 pmu_count_test"
+    },
+    {
+      "body": "tests/ST/xcall/CMakeLists.txt target_include_directories 用 ${SDK_INC_PATH}=src/sdk，但 main.cpp #include \"oeaware/oe_client.h\"，而 src/sdk 下无 oeaware/ 子目录(头文件在 src/sdk/oe_client.h)，导致编译失败",
+      "source": "tests/ST/xcall/CMakeLists.txt + main.cpp",
+      "time": "2026-09-09T19:47:16",
+      "title": "ST/xcall 测试 include 路径配置错误"
+    },
+    {
+      "body": "analysis_report_test/test_sdk 链接 liboeaware-sdk.so 但未安装到系统库路径，运行需手动设置 LD_LIBRARY_PATH 指向 build/output/sdk，README/build.sh 未说明",
+      "source": "README.md + tests/CMakeLists.txt",
+      "time": "2026-09-09T19:47:16",
+      "title": "README 未说明构建测试需 LD_LIBRARY_PATH"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "git clone 仓库到本地阅读 README/Dockerfile/spec 等文档",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/openeuler/oeAware-manager.git /tmp/opencode/oeAware-manager",
+      "details": {
+        "branch": "master",
+        "local_path": "/tmp/opencode/oeAware-manager",
+        "repo": "oeAware-manager"
+      },
+      "duration_seconds": 8,
+      "error": "",
+      "output": "仓库克隆成功，根目录含 README.md、build.sh、CMakeLists.txt、install.sh、rpm/oeAware.spec、tests/、docs/ 等",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-09T19:24:24"
+    },
+    {
+      "action": "读取 README.md 提取构建依赖和命令",
+      "command": "cat README.md",
+      "details": {
+        "file": "README.md"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "oeAware 是 openEuler 低负载采集感知调优框架，支持 arm/X86；yum 安装或源码编译（yum-builddep oeAware.spec + bash build.sh）；运行 ./build/output/bin/oeaware etc/config.yaml",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-09T19:24:24"
+    },
+    {
+      "action": "扫描仓库是否存在 Dockerfile/.devcontainer/预构建镜像",
+      "command": "find . -name 'Dockerfile*' -o -name 'devcontainer*'",
+      "details": {
+        "reason": "无 Dockerfile、无 .devcontainer、README/spec 无 docker pull 业务镜像",
+        "tier": "Tier 3 基础 OS 从零安装"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "仅找到 rpm/oeAware.spec 与 docs/dev_guide/kylinV10SP3/oeAware-manager.spec，无任何 Dockerfile 或镜像引用",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-09T19:24:24"
+    },
+    {
+      "action": "读取 rpm/oeAware.spec 提取 BuildRequires 依赖清单",
+      "command": "cat rpm/oeAware.spec",
+      "details": {
+        "buildRequires": [
+          "cmake",
+          "make",
+          "gcc-c++",
+          "curl-devel",
+          "yaml-cpp-devel",
+          "log4cplus-devel",
+          "gtest-devel",
+          "gmock-devel",
+          "libboundscheck",
+          "numactl-devel",
+          "git",
+          "libnl3",
+          "libnl3-devel",
+          "kernel-devel",
+          "libbpf-devel",
+          "clang",
+          "bpftool"
+        ],
+        "file": "rpm/oeAware.spec"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "BuildRequires 列出 17 个构建依赖；Requires 含 yaml-cpp/curl/log4cplus/systemd/libboundscheck/acl/libnl3/sysstat",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-09-09T19:24:24"
+    },
+    {
+      "action": "读取 build.sh 理解构建流程与 libkperf 源码构建",
+      "command": "cat build.sh",
+      "details": {
+        "aarch64_build_kperf": true,
+        "file": "build.sh",
+        "libkperf_repo": "https://atomgit.com/openeuler/libkperf.git",
+        "libkperf_version": "v1.3.0"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "build.sh 创建 build 目录；aarch64 时 git clone libkperf v1.3.0 源码构建安装到 /usr/include/libkperf 与 /usr/lib64；cmake .. -DWITH_TEST 等选项 \u0026\u0026 make -j$(nproc)；-t 开启测试",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-09T19:24:24"
+    },
+    {
+      "action": "读取 tests/CMakeLists.txt 与 tests/ci_test.sh 理解 UT 执行方式",
+      "command": "cat tests/CMakeLists.txt tests/ci_test.sh",
+      "details": {
+        "framework": "GTest",
+        "ut_binaries": [
+          "serialize_test",
+          "logger_test",
+          "safe_queue_test",
+          "pmu_count_test",
+          "utils_test",
+          "data_register_test",
+          "table_test",
+          "analysis_report_test",
+          "realtime_tune_test"
+        ]
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "tests/CMakeLists.txt 用 find_package(GTest CONFIG REQUIRED) 定义 9 个测试可执行，输出到 build/output/tests/；ci_test.sh 仅检查头文件是否被 CMakeLists.txt 引用",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-09T19:24:24"
+    },
+    {
+      "action": "跟进 README 文档链接：docs/zh/master/oeaware_user_guide.md、docs/design/oeaware-设计文档.md、docs/example/、docs/dev_guide/dev_rule.md",
+      "command": "cat docs/zh/master/oeaware_user_guide.md docs/dev_guide/dev_rule.md",
+      "details": {
+        "docker_mentions": "用户指南中的 docker 仅为插件名(docker_collector/docker_tune)，非镜像来源",
+        "docs_read": [
+          "docs/zh/master/oeaware_user_guide.md",
+          "docs/design/oeaware-设计文档.md",
+          "docs/example/",
+          "docs/dev_guide/dev_rule.md",
+          "docs/dev_guide/multi_os_adapt.md"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "用户指南介绍插件功能与运行命令；dev_rule.md 第8节要求必须编写单元测试放 tests/ 目录；multi_os_adapt.md 介绍低版本 OS 适配。无镜像/容器构建来源",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-09T19:24:24"
+    },
+    {
+      "action": "NPU 需求判断：grep CANN/Ascend/torch_npu/davinci/910/昇腾",
+      "command": "grep -ri 'CANN|Ascend|torch_npu|npu|davinci|910|昇腾' README.md build.sh CMakeLists.txt rpm/oeAware.spec",
+      "details": {
+        "npu_required": false,
+        "reason": "README/spec/build.sh/CMakeLists 均无 CANN/NPU/Ascend 任何引用"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "无任何 NPU 相关引用，npu_required=false",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-09T19:24:24"
+    },
+    {
+      "action": "按三级优先级选择镜像",
+      "command": "docker pull hub.oepkgs.net/openeuler/openeuler:22.03-lts-sp4",
+      "details": {
+        "candidates": {
+          "tier1": "无(无预构建镜像/Dockerfile FROM/registry 链接)",
+          "tier2": "无(仓库无 Dockerfile)",
+          "tier3": "openEuler 基础镜像"
+        },
+        "chosen": "hub.oepkgs.net/openeuler/openeuler:22.03-lts-sp4",
+        "reason": "匹配宿主内核 5.10.0-216.0.0.115.oe2203sp4 以满足 smc_acc.ko 模块构建",
+        "tier": "Tier 3"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "Image is up to date for hub.oepkgs.net/openeuler/openeuler:22.03-lts-sp4",
+      "result": "Tier 3 基础 OS 从零安装",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-09-09T19:38:23"
+    },
+    {
+      "action": "SSH 远程 clone 仓库到 /home/workspace/oeAware-manager-verify",
+      "command": "ssh root@123.60.114.33 'git clone --depth 1 --branch master https://gitcode.com/openeuler/oeAware-manager.git /home/workspace/oeAware-manager-verify'",
+      "details": {
+        "branch": "master",
+        "remote_path": "/home/workspace/oeAware-manager-verify"
+      },
+      "duration_seconds": 6,
+      "error": "",
+      "output": "Cloning into ... ===CLONE OK=== CMakeLists.txt README.md build.sh ...",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-09-09T19:38:23"
+    },
+    {
+      "action": "启动容器 oeAware-manager-ttfhw (Tier 3, 无 NPU, 挂载 workspace)",
+      "command": "docker run -d --privileged --name oeAware-manager-ttfhw -v /home/workspace/oeAware-manager-verify:/workspace hub.oepkgs.net/openeuler/openeuler:22.03-lts-sp4 sleep infinity",
+      "details": {
+        "container_name": "oeAware-manager-ttfhw",
+        "image": "hub.oepkgs.net/openeuler/openeuler:22.03-lts-sp4",
+        "mount": "/home/workspace/oeAware-manager-verify:/workspace",
+        "npu_required": false,
+        "startup_command_source": "default"
+      },
+      "duration_seconds": 4,
+      "error": "",
+      "output": "容器运行中, openEuler 22.03 LTS-SP4, 内核 5.10.0-216.0.0.115.oe2203sp4.aarch64, 608 核",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-09-09T19:38:23"
+    },
+    {
+      "action": "容器内 dnf 安装 spec BuildRequires 全部构建依赖 + 匹配内核的 kernel-devel",
+      "command": "docker exec oeAware-manager-ttfhw dnf install -y gcc gcc-c++ make cmake git curl-devel yaml-cpp-devel log4cplus-devel gtest-devel gmock-devel libboundscheck numactl-devel libnl3 libnl3-devel libbpf-devel clang bpftool kernel-devel-$(uname -r)",
+      "details": {
+        "kernel_devel_match": true,
+        "packages": [
+          "gcc",
+          "gcc-c++",
+          "make",
+          "cmake",
+          "git",
+          "curl-devel→libcurl-devel",
+          "yaml-cpp-devel",
+          "log4cplus-devel",
+          "gtest-devel",
+          "gmock-devel",
+          "libboundscheck",
+          "numactl-devel",
+          "libnl3",
+          "libnl3-devel",
+          "libbpf-devel",
+          "clang",
+          "bpftool",
+          "kernel-devel-5.10.0-216.0.0.115.oe2203sp4"
+        ]
+      },
+      "duration_seconds": 480,
+      "error": "curl-devel 包名在 openEuler 不存在,映射为 libcurl-devel(已安装)",
+      "output": "gcc-10.3.1 cmake-3.22.0 kernel-devel-5.10.0-216.0.0.115.oe2203sp4 等已安装",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-09-09T19:38:23"
+    },
+    {
+      "action": "安装 curl-devel 缺失包(openEuler 映射为 libcurl-devel)",
+      "command": "docker exec oeAware-manager-ttfhw dnf install -y libcurl-devel",
+      "details": {
+        "mapped": "libcurl-devel",
+        "original": "curl-devel",
+        "version": "7.79.1-53.oe2203sp4"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "libcurl-devel-7.79.1-53.oe2203sp4.aarch64 is already installed",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-09-09T19:38:23"
+    },
+    {
+      "action": "验证全部 17 个构建依赖已安装且 kernel-devel 匹配运行内核",
+      "command": "docker exec oeAware-manager-ttfhw 'for p in gcc gcc-c++ make cmake git curl-devel ...; do rpm -q $p; done; ls -ld /lib/modules/$(uname -r)/build'",
+      "details": {
+        "kdir": "/lib/modules/5.10.0-216.0.0.115.oe2203sp4.aarch64/build -\u003e /usr/src/kernels/...",
+        "kernel_devel": "5.10.0-216.0.0.115.oe2203sp4 == uname -r",
+        "missing": [],
+        "verified_count": 17
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "全部 OK(仅 curl-devel 映射为 libcurl-devel), KDIR 软链存在",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-09-09T19:38:23"
+    },
+    {
+      "action": "执行仓库 build.sh 构建（aarch64 含 libkperf 源码构建），并发约束为 30%=182",
+      "command": "docker exec oeAware-manager-ttfhw bash -c 'cd /workspace \u0026\u0026 PATH=/tmp/nproc_wrap:$PATH bash build.sh'",
+      "details": {
+        "concurrency": 182,
+        "enable_ebpf": "ON",
+        "libkperf": "git clone v1.3.0 源码构建安装",
+        "nproc_wrapper": "PATH 注入 nproc=182",
+        "script": "build.sh",
+        "with_test": "OFF"
+      },
+      "duration_seconds": 127,
+      "error": "",
+      "output": "[100%] Built target oeaware / oeawarectl；仅 -Wunused-parameter 警告无错误",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-09-09T19:42:06"
+    },
+    {
+      "action": "验证构建产物（bin/sdk/plugin/ko/libkperf）",
+      "command": "ls -lh build/output/{bin,sdk,plugin/lib,plugin/ko} build/libkperf/output/lib /usr/lib64/libkperf.so",
+      "details": {
+        "binaries": [
+          "oeaware 14M",
+          "oeawarectl 8.2M"
+        ],
+        "kernel_module": "smc_acc.ko 615K",
+        "libkperf": "libkperf.so+libsym.so 已安装 /usr/lib64",
+        "plugins": 8,
+        "sdk": "liboeaware-sdk.so 3.9M"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "全部产物存在",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-09-09T19:42:06"
+    },
+    {
+      "action": "用 build.sh -t 重新构建(WITH_TEST=ON)生成 GTest 用例",
+      "command": "docker exec oeAware-manager-ttfhw bash -c 'cd /workspace \u0026\u0026 rm -rf build \u0026\u0026 PATH=/tmp/nproc_wrap:$PATH bash build.sh -t'",
+      "details": {
+        "st_xcall_compile_error": "oeaware/oe_client.h 找不到(include 路径 bug)",
+        "test_binaries_built": 9,
+        "with_test": "ON"
+      },
+      "duration_seconds": 112,
+      "error": "tests/ST/xcall/main.cpp: fatal error: oeaware/oe_client.h: No such file or directory",
+      "output": "9 个单测全部编译成功(pm_count_test 输出到 build/tests/，其余到 output/tests/)；ST/xcall 编译失败",
+      "result": "部分成功",
+      "returncode": 2,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-09-09T19:47:16"
+    },
+    {
+      "action": "执行 9 个单元测试可执行文件",
+      "command": "for t in output/tests/*_test tests/pmu_count_test; do $t; done",
+      "details": {
+        "analysis_report_test": "1/1",
+        "data_register_test": "2/2",
+        "logger_test": "1/1",
+        "pmu_count_test": "1/1",
+        "realtime_tune_test": "11/11",
+        "safe_queue_test": "3/3",
+        "serialize_test": "5/5",
+        "table_test": "1/1",
+        "total": "33 passed / 1 failed",
+        "utils_test": "8/9(1 失败)"
+      },
+      "duration_seconds": 95,
+      "error": "",
+      "output": "33 通过 1 失败(UtilsTest.ServiceControlTest)",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-09-09T19:47:16"
+    },
+    {
+      "action": "analysis_report_test 与 test_sdk 运行报缺 liboeaware-sdk.so，设置 LD_LIBRARY_PATH 重跑",
+      "command": "export LD_LIBRARY_PATH=/workspace/build/output/sdk \u0026\u0026 output/tests/analysis_report_test \u0026\u0026 output/tests/test_sdk",
+      "details": {
+        "fix": "export LD_LIBRARY_PATH=/workspace/build/output/sdk",
+        "missing_lib": "liboeaware-sdk.so"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "analysis_report_test 1/1 通过；test_sdk 为交互式 CLI 工具打印 options 后退出(RC=0)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-09-09T19:47:16"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "oeaware",
+          "path": "build/output/bin/oeaware",
+          "size": "14M",
+          "type": "binary"
+        },
+        {
+          "name": "oeawarectl",
+          "path": "build/output/bin/oeawarectl",
+          "size": "8.2M",
+          "type": "binary"
+        },
+        {
+          "name": "liboeaware-sdk.so",
+          "path": "build/output/sdk/liboeaware-sdk.so",
+          "size": "3.9M",
+          "type": "library"
+        },
+        {
+          "name": "libanalysis_oeaware.so",
+          "path": "build/output/plugin/lib/libanalysis_oeaware.so",
+          "size": "9.5M",
+          "type": "library"
+        },
+        {
+          "name": "libdocker_collector.so",
+          "path": "build/output/plugin/lib/libdocker_collector.so",
+          "size": "1.1M",
+          "type": "library"
+        },
+        {
+          "name": "libdocker_tune.so",
+          "path": "build/output/plugin/lib/libdocker_tune.so",
+          "size": "8.7M",
+          "type": "library"
+        },
+        {
+          "name": "libpmu.so",
+          "path": "build/output/plugin/lib/libpmu.so",
+          "size": "1.9M",
+          "type": "library"
+        },
+        {
+          "name": "libsystem_collector.so",
+          "path": "build/output/plugin/lib/libsystem_collector.so",
+          "size": "8.8M",
+          "type": "library"
+        },
+        {
+          "name": "libsystem_tune.so",
+          "path": "build/output/plugin/lib/libsystem_tune.so",
+          "size": "14M",
+          "type": "library"
+        },
+        {
+          "name": "libthread_scenario.so",
+          "path": "build/output/plugin/lib/libthread_scenario.so",
+          "size": "645K",
+          "type": "library"
+        },
+        {
+          "name": "libub_tune.so",
+          "path": "build/output/plugin/lib/libub_tune.so",
+          "size": "686K",
+          "type": "library"
+        },
+        {
+          "name": "smc_acc.ko",
+          "path": "build/output/plugin/ko/smc_acc.ko",
+          "size": "615K",
+          "type": "kernel_module"
+        },
+        {
+          "name": "libkperf.so",
+          "path": "build/libkperf/output/lib/libkperf.so",
+          "size": "515K",
+          "type": "library"
+        },
+        {
+          "name": "libsym.so",
+          "path": "build/libkperf/output/lib/libsym.so",
+          "size": "387K",
+          "type": "library"
+        }
+      ],
+      "cmake": "cmake 3.22.0, -DWITH_TEST=OFF -DWITH_DEBUG=OFF -DWITH_ASAN=OFF -DENABLE_EBPF=ON -DWITH_REALTIME=OFF",
+      "compiler": "gcc/g++ 10.3.1 (gcc-10.3.1-71.oe2203sp4.aarch64)",
+      "concurrency": 182,
+      "concurrency_ratio": "30% (容器 608 核 × 0.3 = 182，通过 PATH 注入 nproc=182 包装器约束 make -j)",
+      "duration_seconds": 127,
+      "notes": "build.sh 原样执行：aarch64 时先 git clone libkperf v1.3.0 源码构建安装到 /usr/include/libkperf 与 /usr/lib64，再 cmake + make。仅有 -Wunused-parameter 等警告，无错误。smc_acc.ko 内核模块成功构建(kernel-devel 匹配 5.10.0-216.0.0.115.oe2203sp4)",
+      "status": "success"
+    },
+    "ut": {
+      "cpp": {
+        "failed": 1,
+        "note": "9 个 GTest 单元测试全部编译并执行；1 个失败因容器无 systemd(PID 1) 致 systemctl 不可用；test_sdk(ST) 为交互式 CLI 工具非单测；ST/xcall 因 include 路径 bug 未编译（见 problems_encountered）",
+        "passed": 33,
+        "status": "partial_success",
+        "total": 34
+      },
+      "duration_seconds": 95,
+      "failed": 1,
+      "failures": [
+        {
+          "error": "容器未以 systemd 为 PID 1 启动，systemctl 报 'System has not been booted with systemd as init system (PID 1). Can't operate.'，断言 ret==true 失败。属环境限制非代码缺陷",
+          "test_name": "UtilsTest.ServiceControlTest"
+        }
+      ],
+      "passed": 33,
+      "skipped": 0,
+      "status": "partial_success",
+      "total": 34
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "oeAware-manager-ttfhw",
+      "cpu_cores": 608,
+      "memory": "1.0Ti",
+      "os": "openEuler 22.03 LTS-SP4"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 608,
+      "cpu_model": "Kunpeng 920 72F8",
+      "disk": "492G (143G 可用)",
+      "docker_version": "18.09.0",
+      "memory": "1.0Ti",
+      "npu": {
+        "available": false,
+        "card_count": 0,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "CMakeLists.txt 通过 rpm -q kernel-devel 获取 KERNEL_VERSION，用于 eBPF 与 smc_acc.ko 模块构建(KDIR=/lib/modules/${KERNEL_VERSION}/build)",
+        "from_dockerfile": "无 Dockerfile",
+        "from_readme": "README 指定 yum-builddep oeAware.spec 安装依赖 + bash build.sh 编译",
+        "mappings": [
+          {
+            "original": "curl-devel",
+            "source": "rpm/oeAware.spec BuildRequires → openEuler 22.03 包名为 libcurl-devel",
+            "target": "libcurl-devel"
+          }
+        ]
+      },
+      "image_name": "hub.oepkgs.net/openeuler/openeuler:22.03-lts-sp4",
+      "selection_reason": "Tier 3 基础 OS 从零安装：仓库无 Dockerfile/预构建镜像，README 与 spec 全程使用 yum 目标 openEuler。选用 22.03-lts-sp4 而非 24.03-lts 默认值，因 build.sh 构建 smc_acc.ko 内核模块需 kernel-devel 匹配运行内核(5.10.0-216.0.0.115.oe2203sp4)，22.03 SP4 镜像可安装匹配版本",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "",
+    "duration_seconds": 1536,
+    "end_time": "2026-09-09T19:47:46",
+    "environment": "远程 openEuler 22.03 LTS-SP4 aarch64 容器(608核/1.0Ti/492G)，Tier 3 基础 OS 从零安装",
+    "repo_url": "https://gitcode.com/openeuler/oeAware-manager.git",
+    "start_time": "2026-09-09T19:22:10",
+    "total_steps": 19,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "dnf install curl-devel 失败，openEuler 22.03 无此包名",
+      "solution": "spec 中 curl-devel 在 openEuler 映射为 libcurl-devel（已随依赖安装 7.79.1-53），提供 /usr/include/curl/curl.h",
+      "source": "rpm/oeAware.spec BuildRequires + openEuler 包名差异",
+      "timestamp": "2026-09-09T19:47:16"
+    },
+    {
+      "problem": "build.sh 构建 smc_acc.ko 内核模块需 kernel-devel 匹配运行内核(5.10.0-216.0.0.115.oe2203sp4)，若用 24.03 默认镜像则 kernel-devel 为 6.6.x 不匹配",
+      "solution": "改用 openEuler 22.03-lts-sp4 镜像(匹配宿主内核)，安装 kernel-devel-5.10.0-216.0.0.115.oe2203sp4，KDIR 软链正常",
+      "source": "build.sh + src/plugin/tune/system/network/smc_tune/kprobe/CMakeLists.txt",
+      "timestamp": "2026-09-09T19:47:16"
+    },
+    {
+      "problem": "analysis_report_test 与 test_sdk 运行时报 liboeaware-sdk.so 找不到",
+      "solution": "export LD_LIBRARY_PATH=/workspace/build/output/sdk 指向构建产物 sdk 目录后正常运行",
+      "source": "tests/CMakeLists.txt 链接 liboeaware-sdk.so 但未安装到系统库路径",
+      "timestamp": "2026-09-09T19:47:16"
+    },
+    {
+      "problem": "pmu_count_test 构建成功但未出现在 build/output/tests/ 目录",
+      "solution": "tests/CMakeLists.txt 对其余 8 个测试设置了 RUNTIME_OUTPUT_DIRECTORY 但遗漏 pmu_count_test，故其输出到默认 build/tests/，从该路径执行",
+      "source": "tests/CMakeLists.txt",
+      "timestamp": "2026-09-09T19:47:16"
+    },
+    {
+      "problem": "tests/ST/xcall/main.cpp 编译报 fatal error: oeaware/oe_client.h: No such file or directory",
+      "solution": "SDK_INC_PATH=src/sdk 但 main.cpp 包含 oeaware/oe_client.h，而头文件实际在 src/sdk/oe_client.h(无 oeaware/ 子目录)；属仓库 include 路径配置 bug，未改源码，记录为文档缺陷，其余单测正常执行",
+      "source": "tests/ST/xcall/CMakeLists.txt + main.cpp",
+      "timestamp": "2026-09-09T19:47:16"
+    },
+    {
+      "problem": "UtilsTest.ServiceControlTest 失败：systemctl 报 'System has not been booted with systemd as init system (PID 1). Can't operate.'",
+      "solution": "容器以 sleep infinity 启动无 systemd，该测试依赖 systemctl 控制 service 属环境限制非代码缺陷；其余 33 个用例全部通过",
+      "source": "tests/utils_test.cpp:81-86",
+      "timestamp": "2026-09-09T19:47:16"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "火山AI网关/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

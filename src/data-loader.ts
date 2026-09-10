@@ -58,6 +58,9 @@ const REPO_COMMUNITY_MAP: Record<string, string> = {
   'flash-engram': 'BoostKit', 'hyperscan': 'BoostKit', 'kvecturbo': 'BoostKit',
   'lmcache': 'BoostKit', 'numpy': 'BoostKit', 'omnioperator': 'BoostKit',
   'rapidjson': 'BoostKit', 'sonic': 'BoostKit', 'sonic-cpp': 'BoostKit',
+  'cache-tuner': 'openEuler', 'eagle': 'openEuler', 'euler-copilot-shell': 'openEuler',
+  'heolleo': 'openEuler', 'oeaware-manager': 'openEuler', 'oedeploy': 'openEuler',
+  'oedevplugin': 'openEuler', 'powerapi': 'openEuler',
 }
 
 const REPO_NAME_NORMALIZE: Record<string, string> = {
