@@ -800,76 +800,43 @@
   {
     "name": "memcache",
     "displayName": "memcache",
-    "result": "partial_success",
+    "result": "success",
     "buildStatus": "success",
     "utStatus": "success",
-    "sampleStatus": "partial_success",
-    "totalDuration": 6572,
-    "environmentDuration": 5803,
-    "buildDuration": 360,
-    "utDuration": 319,
-    "sampleDuration": 90,
-    "testPassed": 492,
+    "sampleStatus": "unknown",
+    "totalDuration": 1756,
+    "environmentDuration": 1193,
+    "buildDuration": 267,
+    "utDuration": 296,
+    "testPassed": 562,
     "testFailed": 0,
-    "testTotal": 494,
-    "testSkipped": 2,
-    "generatedAt": "2026-09-04T23:08:49",
+    "testTotal": 564,
+    "generatedAt": "2026-09-11T16:16:16",
     "environment": "unknown",
     "url": "https://gitcode.com/Ascend/memcache.git",
     "category": "UBSCore",
-    "hasStaticAnalysis": true,
-    "hasDevcontainer": true,
-    "file": "verification_report_memcache_20260904.json",
+    "hasStaticAnalysis": false,
+    "file": "verification_report_memcache_20260911.json",
     "issues": [
       {
-        "problem": "Ubuntu apt 下载极慢（aliyun 镜像仅 0.4MB/s，tsinghua 镜像对 libtool/patchelf/lcov 的 perl 依赖返回 403 Forbidden）",
-        "solution": "将 apt 源切换为 USTC 镜像（mirrors.ustc.edu.cn/ubuntu-ports），下载稳定且速度正常；pip 源使用阿里云 PyPI 镜像",
-        "source": "容器内 apt-get install 阶段",
-        "timestamp": "2026-09-05T00:57:58"
-      },
-      {
-        "problem": "run 包 install.sh precheck 调用 pip3 install --break-system-packages（pip 22.0.2 不支持该选项），导致安装中断、latest 软链与 set_env.sh 未生成",
-        "solution": "手动创建 latest→1.3.0 软链并按 install.sh 模板生成 set_env.sh，补全 run 包安装",
-        "source": "script/run_pkg_maker/install.sh install_wheel_package 函数",
-        "timestamp": "2026-09-05T00:57:58"
-      },
-      {
-        "problem": "C++ 样例运行时 LocalService 连接 MetaService config_store 时崩溃（AccLink acc_tcp_server_default.cpp:489 Assert parser != nullptr），host_rdma 与 host_shm 两种协议均复现",
-        "solution": "未解决。MetaService 正常运行（端口 5000/6000/8000 可达），崩溃发生在 LocalService TCP 握手 parser 初始化阶段，疑似 CANN/NPU 运行时环境兼容性问题或 device 选择（样例自动选 device 7）与实际挂载卡不匹配。已记录为运行时环境问题。",
-        "source": "example/cpp/memcache_cpp_test 运行 + /var/log/memcache_hybrid/logs/mmc-meta.log",
-        "timestamp": "2026-09-05T00:57:58"
+        "timestamp": "2026-09-11T16:25:00",
+        "problem": "容器首次启动失败：挂载宿主机 /usr/local/Ascend/ascend-toolkit 覆盖了镜像自带的 CANN toolkit，导致镜像 entrypoint 中 source set_env.sh 找不到文件，容器立即退出（exit code 1）",
+        "solution": "移除 ascend-toolkit 的 bind mount，仅保留 driver/firmware/npu-smi 等驱动层挂载，CANN toolkit 使用镜像自带的版本，容器正常启动",
+        "source": ".devcontainer/Dockerfile entrypoint + devcontainer.json mounts"
       }
     ],
     "documentationGaps": [
       {
-        "body": "docs/zh/install_run.md 环境准备章节要求 python 3.11.10，但 Ubuntu 22.04 LTS 官方 apt 仓库仅提供 python3 3.10.12。文档未说明是否必须 3.11，也未提供从源码或 PPA 安装 3.11 的指引。本次验证使用 3.10.12 构建成功（wheel 标记 cp310），但新手可能因版本差异困惑。",
-        "source": "docs/zh/install_run.md 环境准备章节",
-        "time": "2026-09-05T00:57:58",
-        "title": "install_run.md 推荐 Python 3.11.10 但未说明 Ubuntu 22.04 apt 仅提供 3.10"
+        "time": "2026-09-11T16:20:00",
+        "title": "Dockerfile FROM 与 devcontainer_quickstart.md 镜像 tag 不一致",
+        "body": ".devcontainer/Dockerfile 的 FROM 指令使用 quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1（A2 tag），但 docs/zh/devcontainer_quickstart.md 指明 A3 环境应使用 v0.20.2rc1-a3 tag。A3 环境用户直接按 Dockerfile FROM 拉取镜像可能遇到兼容性问题，需阅读 quickstart 才能发现正确的 A3 tag。",
+        "source": ".devcontainer/Dockerfile 第39行 + docs/zh/devcontainer_quickstart.md 第60-62行"
       },
       {
-        "body": "example/python 的样例（test_mmc_start_meta_service_and_simple_test.py）import acl（CANN ACL Python 绑定）且经 memfabric_hybrid PyPI 包间接依赖 torch/torch_npu。install_run.md 与样例 README 仅要求安装 CANN 与 memcache/memfabric run 包，未提及 torch/acl Python 包的安装方法，导致在从零构建的 Ubuntu 环境中样例无法执行。",
-        "source": "example/python/README.md + docs/zh/install_run.md",
-        "time": "2026-09-05T00:57:58",
-        "title": "Python 样例依赖 torch 与 acl 但 install_run.md 未列为前置依赖"
-      },
-      {
-        "body": "script/run_pkg_maker/install.sh 的 install_wheel_package 函数调用 pip3 install --break-system-packages，该选项仅 pip 23.0+ 支持。Ubuntu 22.04 默认 pip 为 22.0.2，导致 run 包安装 precheck 失败、latest 软链与 set_env.sh 未生成。文档未声明需要升级 pip 或提供绕过方式。",
-        "source": "script/run_pkg_maker/install.sh install_wheel_package 函数",
-        "time": "2026-09-05T00:57:58",
-        "title": "run 包 install.sh 使用 pip --break-system-packages 但未声明 pip 版本要求"
-      },
-      {
-        "body": "example/cpp/README.md 要求先安装 memfabric_hybrid run 包并 source set_env.sh，但本次验证中 memcache 构建已将 memfabric 作为子模块编译，C++ 样例编译需手动设置 MEMFABRIC_HYBRID_HOME_PATH 指向子模块源码目录才能找到头文件。文档未说明当 memfabric 作为子模块构建时如何设置该环境变量。",
-        "source": "example/cpp/README.md + example/cpp/CMakeLists.txt",
-        "time": "2026-09-05T00:57:58",
-        "title": "C++ 样例需独立安装 memfabric_hybrid run 包但 cpp README 未明确说明"
-      },
-      {
-        "body": ".devcontainer/Dockerfile FROM quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1（预构建含 CANN/NPU/PyTorch/vLLM 的镜像），而 install_run.md 描述的是 Ubuntu 22.04 从零构建。文档未说明两种构建路径的差异与适用场景，新手可能混淆 devcontainer 预构建环境与 install_run.md 的原生构建流程。",
-        "source": ".devcontainer/Dockerfile FROM 指令 + docs/zh/install_run.md",
-        "time": "2026-09-05T00:57:58",
-        "title": ".devcontainer/Dockerfile FROM 使用预构建 Ascend 镜像，与 install_run.md 的从零构建说明不一致"
+        "time": "2026-09-11T16:22:00",
+        "title": "AGENTS.md 未提及 dos2unix/lcov/bc 为 UT 必需依赖",
+        "body": "AGENTS.md 的产物与依赖章节列出 CMake/gcc/Python/pybind11 等构建依赖，但未提及 run_ut.sh 脚本依赖 dos2unix（转换 mockcpp 行尾）、lcov（覆盖率报告）和 bc（浮点运算）。Tier 1 镜像未预装这三个工具，需手动安装。",
+        "source": "AGENTS.md 产物与依赖章节 + script/run_ut.sh + script/build.sh"
       }
     ]
   },
