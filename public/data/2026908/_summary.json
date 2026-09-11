@@ -982,64 +982,58 @@
     ]
   },
   {
-    "name": "Mindspeed",
+    "name": "MindSpeed",
     "displayName": "MindSpeed",
     "result": "partial_success",
     "buildStatus": "success",
     "utStatus": "partial_success",
     "sampleStatus": "unknown",
-    "totalDuration": 4847,
-    "environmentDuration": 4460,
-    "buildDuration": 60,
-    "utDuration": 327,
-    "testPassed": 274,
-    "testFailed": 2,
-    "testTotal": 276,
-    "testSkipped": 91,
-    "generatedAt": "2026-09-07T12:30:19",
+    "totalDuration": 1073,
+    "environmentDuration": 561,
+    "buildDuration": 84,
+    "utDuration": 428,
+    "testPassed": 340,
+    "testFailed": 1,
+    "testTotal": 931,
+    "testSkipped": 590,
+    "generatedAt": "2026-09-10T20:38:14",
     "environment": "unknown",
     "url": "https://gitcode.com/Ascend/MindSpeed.git",
     "category": "MindSpeed",
     "hasStaticAnalysis": false,
-    "file": "verification_report_Mindspeed_20260907.json",
+    "file": "verification_report_MindSpeed_20260910.json",
     "issues": [
       {
-        "problem": "镜像预装的 mindspeed 在 /MindSpeed，PYTHONPATH 含 /MindSpeed 遮蔽了 editable 安装的 /workspace(master)，导致 import mindspeed 加载旧版 26.0.0 而非 master",
-        "solution": "卸载旧版后 editable 安装注册了 __editable__.mindspeed-0.12.1.pth finder，但被 PYTHONPATH 遮蔽；修正方式：export PYTHONPATH=/workspace:${PYTHONPATH//\\/MindSpeed/}（prepend /workspace 并移除 /MindSpeed，保留 CANN 路径），验证 import mindspeed.__file__=/workspace/mindspeed/__init__.py",
-        "source": "步骤3 构建 + 步骤4 UT",
-        "timestamp": "2026-09-07T12:30:19"
+        "timestamp": "2026-09-10T20:45:01",
+        "problem": "pip install -e /workspace 安装 master 版后, import mindspeed 仍指向 /MindSpeed/mindspeed (镜像预装的 v26.1.0 版本), 因 /MindSpeed 在 sys.path 中优先于 editable finder",
+        "solution": "删除 /MindSpeed/mindspeed 目录和 egg-info, 使 Python editable finder 映射到 /workspace/mindspeed 生效",
+        "source": "容器内 sys.path 检查: /MindSpeed 在 PYTHONPATH/egg-link 中残留"
       },
       {
-        "problem": "UT 首轮 16 个收集错误：15 个 triton 测试 No module named 'triton' + 1 swap_attention No module named 'acl'",
-        "solution": "swap_attention 的 acl 错误根因是 UT 脚本 PYTHONPATH=/workspace:/Megatron-LM 覆盖了镜像 CANN python 路径，改为 /workspace:${PYTHONPATH//\\/MindSpeed/} 保留 CANN 路径后修复；triton 测试按 tests_extend/README.md 标记为 slow 默认跳过，triton-ascend 安装卡死(7+分钟无进展)后改用 --ignore ops/triton 避免收集错误",
-        "source": "步骤4 UT",
-        "timestamp": "2026-09-07T13:51:06"
-      },
-      {
-        "problem": "test_compress_tensor 失败：RuntimeError: AclrtHostRegister failed（ACL 运行时主机内存注册失败）",
-        "solution": "根因为 NPU 驱动 25.5.0 与镜像 CANN 9.0.0 版本兼容性问题（AclrtHostRegister 是 ACL C API），非 MindSpeed 代码 bug；需升级驱动固件或使用 CANN 9.1.0 镜像(docker/Dockerfile 的 9.1.0-910b-openeuler24.03-py3.11)才可能解决，本验证环境未进一步处理",
-        "source": "步骤4 UT",
-        "timestamp": "2026-09-07T13:51:06"
-      },
-      {
-        "problem": "Pass 2 分布式测试 test_forward_backward_func_with_uneven_interleaving 超时 600s，HCCL 多进程(multiprocessing.forkserver)卡死，pytest-timeout 的 SIGALRM 无法中断 C++ HCCL 代码",
-        "solution": "pkill -9 终止卡死的 HCCL 进程(PASS2_RC=137)。根因为分布式 HCCL 初始化在多进程 forkserver 场景下挂起，属环境/分布式配置问题。单卡用例(Pass 1)全部正常，3 个分布式用例(含 pipeline_parallel schedules)通过。",
-        "source": "步骤4 UT",
-        "timestamp": "2026-09-07T13:51:06"
+        "timestamp": "2026-09-10T20:55:46",
+        "problem": "zarr 3.3.0 (镜像预装) 使用 numpy.dtypes.StringDType (numpy 2.0+ 属性), 与镜像预装的 numpy 1.26.0 不兼容, 导致 pytest 测试收集时 AttributeError: module 'numpy.dtypes' has no attribute 'StringDType'",
+        "solution": "降级 zarr 到 2.18.3 版本 (兼容 numpy 1.26.0): pip3 install zarr==2.18.3",
+        "source": "tests_extend/unit_tests 测试收集阶段, zarr 被 megatron-core dist_checkpointing 间接导入"
       }
     ],
     "documentationGaps": [
       {
-        "body": "install_guide.md 方式一引用 26.0.0_core_r0.12.1-910b-openeuler24.03-py3.11-aarch64（CANN 9.0.0），而 docker/OVERVIEW.zh.md 最新版本为 v26.1.0_core_r0.12.1-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11（CANN 9.1.0），且该最新 tag 在 registry 实际不存在(manifest not found)。README 版本配套表写 CANN 9.0.0/TorchNPU 26.0.0，但 .devcontainer/Dockerfile 用 CANN 9.0.1/torch 2.9.0，版本信息分散且不一致。",
-        "source": "README.md + install_guide.md + docker/OVERVIEW.zh.md + .devcontainer/Dockerfile",
-        "time": "2026-09-07T13:51:06",
-        "title": "install_guide.md 方式一镜像安装的镜像 tag 与 docker/OVERVIEW.zh.md 不一致"
+        "time": "2026-09-10T20:55:46",
+        "title": "README 版本配套表与 release_notes/install_guide 不一致",
+        "body": "README.md 版本配套表写 CANN 9.0.0/PyTorch 2.7.1/TorchNPU 26.0.0/Python3.10.x, 但 release_notes_core.md 显示 master 分支配套 Python3.12/PyTorch 2.10.0(在研版本), install_guide.md 推荐 CANN 9.1.0/TorchNPU 26.1.0 预构建镜像, 三处文档版本号不一致",
+        "source": "README.md 版本配套表 vs docs/zh/release_notes_core.md vs docs/zh/user-guide/install_guide.md"
       },
       {
-        "body": "tests_extend/unit_tests/ops/triton 下的测试 import triton，但 requirements.txt 未列 triton 依赖；ci/Dockerfile 通过 vllm-ascend 间接安装 triton-ascend，mindspeed-core 镜像未含。tests_extend/README.md 标注 triton 测试为 slow 默认跳过，但收集时仍因 import 失败报错，未说明需 --ignore 或预装 triton-ascend。",
-        "source": "tests_extend/README.md + requirements.txt + ci/Dockerfile",
-        "time": "2026-09-07T13:51:06",
-        "title": "triton 测试依赖未在 requirements.txt 或 CI 镜像说明中明确"
+        "time": "2026-09-10T20:55:46",
+        "title": "install_guide.md 镜像 tag (py3.12) 与 docker/OVERVIEW.zh.md (py3.11) 不一致",
+        "body": "install_guide.md 方式一镜像安装章节列出的 tag 为 py3.12 (如 v26.1.0_core_r0.12.1-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.12), 但 docker/OVERVIEW.zh.md 和 docker/support_tags.md 列出的 tag 为 py3.11. 实际拉取 py3.11 tag 返回 manifest not found, py3.12 tag 可用",
+        "source": "docs/zh/user-guide/install_guide.md vs docker/OVERVIEW.zh.md vs docker/support_tags.md"
+      },
+      {
+        "time": "2026-09-10T20:55:46",
+        "title": "CONTRIBUTING.md 未提供 UT 执行命令",
+        "body": "贡献指南说明了 UT 位置 (tests_extend/unit_tests) 和测试规范, 但未提供具体的 pytest 执行命令. UT 执行命令需从 ci/run_ci_ut.sh 脚本中提取, 新开发者可能不知道如何运行测试",
+        "source": "CONTRIBUTING.md 三、测试用例规范 vs ci/run_ci_ut.sh"
       }
     ]
   },
