@@ -63,7 +63,7 @@ const REPO_COMMUNITY_MAP = {
   'rapidjson': 'BoostKit', 'sonic': 'BoostKit', 'sonic-cpp': 'BoostKit',
   'cache-tuner': 'openEuler', 'eagle': 'openEuler', 'euler-copilot-shell': 'openEuler',
   'heolleo': 'openEuler', 'oeaware-manager': 'openEuler', 'oedeploy': 'openEuler',
-  'oedevplugin': 'openEuler', 'powerapi': 'openEuler',
+  'oedevplugin': 'openEuler', 'powerapi': 'openEuler', 'openeuler-jenkins': 'openEuler',
 }
 
 const REPO_NAME_NORMALIZE = {

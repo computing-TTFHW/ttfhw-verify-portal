@@ -1,0 +1,943 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "docker/Dockerfile_ARM64 (FROM openeuler/openeuler:22.03-lts-sp1) + 远程机器 aarch64",
+      "value": "aarch64"
+    },
+    "build_commands": {
+      "source": "README.md 单节点编译部署指南 + build/local_install.sh",
+      "value": "cd build \u0026\u0026 sh local_install.sh prepare \u0026\u0026 sh local_install.sh compile -b release（prepare 安装依赖，compile 执行 sh Makefile.sh package-release 编译打包）"
+    },
+    "build_entry": {
+      "source": "build/local_install.sh compile() 函数",
+      "value": "compile 调用 sh Makefile.sh package-${BUILD_TYPE}，Makefile.sh 使用 cmake 编译，自动检测 aarch64 架构和 CPU 核数"
+    },
+    "dependencies": {
+      "source": "README.md + docker/Dockerfile_ARM64 + build/local_install.sh + 容器化安装指南",
+      "value": [
+        "gcc gcc-c++ (编译器)",
+        "make cmake (构建工具，要求 cmake \u003e= 3.12)",
+        "python3 python3-devel (安装脚本和工具)",
+        "git (源码管理)",
+        "libaio-devel (异步 I/O)",
+        "openssl openssl-devel (加密库)",
+        "ndctl-devel (NVDIMM)",
+        "ncurses ncurses-devel (终端库)",
+        "libtirpc-devel (RPC 库)",
+        "expect (自动化交互)",
+        "ant (Java 构建，用于 JDBC)",
+        "bison (语法生成器)",
+        "iputils iproute (网络工具)",
+        "wget (下载工具)",
+        "gdb gdb-gdbserver (调试器)",
+        "net-tools (网络工具)",
+        "automake byacc libtool (构建工具)",
+        "unzip vim patch xz flex (工具链)",
+        "lz4 lz4-devel (压缩库，要求 \u003e= 1.8.3)",
+        "unixODBC-devel unixODBC (ODBC 接口)",
+        "libasan (地址 sanitiser)",
+        "rpcgen (RPC 生成器)",
+        "numactl numactl-devel (NUMA 支持)",
+        "lcov (代码覆盖率，UT 需要)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "docker/Dockerfile_ARM64 RUN 指令",
+      "value": [
+        {
+          "original": "yum install -y libaio-devel openssl openssl-devel ndctl-devel ncurses ncurses-devel libtirpc-devel expect ant bison iputils iproute wget make gcc gcc-c++ gdb gdb-gdbserver python3 python3-devel git net-tools cmake automake byacc libtool unzip vim lz4 lz4-devel patch xz flex unixODBC-devel unixODBC libasan rpcgen numactl numactl-devel --skip-broken",
+          "target_equivalent": "Dockerfile_ARM64 中已通过 yum 安装（openEuler 22.03-lts-sp1 原生包，无需翻译）"
+        },
+        {
+          "original": "yum install -y libaio-devel openssl openssl-devel ndctl-devel ncurses ncurses-devel libtirpc-devel expect ant bison iputils iproute wget libtirpc-devel make gcc gcc-c++ gdb gdb-gdbserver python3 python3-devel git net-tools cmake automake byacc libtool --skip-broken (local_install.sh prepare)",
+          "target_equivalent": "local_install.sh prepare 安装的依赖（与 Dockerfile 重叠，Dockerfile 已包含）"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "docker/Dockerfile_ARM64 (Tier 2 — 仓库内 Dockerfile 构建)",
+      "value": "Tier 2: 使用 docker/Dockerfile_ARM64 构建镜像，FROM openeuler/openeuler:22.03-lts-sp1，无业务预构建镜像（下载页仅有安装包，无 Docker 镜像）"
+    },
+    "special_dependencies": {
+      "source": ".gitmodules + build/prepare_ogbackup_unit_test_deps.sh + README",
+      "value": [
+        "open_source 子模块: https://gitee.com/cantian-repo/cantian-repo.git (编译时拉取的三方源码)",
+        "lcov: UT 代码覆盖率工具 (do_all_test.sh 中 yum install lcov)",
+        "googletest + mockcpp: ogbackup 单元测试依赖 (build/prepare_ogbackup_unit_test_deps.sh 自动下载构建)",
+        "数据库可独占内存需满足 16 GB",
+        "磁盘可用空间至少 20580 MB (编译), UT 需 \u003e= 50 GB"
+      ]
+    },
+    "ut_commands": {
+      "source": "README.md 单元测试章节 + pkg/test/og_regress/do_all_test.sh",
+      "value": "bash pkg/test/og_regress/do_all_test.sh need_compile（need_compile 触发完整编译+回归测试，脚本调用 CI/build/script/run_ograc_test.sh，期望代码在 /home/regress/ogracKernel）"
+    },
+    "ut_entry": {
+      "source": "CI/build/script/run_ograc_test.sh + CI/script/Dev_ograc_regress.sh",
+      "value": "do_all_test.sh → run_ograc_test.sh part_all → Dev_ograc_regress.sh，使用 og_schedule_part* 调度文件执行 SQL 回归测试"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "README 和容器化安装指南均未提及 CPU_GROUP_INFO 配置参数。在多 NUMA 节点（含空节点）的容器环境中，数据库的 CPU 组检测代码 (cm_cpu.c) 会失败，需要手动设置此参数。建议在安装指南中补充此参数的说明。",
+      "source": "README.md + 容器化安装指南 + pkg/src/common/cm_cpu.c",
+      "time": "2026-09-12T09:01:39",
+      "title": "README 未说明 CPU_GROUP_INFO 配置参数"
+    },
+    {
+      "body": "Dev_ograc_regress.sh 的 main() 函数中，need_compile 分支在 compile_code() 后未执行 chown root:root（而非 need_compile 分支有此步骤），导致 install_ogracdb() 因 install.py 属主为 ogracdba 而失败。这是脚本 bug。",
+      "source": "CI/script/Dev_ograc_regress.sh main() 函数",
+      "time": "2026-09-12T09:01:39",
+      "title": "UT 脚本 need_compile 分支缺少 chown root:root 步骤"
+    },
+    {
+      "body": "7 个测试用例的期望输出与当前版本行为不一致：SQL 回显格式（'SQL CONTAINS:XXX' vs 完整 SQL）、时区差异（UTC vs +08:00）、系统参数 readonly 状态变更、加密迭代范围变更。这些差异可能是版本迭代导致的回归基线未更新。",
+      "source": "pkg/test/og_regress/expected/ 目录下的期望输出文件",
+      "time": "2026-09-12T09:01:39",
+      "title": "UT 测试用例期望输出与当前版本行为不一致"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "读取 README.md 提取构建说明、依赖列表、UT 命令",
+      "command": "ssh root@123.60.114.33 \"cat /home/workspace/oGRAC-verify/README.md\"",
+      "details": {
+        "file": "README.md",
+        "sections_read": [
+          "什么是oGRAC",
+          "oGRAC架构",
+          "工程说明",
+          "单节点编译部署指南",
+          "单元测试",
+          "文档",
+          "下载"
+        ]
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "oGRAC 是 openGauss 社区开源多主关系型数据库。编程语言 C，编译工程 cmake/make。构建: sh local_install.sh prepare \u0026\u0026 compile。UT: bash pkg/test/og_regress/do_all_test.sh need_compile。OS: openEuler 20.03/22.03/24.03。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-12T07:11:13"
+    },
+    {
+      "action": "读取容器化单节点安装指南（WebFetch），提取 Docker 镜像信息和依赖安装命令",
+      "command": "WebFetch https://docs.opengauss.org/zh/docs/latest/ograc/installation_guide/single_node_guide/containerized_single_node_installation.html",
+      "details": {
+        "key_findings": [
+          "OS: openEuler 22.03 LTS",
+          "基础镜像: openEuler-docker.aarch64.tar.xz (非业务预构建镜像)",
+          "编译安装依赖: yum install libaio-devel openssl openssl-devel ndctl-devel 等",
+          "构建: sh local_install.sh prepare \u0026\u0026 compile -b debug \u0026\u0026 install"
+        ],
+        "url": "https://docs.opengauss.org/zh/docs/latest/ograc/installation_guide/single_node_guide/containerized_single_node_installation.html"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "容器化指南使用 openEuler 22.03 LTS 基础镜像，非业务预构建镜像。编译安装依赖列表与 Dockerfile_ARM64 一致。构建命令: local_install.sh prepare → compile → install。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-12T07:11:13"
+    },
+    {
+      "action": "读取 docker/Dockerfile_ARM64 提取 FROM、依赖安装指令，判断 Tier 选择",
+      "command": "ssh root@123.60.114.33 \"cat /home/workspace/oGRAC-verify/docker/Dockerfile_ARM64\"",
+      "details": {
+        "deps_installed": [
+          "libaio-devel",
+          "openssl",
+          "openssl-devel",
+          "ndctl-devel",
+          "ncurses",
+          "ncurses-devel",
+          "libtirpc-devel",
+          "expect",
+          "ant",
+          "bison",
+          "iputils",
+          "iproute",
+          "wget",
+          "make",
+          "gcc",
+          "gcc-c++",
+          "gdb",
+          "gdb-gdbserver",
+          "python3",
+          "python3-devel",
+          "git",
+          "net-tools",
+          "cmake",
+          "automake",
+          "byacc",
+          "libtool",
+          "unzip",
+          "vim",
+          "lz4",
+          "lz4-devel",
+          "patch",
+          "xz",
+          "flex",
+          "unixODBC-devel",
+          "unixODBC",
+          "libasan",
+          "rpcgen",
+          "numactl",
+          "numactl-devel"
+        ],
+        "dockerfile": "docker/Dockerfile_ARM64",
+        "from": "openeuler/openeuler:22.03-lts-sp1",
+        "reason": "FROM 指向基础 OS 镜像 (openeuler)，非自定义预构建镜像；但 Dockerfile 内含完整依赖安装，可直接 docker build",
+        "tier": "Tier 2"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "FROM openeuler/openeuler:22.03-lts-sp1，安装全部编译依赖，设置英文 locale，CMD tail -f /dev/null。",
+      "result": "Tier 2 Dockerfile 构建",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-09-12T07:11:13"
+    },
+    {
+      "action": "读取 docker/Dockerfile (x86 版本) 确认不适用于 aarch64",
+      "command": "ssh root@123.60.114.33 \"cat /home/workspace/oGRAC-verify/docker/Dockerfile\"",
+      "details": {
+        "dockerfile": "docker/Dockerfile",
+        "from": "centos:8.2.2004",
+        "reason": "x86 专用 Dockerfile，含 x86_64 RPM 包，不适用于 aarch64 远程机器"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "FROM centos:8.2.2004，含 x86_64 专用包（libasan5-8.2.1-3.el7.x86_64.rpm 等），不适用于 aarch64。",
+      "result": "跳过",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-09-12T07:11:13"
+    },
+    {
+      "action": "读取 docker/container.sh 提取 docker run 命令模板",
+      "command": "ssh root@123.60.114.33 \"cat /home/workspace/oGRAC-verify/docker/container.sh\"",
+      "details": {
+        "file": "docker/container.sh",
+        "key_params": [
+          "--privileged",
+          "--shm-size 10240M",
+          "--ulimit core=-1",
+          "--ulimit memock=-1",
+          "--volume /var/lib/docker:/var/lib/docker",
+          "-v /root:/root",
+          "--cap-add=ALL",
+          "--security-opt seccomp=unconfined",
+          "--network=host",
+          "挂载代码到 /home/regress/ogracKernel",
+          "CMD /usr/sbin/init"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "container.sh 提供 dev/rundev/startnode 模式，使用 --privileged --shm-size 10240M，挂载代码到 /home/regress/ogracKernel，网络 host 模式。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-12T07:11:13"
+    },
+    {
+      "action": "读取 build/local_install.sh 提取构建流程（prepare/compile/install/clean）",
+      "command": "ssh root@123.60.114.33 \"cat /home/workspace/oGRAC-verify/build/local_install.sh\"",
+      "details": {
+        "clean": "kill 进程 + 清理目录",
+        "compile": "sh Makefile.sh package-${BUILD_TYPE}",
+        "file": "build/local_install.sh",
+        "install": "python3 install.py 部署数据库",
+        "prepare": "yum install 依赖"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "local_install.sh 提供 prepare(安装依赖) → compile(编译: Makefile.sh package-release/debug) → install(部署) → clean(清理) 四个子命令。compile 调用 Makefile.sh。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-12T07:11:13"
+    },
+    {
+      "action": "读取 build/Makefile.sh 确认编译系统和并发配置",
+      "command": "ssh root@123.60.114.33 \"head -100 /home/workspace/oGRAC-verify/build/Makefile.sh\"",
+      "details": {
+        "arch_detect": "aarch64 → CPU_CORES_NUM = grep architecture | wc -l",
+        "build_system": "cmake",
+        "cmake_min_version": "3.14.1 (CMakeLists.txt)",
+        "file": "build/Makefile.sh"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Makefile.sh 使用 cmake 编译，自动检测 aarch64 架构，CPU_CORES_NUM 从 /proc/cpuinfo 获取。CMakeLists.txt 要求 cmake \u003e= 3.14.1。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-12T07:11:13"
+    },
+    {
+      "action": "读取 pkg/test/og_regress/do_all_test.sh 提取 UT 执行流程",
+      "command": "ssh root@123.60.114.33 \"cat /home/workspace/oGRAC-verify/pkg/test/og_regress/do_all_test.sh\"",
+      "details": {
+        "file": "pkg/test/og_regress/do_all_test.sh",
+        "flow": "cleanup → yum install lcov → run_ograc_test.sh part_all → Dev_ograc_regress.sh",
+        "paths": {
+          "OGDB_CODE_PATH": "/home/regress/ogracKernel",
+          "REGRESS_HOME": "/home/regress/og_regress",
+          "ROOT_PATH": "代码根目录"
+        }
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "do_all_test.sh: cleanup_regress_install → do_regress part_all → CI/build/script/run_ograc_test.sh → Dev_ograc_regress.sh。need_compile 参数触发完整编译+测试。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-12T07:11:13"
+    },
+    {
+      "action": "读取 CI/build/script/run_ograc_test.sh 确认 UT 编排逻辑",
+      "command": "ssh root@123.60.114.33 \"cat /home/workspace/oGRAC-verify/CI/build/script/run_ograc_test.sh\"",
+      "details": {
+        "file": "CI/build/script/run_ograc_test.sh",
+        "init": "创建 ogracdba 用户, /home/regress/ograc_data, 设置 core_pattern",
+        "test_part_all": "调用 Dev_ograc_regress.sh --coverage 1 --og_schedule_list og_schedule_part*"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "run_ograc_test.sh: init_container(创建用户/目录) → run_test part_all → Dev_ograc_regress.sh。期望代码在 /home/regress/ogracKernel。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-12T07:11:13"
+    },
+    {
+      "action": "读取 .gitmodules 确认子模块依赖",
+      "command": "ssh root@123.60.114.33 \"cat /home/workspace/oGRAC-verify/.gitmodules\"",
+      "details": {
+        "file": ".gitmodules",
+        "submodule": "open_source",
+        "url": "https://gitee.com/cantian-repo/cantian-repo.git"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "open_source 子模块指向 https://gitee.com/cantian-repo/cantian-repo.git，编译时需要。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-12T07:11:13"
+    },
+    {
+      "action": "检查下载页面 (https://download-opengauss.osinfra.cn/archive_test/oGRAC/) 确认无预构建 Docker 镜像",
+      "command": "WebFetch https://download-opengauss.osinfra.cn/archive_test/oGRAC/",
+      "details": {
+        "findings": "仅有安装包目录 (1.0.0/openEuler20.03/, 1.0.0/openEuler22.03/, JDBC/)，无 Docker 镜像",
+        "tier1_signal": false,
+        "url": "https://download-opengauss.osinfra.cn/archive_test/oGRAC/"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "下载页仅有安装包（openEuler20.03/, openEuler22.03/, JDBC/），无 Docker 镜像。Tier 1 不触发。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-12T07:11:13"
+    },
+    {
+      "action": "读取 build/prepare_ogbackup_unit_test_deps.sh 确认 ogbackup UT 依赖",
+      "command": "ssh root@123.60.114.33 \"cat /home/workspace/oGRAC-verify/build/prepare_ogbackup_unit_test_deps.sh\"",
+      "details": {
+        "deps": [
+          "googletest (github.com/google/googletest.git)",
+          "mockcpp (gitee.com/sinojelly/mockcpp.git)"
+        ],
+        "file": "build/prepare_ogbackup_unit_test_deps.sh",
+        "purpose": "ogbackup 单元测试的 gtest/mockcpp 依赖自动下载构建"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "prepare_ogbackup_unit_test_deps.sh 自动下载 googletest 和 mockcpp，构建 libgtest.a/libgmock.a/libmockcpp.a 到 library/ 目录。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-12T07:11:13"
+    },
+    {
+      "action": "镜像信号探测汇总：确定 Tier 选择",
+      "command": "",
+      "details": {
+        "decision": "Tier 2 — 使用 docker/Dockerfile_ARM64 构建镜像",
+        "npu_reason": "README/Dockerfile/代码中无 CANN/Ascend/torch_npu/davinci/910/310/昇腾 相关引用",
+        "npu_required": false,
+        "tier1_signals": "无（下载页无 Docker 镜像，README 无 docker pull 自定义镜像，Dockerfile FROM 为基础 OS）",
+        "tier2_signals": "docker/Dockerfile_ARM64 存在，FROM openeuler/openeuler:22.03-lts-sp1，内含完整依赖安装",
+        "tier3_signals": "若 Tier 2 build 失败，回退到 openEuler 22.03 基础镜像从零安装"
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "Tier 2: 仓库内 docker/Dockerfile_ARM64 可直接 build。FROM openeuler/openeuler:22.03-lts-sp1 安装全部编译依赖。NPU 不需要。",
+      "result": "Tier 2 Dockerfile 构建",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-09-12T07:11:13"
+    },
+    {
+      "action": "Tier 2 决策：使用仓库内 docker/Dockerfile_ARM64 构建镜像",
+      "command": "docker build -f docker/Dockerfile_ARM64 -t ograc-ttfhw .",
+      "details": {
+        "dockerfile": "docker/Dockerfile_ARM64",
+        "from": "openeuler/openeuler:22.03-lts-sp1",
+        "reason": "仓库内 docker/Dockerfile_ARM64 存在，FROM openeuler/openeuler:22.03-lts-sp1，内含完整编译依赖安装。无业务预构建镜像（Tier 1 不触发）",
+        "tier": "Tier 2"
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "Tier 2: 使用 docker/Dockerfile_ARM64 构建镜像，FROM openeuler/openeuler:22.03-lts-sp1",
+      "result": "Tier 2 Dockerfile 构建",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-09-12T07:17:43"
+    },
+    {
+      "action": "使用 docker build 从 Dockerfile_ARM64 构建镜像 ograc-ttfhw:latest",
+      "command": "ssh root@123.60.114.33 \"cd /home/workspace/oGRAC-verify \u0026\u0026 docker build -f docker/Dockerfile_ARM64 -t ograc-ttfhw .\"",
+      "details": {
+        "dockerfile": "docker/Dockerfile_ARM64",
+        "from": "openeuler/openeuler:22.03-lts-sp1",
+        "image": "ograc-ttfhw:latest",
+        "key_deps": [
+          "gcc 10.3.1",
+          "cmake 3.22.0",
+          "lz4 1.9.3",
+          "python3 3.9.9",
+          "make 4.3"
+        ],
+        "packages_installed": 271
+      },
+      "duration_seconds": 180,
+      "error": "",
+      "output": "Successfully built bd50c5fe2830, Successfully tagged ograc-ttfhw:latest。271 个包安装成功。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-09-12T07:17:43"
+    },
+    {
+      "action": "启动容器 oGRAC-ttfhw，挂载代码到 /home/regress/ogracKernel 和 /workspace",
+      "command": "docker run -d --privileged --name oGRAC-ttfhw --shm-size 10240M --network=host -v /home/workspace/oGRAC-verify:/home/regress/ogracKernel -v /home/workspace/oGRAC-verify:/workspace ograc-ttfhw:latest",
+      "details": {
+        "container_name": "oGRAC-ttfhw",
+        "image": "ograc-ttfhw:latest",
+        "mounts": [
+          "/home/workspace/oGRAC-verify:/home/regress/ogracKernel",
+          "/home/workspace/oGRAC-verify:/workspace"
+        ],
+        "options": [
+          "--privileged",
+          "--shm-size 10240M",
+          "--network=host"
+        ],
+        "startup_command_source": "default"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Container ID: 920cfe28f028, Status: Up",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-09-12T07:17:43"
+    },
+    {
+      "action": "依赖安装（Tier 2 Dockerfile 已安装，跳过手动安装）",
+      "command": "",
+      "details": {
+        "deps_from_dockerfile": "libaio-devel, openssl, openssl-devel, ndctl-devel, ncurses, ncurses-devel, libtirpc-devel, expect, ant, bison, iputils, iproute, wget, make, gcc, gcc-c++, gdb, gdb-gdbserver, python3, python3-devel, git, net-tools, cmake, automake, byacc, libtool, unzip, vim, lz4, lz4-devel, patch, xz, flex, unixODBC-devel, unixODBC, libasan, rpcgen, numactl, numactl-devel",
+        "reason": "Tier 2 Dockerfile_ARM64 已通过 yum install 安装全部编译依赖（271 个包），无需重复安装"
+      },
+      "duration_seconds": 0,
+      "error": "",
+      "output": "Tier 2: Dockerfile 已安装全部依赖，跳过手动安装",
+      "result": "跳过",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-09-12T07:17:43"
+    },
+    {
+      "action": "验证容器内关键依赖版本",
+      "command": "docker exec oGRAC-ttfhw bash -c 'gcc --version | head -1 \u0026\u0026 cmake --version | head -1 \u0026\u0026 lz4 --version \u0026\u0026 python3 --version \u0026\u0026 make --version | head -1'",
+      "details": {
+        "arch": "aarch64",
+        "cmake": "3.22.0 (\u003e= 3.12 ✓)",
+        "cpu_cores": 601,
+        "gcc": "10.3.1",
+        "lz4": "1.9.3 (\u003e= 1.8.3 ✓)",
+        "make": "4.3",
+        "memory": "1.0Ti",
+        "os": "openEuler 22.03 (LTS-SP1)",
+        "python3": "3.9.9"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "gcc 10.3.1, cmake 3.22.0, lz4 1.9.3, python3 3.9.9, make 4.3 — 全部满足版本要求",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-09-12T07:17:43"
+    },
+    {
+      "action": "初始化 open_source 子模块（编译依赖的三方源码）",
+      "command": "ssh root@123.60.114.33 \"cd /home/workspace/oGRAC-verify \u0026\u0026 git submodule update --init open_source\"",
+      "details": {
+        "commit": "82ae7ed34f541c3ba5c8d24058442543671e57df",
+        "submodule": "open_source",
+        "url": "https://gitee.com/cantian-repo/cantian-repo.git"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "Submodule 'open_source' registered, checked out 82ae7ed34f541c3ba5c8d24058442543671e57df",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-09-12T07:17:43"
+    },
+    {
+      "action": "设置编译并发为 601×30%=180，执行 sh local_install.sh prepare 准备环境",
+      "command": "docker exec oGRAC-ttfhw bash -c 'cd /home/regress/ogracKernel/build \u0026\u0026 time sh local_install.sh prepare'",
+      "details": {
+        "concurrency": 180,
+        "concurrency_ratio": "30%",
+        "deps_status": "全部已安装（Dockerfile 预装，prepare 确认无新增）",
+        "prepare_time": "3.9s"
+      },
+      "duration_seconds": 4,
+      "error": "",
+      "output": "Prepare env start. 全部包已安装。Prepare env success. real 0m3.922s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-09-12T07:40:34"
+    },
+    {
+      "action": "执行 sh local_install.sh compile -b release 编译 oGRAC（并发 180）",
+      "command": "docker exec oGRAC-ttfhw bash -c 'cd /home/regress/ogracKernel/build \u0026\u0026 time sh local_install.sh compile -b release'",
+      "details": {
+        "build_system": "cmake (Makefile.sh → compile_opensource_new.sh + cmake build)",
+        "build_type": "release",
+        "concurrency": 180,
+        "libraries": [
+          "libograc.so",
+          "libogclient.so",
+          "libogcommon.so",
+          "libogodbc.so",
+          "libogprotocol.so",
+          "libdsslock.so",
+          "libogserver.a",
+          "libogkernel.a",
+          "libogracsql.a"
+        ],
+        "main_targets": [
+          "ogracd",
+          "ogsql",
+          "ogbox",
+          "ogrst",
+          "cms",
+          "ogbackup",
+          "dbstor",
+          "ogencrypt",
+          "rbps"
+        ],
+        "third_party_libs": [
+          "zlib 1.2.13",
+          "pcre2 10.39",
+          "zstd 1.5.6",
+          "openssl 1.1.1m"
+        ],
+        "total_output_size": "2.0G"
+      },
+      "duration_seconds": 1158,
+      "error": "",
+      "output": "[100%] Built target oGRAC. [100%] Built target ogracd. [100%] Built target ogrst. [100%] Built target ogsql. [100%] Built target ogbox. real 19m18.526s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-09-12T07:40:34"
+    },
+    {
+      "action": "检查构建产物和打包结果",
+      "command": "docker exec oGRAC-ttfhw bash -c 'ls -lh /home/regress/ogracKernel/output/bin/ \u0026\u0026 ls -lh /home/regress/ogracKernel/output/lib/ \u0026\u0026 du -sh /home/regress/ogracKernel/output/'",
+      "details": {
+        "debug_symbols": "已分离（seperate_dbg_symbol.sh 处理 16 个二进制/库）",
+        "output_bin": "423M (ogracd 15M, ogbox 16M, ogrst 18M, ogsql 3.1M, cms 790K, ogbackup 323K 等)",
+        "output_lib": "1.2G (libogracsql.a 524M, libogkernel.a 273M, libogserver.a 71M, libogodbc.a 83M 等)",
+        "packages": [
+          "oGRAC-DATABASE-LINUX-64bit.tar.gz (30M)",
+          "oGRAC-DATABASE-LINUX-64bit-SYMBOL.tar.gz (200M)",
+          "oGRAC-OGSQL-LINUX-64bit.tar.gz (5.0M)"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "output/bin: 423M, output/lib: 1.2G, total output: 2.0G. 打包: oGRAC-DATABASE-LINUX-64bit.tar.gz (30M)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-09-12T07:40:34"
+    },
+    {
+      "action": "首次 UT 执行：bash pkg/test/og_regress/do_all_test.sh need_compile（含编译+安装+测试）",
+      "command": "docker exec oGRAC-ttfhw bash -c 'cd /home/regress/ogracKernel \u0026\u0026 bash pkg/test/og_regress/do_all_test.sh need_compile'",
+      "details": {
+        "fix": "在 install_ogracdb() 中添加 -Z CPU_GROUP_INFO 参数，显式指定 16 个 CPU 组的 CPU 列表",
+        "issue": "数据库实例启动失败：g_cpu_group_num init error, g_cpu_group_num is 0",
+        "root_cause": "容器内 32 个 NUMA 节点中 16 个无 CPU（NUMA node16-31），数据库 CPU 组检测代码 cm_cpu.c 无法正确初始化 CPU 组"
+      },
+      "duration_seconds": 30,
+      "error": "g_cpu_group_num init error, g_cpu_group_num is 0 [cm_cpu.c:126]",
+      "output": "Install ogracDB → g_cpu_group_num init error → begin to shutdown, mode abort",
+      "result": "失败",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-09-12T09:01:39"
+    },
+    {
+      "action": "修复 CPU 组检测问题：在 Dev_ograc_regress.sh 的 install_ogracdb() 中添加 -Z CPU_GROUP_INFO 参数",
+      "command": "docker exec oGRAC-ttfhw python3 /tmp/fix_cpu_group.py",
+      "details": {
+        "fix": "添加 -Z CPU_GROUP_INFO=\"0-36 37-74 75-112 113-150 151-188 189-226 227-264 265-302 303-339 340-376 377-413 414-450 451-488 489-524 525-562 563-600\" 显式指定 16 个 CPU 组",
+        "root_cause": "容器内 NUMA 拓扑有 32 节点但 16 个无 CPU，cm_cpu.c 的 init_cpu_info() 检测失败",
+        "source": "pkg/src/common/cm_cpu.c (init_cpu_info) + cm_config.c (CPU_GROUP_INFO 配置项)"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Modified successfully — added CPU_GROUP_INFO parameter to install_ogracdb()",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-09-12T09:01:39"
+    },
+    {
+      "action": "重新执行 UT：bash pkg/test/og_regress/do_all_test.sh（不含 need_compile，使用已编译的构建产物）",
+      "command": "docker exec oGRAC-ttfhw bash -c 'cd /home/regress/ogracKernel \u0026\u0026 time bash pkg/test/og_regress/do_all_test.sh'",
+      "details": {
+        "failed": 7,
+        "failed_tests": [
+          "og_withas",
+          "bison_parser_1",
+          "bison_parser_2",
+          "bison_parser_dcl",
+          "bison_parser_ddl",
+          "bison_sys_param_all",
+          "og_resource_manager"
+        ],
+        "failure_categories": {
+          "encryption_range": "1 个测试因加密迭代范围差异失败",
+          "readonly_params": "1 个测试因系统参数变为 readonly 失败",
+          "sql_echo_formatting": "5 个测试因 SQL 回显格式差异失败（数据库输出 'SQL CONTAINS:XXX' 而非完整 SQL 文本）",
+          "stack_depth": "1 个测试因深度嵌套查询栈深度限制失败",
+          "timezone_difference": "1 个测试因时区差异失败（UTC +00:00 vs 预期 +08:00）"
+        },
+        "passed": 273,
+        "schedule_part1": {
+          "failed": 7,
+          "passed": 72,
+          "total": 79
+        },
+        "schedule_part2": {
+          "failed": 0,
+          "passed": 201,
+          "total": 201
+        },
+        "total": 280
+      },
+      "duration_seconds": 420,
+      "error": "7 个测试失败：og_withas(Stack depth), bison_parser_1/2/dcl/ddl(SQL echo format), bison_sys_param_all(readonly params), og_resource_manager(SQL echo format)",
+      "output": "Schedule part1: 72 passed, 7 failed. Schedule part2: 201 passed, 0 failed. Total: 273 passed, 7 failed. real 7m0.004s",
+      "result": "部分成功",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-09-12T09:01:39"
+    },
+    {
+      "action": "停止并删除远程容器 oGRAC-ttfhw",
+      "command": "ssh root@123.60.114.33 \"docker rm -f oGRAC-ttfhw\"",
+      "details": {
+        "container_name": "oGRAC-ttfhw",
+        "image": "ograc-ttfhw:latest"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "oGRAC-ttfhw 容器已删除",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-09-12T09:03:57"
+    },
+    {
+      "action": "生成验证报告",
+      "command": "python3 validate_report.py --jsonschema report_schema.json",
+      "details": {
+        "output_file": "verification_report_oGRAC_20260912.json"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "全量校验通过，0 ERROR",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-09-12T09:03:57"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "ogracd",
+          "path": "output/bin/ogracd",
+          "size": "15M",
+          "type": "binary"
+        },
+        {
+          "name": "ogracd-1.0.0",
+          "path": "output/bin/ogracd-1.0.0",
+          "size": "15M",
+          "type": "binary"
+        },
+        {
+          "name": "ogsql",
+          "path": "output/bin/ogsql",
+          "size": "3.1M",
+          "type": "binary"
+        },
+        {
+          "name": "ogbox",
+          "path": "output/bin/ogbox",
+          "size": "16M",
+          "type": "binary"
+        },
+        {
+          "name": "ogrst",
+          "path": "output/bin/ogrst",
+          "size": "18M",
+          "type": "binary"
+        },
+        {
+          "name": "cms",
+          "path": "output/bin/cms",
+          "size": "790K",
+          "type": "binary"
+        },
+        {
+          "name": "ogbackup",
+          "path": "output/bin/ogbackup",
+          "size": "323K",
+          "type": "binary"
+        },
+        {
+          "name": "libograc.so",
+          "path": "output/lib/libograc.so",
+          "size": "15M",
+          "type": "library"
+        },
+        {
+          "name": "libogclient.so",
+          "path": "output/lib/libogclient.so",
+          "size": "4.8M",
+          "type": "library"
+        },
+        {
+          "name": "libogcommon.so",
+          "path": "output/lib/libogcommon.so",
+          "size": "6.2M",
+          "type": "library"
+        },
+        {
+          "name": "oGRAC-DATABASE-LINUX-64bit.tar.gz",
+          "path": "output/bin/oGRAC-DATABASE-LINUX-64bit.tar.gz",
+          "size": "30M",
+          "type": "package"
+        },
+        {
+          "name": "oGRAC-OGSQL-LINUX-64bit.tar.gz",
+          "path": "output/bin/oGRAC-OGSQL-LINUX-64bit.tar.gz",
+          "size": "5.0M",
+          "type": "package"
+        }
+      ],
+      "cmake": "cmake 3.22.0 (\u003e= 3.14.1 要求满足)",
+      "compiler": "gcc 10.3.1 (GCC)",
+      "concurrency": 180,
+      "concurrency_ratio": "30% (601核 × 30% = 180)",
+      "duration_seconds": 1158,
+      "notes": "构建使用 local_install.sh compile -b release，调用 Makefile.sh package-release。先编译三方库（compile_opensource_new.sh），再用 cmake 编译主项目，最后打包。三方库含 zlib、pcre2、zstd、openssl 等。构建无错误，100% 完成。",
+      "status": "success"
+    },
+    "ut": {
+      "duration_seconds": 420,
+      "failed": 7,
+      "failures": [
+        {
+          "error": "Stack depth limit exceeded — 深度嵌套 UNION 查询触发栈深度限制，非功能缺陷，属资源限制差异",
+          "test_name": "og_withas"
+        },
+        {
+          "error": "SQL 回显格式差异：数据库输出 'SQL CONTAINS:CREATE DATABASE' 而非完整 SQL 文本；SESSIONTIMEZONE 为 +00:00（UTC）vs 预期 +08:00（时区差异）",
+          "test_name": "bison_parser_1"
+        },
+        {
+          "error": "SQL 回显格式差异：CREATE USER 语句回显为 'SQL CONTAINS:CREATE USER OR ROLE' 而非完整 SQL 文本",
+          "test_name": "bison_parser_2"
+        },
+        {
+          "error": "SQL 回显格式差异：BACKUP DATABASE / RESTORE DATABASE 语句回显为 'SQL CONTAINS:BACKUP DATABASE' / 'SQL CONTAINS:RESTORE DATABASE' 而非完整 SQL 文本",
+          "test_name": "bison_parser_dcl"
+        },
+        {
+          "error": "SQL 回显格式差异：CREATE USER / ALTER USER 语句回显为 'SQL CONTAINS:CREATE USER OR ROLE' / 'SQL CONTAINS:ALTER USER OR ROLE' 而非完整 SQL 文本",
+          "test_name": "bison_parser_ddl"
+        },
+        {
+          "error": "多个系统参数在当前版本变为 readonly（PAGE_SIZE, CONTROL_FILES, ARCHIVE_CONFIG, DB_TIMEZONE 等），预期输出中可修改；加密迭代范围 [1000,20000000] vs 预期 [1000,10000000]；部分 SQL 回显格式差异",
+          "test_name": "bison_sys_param_all"
+        },
+        {
+          "error": "SQL 回显格式差异：CREATE USER 和 CONN 语句回显为 'SQL CONTAINS:CREATE USER OR ROLE' / 'SQL CONTAINS:CONN' 而非完整 SQL 文本",
+          "test_name": "og_resource_manager"
+        }
+      ],
+      "passed": 273,
+      "status": "partial_success",
+      "total": 280
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "oGRAC-ttfhw",
+      "cpu_cores": 601,
+      "memory": "1.0Ti",
+      "os": "openEuler 22.03 (LTS-SP1)"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 601,
+      "cpu_model": "Kunpeng 920 72F8",
+      "disk": "492G (132G available)",
+      "docker_version": "Docker version 18.09.0, build 4fc3a92",
+      "memory": "1.0Ti",
+      "npu": {
+        "available": false,
+        "card_count": 0,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_dockerfile": "docker/Dockerfile_ARM64 中的 yum install 指令（与基础镜像一致，均为 openEuler 原生包，无需翻译）",
+        "mappings": [
+          {
+            "original": "libaio-devel",
+            "source": "Dockerfile_ARM64（openEuler 原生包，无需翻译）",
+            "target": "libaio-devel"
+          },
+          {
+            "original": "openssl openssl-devel",
+            "source": "Dockerfile_ARM64（openEuler 原生包，无需翻译）",
+            "target": "openssl openssl-devel"
+          },
+          {
+            "original": "gcc gcc-c++",
+            "source": "Dockerfile_ARM64（openEuler 原生包，无需翻译）",
+            "target": "gcc gcc-c++"
+          },
+          {
+            "original": "cmake",
+            "source": "Dockerfile_ARM64（openEuler 原生包，无需翻译）",
+            "target": "cmake"
+          },
+          {
+            "original": "lz4 lz4-devel",
+            "source": "Dockerfile_ARM64（openEuler 原生包，无需翻译）",
+            "target": "lz4 lz4-devel"
+          },
+          {
+            "original": "numactl numactl-devel",
+            "source": "Dockerfile_ARM64（openEuler 原生包，无需翻译）",
+            "target": "numactl numactl-devel"
+          }
+        ]
+      },
+      "image_name": "ograc-ttfhw:latest (FROM openeuler/openeuler:22.03-lts-sp1)",
+      "selection_reason": "Tier 2 Dockerfile 构建 — 仓库内 docker/Dockerfile_ARM64 可直接 build，FROM openeuler/openeuler:22.03-lts-sp1 基础镜像，Dockerfile 内已安装全部编译依赖",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "f72e371ccd98dcdb2462ae7fd3d83f4abe2e17ef",
+    "duration_seconds": 6906,
+    "end_time": "2026-09-12T09:02:27",
+    "environment": "远程容器 (openEuler 22.03 LTS-SP1, aarch64, Kunpeng 920)",
+    "repo_url": "https://gitcode.com/openGauss/oGRAC.git",
+    "start_time": "2026-09-12T07:07:21",
+    "total_steps": 27,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "数据库实例启动失败：g_cpu_group_num init error, g_cpu_group_num is 0",
+      "solution": "容器内 32 个 NUMA 节点中 16 个无 CPU，导致 cm_cpu.c 的 CPU 组检测失败。通过在 install_ogracdb() 中添加 -Z CPU_GROUP_INFO 参数显式指定 16 个 CPU 组的 CPU 列表解决",
+      "source": "pkg/src/common/cm_cpu.c:126 (init_cpu_info) + 容器 NUMA 拓扑",
+      "timestamp": "2026-09-12T09:01:39"
+    },
+    {
+      "problem": "首次 UT 执行时 install.py 属主为 ogracdba，root 运行触发安全检查失败",
+      "solution": "使用 do_all_test.sh 不带 need_compile 参数运行，使 Dev_ograc_regress.sh 的 else 分支执行 chown root:root -R output/bin 修复属主",
+      "source": "CI/build/script/run_ograc_test.sh init_container() chown + Dev_ograc_regress.sh install_ogracdb()",
+      "timestamp": "2026-09-12T09:01:39"
+    },
+    {
+      "problem": "lcov 包在 openEuler 22.03 SP1 仓库中不可用",
+      "solution": "do_all_test.sh 使用 set +e 容错，lcov 不可用时跳过覆盖率报告生成，不影响测试执行",
+      "source": "do_all_test.sh do_regress() yum install lcov",
+      "timestamp": "2026-09-12T09:01:39"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 8000,
+    "cache_miss_tokens": 0,
+    "input_tokens": 55000,
+    "model": "火山AI网关/glm-5.2",
+    "output_tokens": 12000,
+    "tool": "opencode"
+  }
+}

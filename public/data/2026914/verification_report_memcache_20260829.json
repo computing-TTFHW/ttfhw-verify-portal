@@ -1,0 +1,742 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md + .devcontainer/Dockerfile + 远程 npu-smi info",
+      "value": "aarch64（昇腾 910B3 / A2 架构，16 张 NPU 卡）"
+    },
+    "build_commands": {
+      "source": "AGENTS.md + docs/install_run.md + script/build_and_pack_run.sh",
+      "value": "git submodule update --init 3rdparty/ \u0026\u0026 bash script/build_and_pack_run.sh --build_mode RELEASE --build_test OFF（产物: output/memcache_hybrid-*.run + output/memcache/wheel/memcache_hybrid-*.whl）"
+    },
+    "dependencies": {
+      "source": "AGENTS.md + docs/install_run.md + .devcontainer/requirements.txt + .gitmodules",
+      "value": [
+        "gcc 11.4+（C++17 编译器）",
+        "cmake 3.20.x（最低 3.12）",
+        "ninja 1.13.0 或 make 4.3",
+        "python 3.11.10（最低 3.8）",
+        "pybind11 2.10.3",
+        "dos2unix（build.sh/run_ut.sh 行尾转换）",
+        "lcov（UT 覆盖率生成）",
+        "bc（性能脚本浮点运算）",
+        "MemFabric Hybrid（传输层依赖，pip 包 memfabric_hybrid\u003e=1.1.0 或 3rdparty 子模块）",
+        "子模块: memfabric_hybrid/spdlog/nlohmann-json/prometheus-cpp-lite/msgpack-c/libzmq/libsodium（3rdparty/）",
+        "UT 子模块: googletest v1.12.0/mockcpp v2.7（test/3rdparty/）",
+        "pytest/pytest-xdist（Python 测试）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": ".devcontainer/Dockerfile + .devcontainer/requirements.txt",
+      "value": [
+        {
+          "original": "apt-get install doxygen graphviz gdb valgrind strace ltrace cgdb dos2unix lcov bc",
+          "target_equivalent": "apt-get update \u0026\u0026 apt-get install -y --no-install-recommends doxygen graphviz gdb valgrind strace ltrace cgdb dos2unix lcov bc"
+        },
+        {
+          "original": "pip install pybind11\u003e=2.10.3 wheel\u003e=0.40 setuptools\u003e=68.0 memfabric_hybrid\u003e=1.1.0 pre-commit\u003e=4.0.0 pytest\u003e=7.4 pytest-xdist\u003e=3.0 pyyaml\u003e=6.0",
+          "target_equivalent": "pip3 install --no-cache-dir --break-system-packages -r .devcontainer/requirements.txt"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": ".devcontainer/Dockerfile FROM 指令",
+      "value": "Tier 1 业务预构建镜像 quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1（含 CANN/NPU 驱动/PyTorch/vLLM-Ascend，预装 gcc 11.4+/cmake 3.22+/ninja 1.13.0/Python 3.11.15）"
+    },
+    "sample_commands": {
+      "source": "docs/devcontainer_quickstart.md + script/run_all_examples.sh",
+      "value": "bash script/run_all_examples.sh（自动检测/启动 MetaService，运行 Python CRUD/layers + C++ example + benchmark；--python/--cpp/--run-bench 可选）"
+    },
+    "special_dependencies": {
+      "source": ".gitmodules + docs/install_run.md + .devcontainer/post_create.sh",
+      "value": [
+        "git submodule update --init 3rdparty/（含 memfabric_hybrid 等 8 个三方库子模块）",
+        "git submodule update --recursive --init test/3rdparty/（UT 依赖 googletest+mockcpp）",
+        "Ascend CANN 环境变量 source /usr/local/Ascend/ascend-toolkit/set_env.sh",
+        "NPU 驱动挂载: davinci_manager/devmm_svm/hisi_hdc + driver/firmware/npu-smi",
+        "pip 镜像源: mirrors.aliyun.com（devcontainer.json PIP_INDEX_URL）"
+      ]
+    },
+    "ut_commands": {
+      "source": "AGENTS.md + script/run_ut.sh",
+      "value": "bash script/run_ut.sh（DEBUG 构建+BUILD_TESTS=ON，运行 output/bin/ut/test_mmc_test，生成覆盖率报告，行覆盖≥70%分支≥40%门禁）"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "detect_npu_info函数从npu-smi输出解析idle卡时，未检查Health状态。卡0状态为Critical但被报告为idle，导致脚本选中故障卡。建议在detect_npu_info中过滤掉非OK状态的卡。",
+      "source": "script/run_all_examples.sh detect_npu_info函数",
+      "time": "2026-08-29T22:46:33",
+      "title": "run_all_examples.sh NPU检测不跳过Critical卡"
+    },
+    {
+      "body": "vllm-ascend:v0.20.2rc1镜像中的pip包memfabric_hybrid版本过旧，缺少smem_bm_update_store_url符号。post_create.sh应增加memfabric_hybrid版本检查和更新逻辑，或run_all_examples.sh的ensure_python_deps应在memcache_version_ok通过后也检查memfabric_version_ok。",
+      "source": ".devcontainer/Dockerfile + .devcontainer/post_create.sh",
+      "time": "2026-08-29T22:46:33",
+      "title": "基础镜像memfabric_hybrid版本与memcache 1.3.0不兼容"
+    },
+    {
+      "body": "memcache_hybrid-*.run安装后目录结构为/usr/local/memcache_hybrid/1.3.0/aarch64-linux/，无set_env.sh脚本和latest符号链接。install_run.md中提到的source /usr/local/memcache_hybrid/set_env.sh路径不存在。",
+      "source": "docs/install_run.md + run包安装结构",
+      "time": "2026-08-29T22:46:33",
+      "title": "run包安装不创建set_env.sh"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "WebFetch 读取 gitcode.com/Ascend/memcache 仓库 README.md",
+      "command": "WebFetch https://gitcode.com/Ascend/memcache",
+      "details": {
+        "branch": "develop",
+        "key_findings": "MemCache 是高性能分布式 KVCache 存储引擎，针对昇腾 NPU，依赖 MemFabric，对接 vllm-ascend/sglang/mindie",
+        "url": "https://gitcode.com/Ascend/memcache"
+      },
+      "duration_seconds": 8,
+      "error": "",
+      "output": "MemCache针对AI推理场景设计的高性能分布式KVCache缓存，针对昇腾超节点/服务器精细化性能调优。含 LocalService+MetaService 两大组件。快速入门链接: install_whl.md/install_run.md/devcontainer_quickstart.md/examples.md",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T21:44:33"
+    },
+    {
+      "action": "git clone develop 分支到本地 /tmp/opencode/memcache-readonly 以读取全部仓库文件",
+      "command": "git clone --depth 1 --branch develop https://gitcode.com/Ascend/memcache.git /tmp/opencode/memcache-readonly",
+      "details": {
+        "branch": "develop",
+        "commit": "2d82478",
+        "files_read": "README.md/AGENTS.md/CMakeLists.txt/.devcontainer/*/docs/install_run.md/docs/install_whl.md/docs/devcontainer_quickstart.md/example/examples.md/script/build_and_pack_run.sh/script/build.sh/script/run_ut.sh/script/run_all_examples.sh/.gitmodules/VERSION",
+        "url": "https://gitcode.com/Ascend/memcache.git"
+      },
+      "duration_seconds": 12,
+      "error": "",
+      "output": "克隆成功，commit 2d82478。仓库含 .devcontainer/(Dockerfile+devcontainer.json+post_create.sh)、docs/、script/、example/、test/、3rdparty/ 等目录",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T21:44:33"
+    },
+    {
+      "action": "阅读 AGENTS.md 提取构建/测试入口命令",
+      "command": "cat AGENTS.md",
+      "details": {
+        "build_cmd": "bash script/build_and_pack_run.sh --build_mode RELEASE --build_test OFF",
+        "coverage_gate": "src/memcache 行覆盖≥70% 分支≥40%",
+        "deps": "CMake\u003e=3.12 C++17 Ninja/Make Python\u003e=3.8 pybind11 MemFabric Hybrid",
+        "ut_cmd": "bash script/run_ut.sh"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "构建统一使用 build_and_pack_run.sh；UT 使用 run_ut.sh 执行 DEBUG 测试构建运行 test_mmc_test 并生成覆盖率；Python 测试位于 test/python 依赖 Ascend/NPU/MetaService",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T21:44:33"
+    },
+    {
+      "action": "阅读 .devcontainer/Dockerfile 判断镜像 Tier 等级",
+      "command": "cat .devcontainer/Dockerfile",
+      "details": {
+        "extra_apt": "doxygen graphviz gdb valgrind strace ltrace cgdb dos2unix lcov bc",
+        "from": "quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1",
+        "is_base_os": false,
+        "preinstalled": "gcc 11.4+/cmake 3.22+/ninja 1.13.0/Python 3.11.15/CANN/NPU驱动/PyTorch/vLLM-Ascend",
+        "reason": "Dockerfile FROM 指向非纯基础 OS 镜像（vllm-ascend 业务预构建镜像），命中 Tier 1 信号",
+        "tier": 1
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "FROM quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1。基础镜像已含 CANN+NPU驱动+PyTorch+vLLM-Ascend。Dockerfile 额外 apt 安装 doxygen/gdb/valgrind/dos2unix/lcov/bc 等开发调试工具",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-08-29T21:44:33"
+    },
+    {
+      "action": "阅读 .devcontainer/devcontainer.json 提取容器启动参数和 NPU 挂载配置",
+      "command": "cat .devcontainer/devcontainer.json",
+      "details": {
+        "build": "Dockerfile context=..",
+        "mounts": "dcmi/driver/npu-smi/ascend_install.info/hccn.conf",
+        "pip_index_url": "https://mirrors.aliyun.com/pypi/simple/",
+        "postCreate": "bash .devcontainer/post_create.sh",
+        "postStart": "git submodule update --init 3rdparty/",
+        "python_path": "/usr/local/python3.11.15/bin/python",
+        "runArgs": "--network=host --privileged --shm-size=2g --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "devcontainer.json 使用 Dockerfile 构建，runArgs 含 --privileged --device davinci_manager/devmm_svm/hisi_hdc，挂载 dcmi/driver/npu-smi 等 NPU 目录。PIP_INDEX_URL 指向阿里云镜像",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T21:44:33"
+    },
+    {
+      "action": "阅读 docs/install_run.md 提取 C++ 构建编译流程和依赖",
+      "command": "cat docs/install_run.md",
+      "details": {
+        "artifacts": "output/*.run + output/memcache/wheel/*.whl",
+        "build_cmd": "bash script/build_and_pack_run.sh --build_mode RELEASE --build_test OFF",
+        "cmake": "3.20.x",
+        "gcc": "11.4+",
+        "os": "Ubuntu 22.04 LTS+",
+        "pybind11": "2.10.3",
+        "python": "3.11.10",
+        "submodule_cmd": "git submodule update --init 3rdparty/"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "run包需自行编译。环境: Ubuntu22.04+/cmake3.20.x/gcc11.4+/python3.11.10/pybind11 2.10.3。编译: git submodule update --init 3rdparty/ → bash script/build_and_pack_run.sh --build_mode RELEASE --build_test OFF",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T21:44:33"
+    },
+    {
+      "action": "阅读 docs/devcontainer_quickstart.md 提取样例执行命令和镜像信息",
+      "command": "cat docs/devcontainer_quickstart.md",
+      "details": {
+        "build_cmd": "bash script/build_and_pack_run.sh --build_mode RELEASE --build_test OFF",
+        "image_a2": "quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1",
+        "image_a3": "quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1-a3",
+        "image_size": "约15-20GB",
+        "npu_required": true,
+        "sample_cmd": "bash script/run_all_examples.sh"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "DevContainer 远端开发指南。镜像 quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1（A2）/v0.20.2rc1-a3（A3）。样例: bash script/run_all_examples.sh。无 NPU 不能跑，依赖昇腾 NPU 驱动 davinci/devmm_svm",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T21:44:33"
+    },
+    {
+      "action": "阅读 script/run_ut.sh 提取 UT 执行流程",
+      "command": "cat script/run_ut.sh",
+      "details": {
+        "build_type": "DEBUG",
+        "cmake_flags": "-DBUILD_TESTS=ON -DBUILD_OPEN_ABI=ON",
+        "coverage_gate_branches": "40%",
+        "coverage_gate_lines": "70%",
+        "coverage_tool": "lcov",
+        "mmc_build_jobs": "默认32",
+        "needs": "dos2unix/lcov/mockcpp/googletest",
+        "test_binary": "output/bin/ut/test_mmc_test"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "run_ut.sh: cmake DEBUG BUILD_TESTS=ON → make install → dos2unix mockcpp → 运行 test_mmc_test --gtest_filter → lcov 覆盖率报告。门禁: 行覆盖≥70% 分支≥40%",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T21:44:33"
+    },
+    {
+      "action": "阅读 script/run_all_examples.sh 提取样例执行流程",
+      "command": "cat script/run_all_examples.sh",
+      "details": {
+        "auto_build": "自动构建 memcache_hybrid whl 和 memfabric_hybrid whl",
+        "auto_meta": "自动检测/启动 MetaService",
+        "benchmark": "bench_start.sh write/read",
+        "cpp_example": "memcache_cpp_test (cmake+make)",
+        "npu_detect": "自动检测空闲 NPU 卡",
+        "python_examples": "test_mmc_demo/test_mmc_batch/test_mmc_layers"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "run_all_examples.sh: 自动检测 NPU、启动 MetaService、构建/安装 whl、运行 Python+C++样例+benchmark。支持 --python/--cpp/--run-bench/--dry-run",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T21:44:33"
+    },
+    {
+      "action": "阅读 .gitmodules 提取子模块依赖列表",
+      "command": "cat .gitmodules",
+      "details": {
+        "submodules_3rdparty": "memfabric_hybrid/spdlog v1.15.3/nlohmann-json v3.12.0/prometheus-cpp-lite/msgpack-c cpp-6.1.0/libzmq v4.3.5/libsodium 1.0.21",
+        "submodules_test": "googletest v1.12.0/mockcpp v2.7"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "9 个子模块: 3rdparty/ 下 memfabric_hybrid/spdlog/json/prometheus-cpp-lite/msgpack-c/libzmq/libsodium；test/3rdparty/ 下 googletest/mockcpp",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T21:44:33"
+    },
+    {
+      "action": "远程执行 npu-smi info 确认 NPU 类型和健康状态",
+      "command": "ssh root@192.168.9.114 'npu-smi info'",
+      "details": {
+        "architecture": "A2",
+        "card_0_status": "Critical（跳过）",
+        "driver_version": "25.5.0",
+        "npu_type": "910B3",
+        "ok_cards": "1-7",
+        "total_cards_visible": 8
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "910B3 NPU，驱动 25.5.0。卡0 Critical，卡1-7 OK。A2 架构，匹配 vllm-ascend:v0.20.2rc1 镜像",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-08-29T21:44:33"
+    },
+    {
+      "action": "Tier 1 镜像选择：docker pull quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1",
+      "command": "ssh root@192.168.9.114 'docker pull quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1'",
+      "details": {
+        "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1",
+        "image_status": "Image is up to date（远程已存在）",
+        "npu_match": "远程910B3(A2)匹配镜像a2版本",
+        "reason": "Dockerfile FROM 指向非纯基础OS镜像（vllm-ascend业务预构建镜像），命中Tier 1信号",
+        "tier": 1
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "Digest: sha256:a926b560b81785a9f820f975748a39807f0b1753675ab40ec30cb4ae3dabb71e. Status: Image is up to date",
+      "result": "成功",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-08-29T21:54:34"
+    },
+    {
+      "action": "远程 clone 仓库到 /home/workspace/memcache-verify（develop 分支）",
+      "command": "ssh root@192.168.9.114 'git clone --depth 1 --branch develop https://gitcode.com/Ascend/memcache.git /home/workspace/memcache-verify'",
+      "details": {
+        "branch": "develop",
+        "commit": "2d82478",
+        "path": "/home/workspace/memcache-verify",
+        "url": "https://gitcode.com/Ascend/memcache.git"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "Cloning into /home/workspace/memcache-verify... commit 2d82478 fix: 日志区分 batch get/batch put 的 update state 调用",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-29T21:54:34"
+    },
+    {
+      "action": "启动容器 memcache-ttfhw，挂载 NPU 设备（davinci1，跳过 Critical 卡0）和工作目录",
+      "command": "docker run -d --name memcache-ttfhw --privileged --network=host --shm-size=2g --device /dev/davinci1 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/Ascend/driver:/usr/local/Ascend/driver -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware -v /home/workspace/memcache-verify:/workspace quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1 sleep infinity",
+      "details": {
+        "card_0_skipped": "Critical状态",
+        "container_name": "memcache-ttfhw",
+        "devices": "davinci1/davinci_manager/devmm_svm/hisi_hdc",
+        "image": "quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1",
+        "mounts": "npu-smi/driver/firmware/workspace",
+        "network": "host",
+        "privileged": true,
+        "shm_size": "2g",
+        "startup_command_source": "default_挂卡"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Container ID: ceeb68938679, Status: Up, Image: quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-08-29T21:54:34"
+    },
+    {
+      "action": "安装缺失 apt 依赖：dos2unix lcov bc",
+      "command": "docker exec memcache-ttfhw apt-get install -y --no-install-recommends dos2unix lcov bc",
+      "details": {
+        "installed": "dos2unix lcov bc",
+        "missing": "dos2unix/lcov/bc",
+        "preinstalled": "gcc 11.4.0/cmake 4.3.2/ninja 1.13.0/python 3.11.15/pybind11 3.0.4/pytest 8.3.2",
+        "tier": 1
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "dos2unix/lcov/bc 安装成功。路径: /usr/bin/dos2unix /usr/bin/lcov /usr/bin/bc",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-29T21:54:34"
+    },
+    {
+      "action": "初始化 git 子模块（3rdparty/ + test/3rdparty/）",
+      "command": "docker exec memcache-ttfhw bash -c 'cd /workspace \u0026\u0026 GIT_SSL_NO_VERIFY=1 git -c protocol.file.allow=always submodule update --init 3rdparty/ test/3rdparty/'",
+      "details": {
+        "3rdparty": "memfabric_hybrid/spdlog v1.15.3/nlohmann-json v3.12.0/prometheus-cpp-lite/msgpack-c cpp-6.1.0/libzmq v4.3.5/libsodium 1.0.21",
+        "git_config": "http.sslVerify=false, http.version=HTTP/1.1, github→gitcode镜像重定向",
+        "test_3rdparty": "googletest v1.12.0/mockcpp v2.7"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "9个子模块全部checkout成功: libsodium/libzmq/spdlog/memfabric_hybrid/msgpack-c/nlohmann-json/prometheus-cpp-lite/googletest/mockcpp",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-08-29T21:54:34"
+    },
+    {
+      "action": "验证容器内关键依赖和 NPU 可用性",
+      "command": "docker exec memcache-ttfhw bash -c 'gcc --version; cmake --version; python3 --version; npu-smi info | head -10; ls /usr/local/Ascend/ascend-toolkit/set_env.sh'",
+      "details": {
+        "arch": "aarch64",
+        "ascend_toolkit": "/usr/local/Ascend/ascend-toolkit/set_env.sh存在",
+        "bc": "已安装",
+        "cmake": "4.3.2",
+        "dos2unix": "已安装",
+        "gcc": "11.4.0",
+        "lcov": "已安装",
+        "ninja": "1.13.0",
+        "npu": "910B3 卡1-7 OK",
+        "os": "Ubuntu 22.04.5 LTS",
+        "pip_mirror": "mirrors.aliyun.com",
+        "pybind11": "3.0.4",
+        "pytest": "8.3.2",
+        "python": "3.11.15"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "gcc 11.4.0/cmake 4.3.2/ninja 1.13.0/python 3.11.15/pybind11 3.0.4/pytest 8.3.2。Ascend toolkit 25.5.0。NPU 910B3 卡1 OK。所有依赖就绪。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-08-29T21:54:34"
+    },
+    {
+      "action": "执行 RELEASE 构建：source Ascend env → bash script/build_and_pack_run.sh --build_mode RELEASE --build_test OFF（MMC_BUILD_JOBS=51）",
+      "command": "docker exec memcache-ttfhw bash -c 'source /usr/local/Ascend/ascend-toolkit/set_env.sh \u0026\u0026 export MMC_BUILD_JOBS=51 \u0026\u0026 cd /workspace \u0026\u0026 bash script/build_and_pack_run.sh --build_mode RELEASE --build_test OFF'",
+      "details": {
+        "artifacts_count": 5,
+        "build_mode": "RELEASE",
+        "build_python": "ON",
+        "build_test": "OFF",
+        "build_ubsio": "ON",
+        "concurrency": 51,
+        "concurrency_ratio": "20%",
+        "duration_seconds": 269,
+        "generator": "Ninja",
+        "key_libs": "libmf_memcache.so / _pymmc.cpython-311-aarch64-linux-gnu.so / mmc_meta_service",
+        "ninja_targets": "libmf_memcache.so / mmc_meta_service / _pymmc.cpython-311-aarch64-linux-gnu.so / install",
+        "run_package": "memcache_hybrid-1.3.0_linux_aarch64.run (33.7MB)",
+        "wheel": "memcache_hybrid-1.3.0-cp311-cp311-linux_aarch64.whl (11.3MB)"
+      },
+      "duration_seconds": 269,
+      "error": "",
+      "output": "构建成功。产物: output/memcache_hybrid-1.3.0_linux_aarch64.run(33.7MB) + output/memcache/wheel/memcache_hybrid-1.3.0-cp311-cp311-linux_aarch64.whl(11.3MB) + output/memcache/lib64/libmf_memcache.so(5.6MB) + _pymmc.so(510KB)。ninja编译约30秒，总耗时约4.5分钟。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-08-29T22:13:34"
+    },
+    {
+      "action": "执行 C++ 单元测试：bash script/run_ut.sh（DEBUG 构建+BUILD_TESTS=ON，gtest+lcov 覆盖率）",
+      "command": "docker exec memcache-ttfhw bash -c 'source /usr/local/Ascend/ascend-toolkit/set_env.sh \u0026\u0026 export MMC_BUILD_JOBS=51 \u0026\u0026 cd /workspace \u0026\u0026 bash script/run_ut.sh'",
+      "details": {
+        "build_type": "DEBUG",
+        "cmake_flags": "-DBUILD_TESTS=ON -DBUILD_OPEN_ABI=ON -DBUILD_GIT_COMMIT=OFF",
+        "coverage_branches": "41.7%",
+        "coverage_gate_branches": "40%",
+        "coverage_gate_lines": "70%",
+        "coverage_gate_passed": true,
+        "coverage_lines": "72.8%",
+        "failed": 0,
+        "generator": "Ninja",
+        "gtest_duration_ms": 319281,
+        "passed": 491,
+        "skipped": 2,
+        "skipped_tests": [
+          "TestMmcServiceError.metaServiceRebuild",
+          "TestMmcMetaService.ExistRequest"
+        ],
+        "test_binary": "output/bin/ut/test_mmc_test",
+        "test_suites": 53,
+        "total": 493,
+        "total_duration_seconds": 490,
+        "ut_exit_code": 0
+      },
+      "duration_seconds": 490,
+      "error": "",
+      "output": "[==========] 493 tests from 53 test suites ran. (319281 ms total)\n[  PASSED  ] 491 tests.\n[  SKIPPED ] 2 tests: TestMmcServiceError.metaServiceRebuild, TestMmcMetaService.ExistRequest\nlines coverage rate: 72.8%\nbranches coverage rate: 41.7%\nUT_EXIT=0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-08-29T22:23:48"
+    },
+    {
+      "action": "初始执行 run_all_examples.sh（自动检测NPU/启动MetaService/运行Python+C++样例+benchmark）",
+      "command": "bash script/run_all_examples.sh",
+      "details": {
+        "fail": 6,
+        "fail_detail": "test_mmc_demo/test_mmc_batch/test_mmc_layers/test_mmc_layers_batch/cpp run/benchmark write",
+        "pass": 1,
+        "pass_detail": "cpp build",
+        "root_causes": [
+          "卡0(Critical)被detect_npu_info选中",
+          "pip安装的memfabric_hybrid版本过旧缺少smem_bm_update_store_url符号",
+          "host_rdma协议在单节点回环失败"
+        ],
+        "skip": 5
+      },
+      "duration_seconds": 122,
+      "error": "smem_bm_update_store_url undefined symbol; Failed to init bm of local service error code -1",
+      "output": "Summary: PASS=1 FAIL=6 SKIP=5。失败原因：object store init res:-1（memfabric库符号缺失+卡0 Critical+host_rdma协议不兼容）",
+      "result": "部分成功",
+      "returncode": 1,
+      "step": "sample_execution",
+      "success": false,
+      "timestamp": "2026-08-29T22:46:33"
+    },
+    {
+      "action": "修复 memfabric_hybrid 版本不兼容：用 Step3 构建的 3rdparty/memfabric_hybrid 新库替换 pip 安装的旧库",
+      "command": "cp -f /workspace/3rdparty/memfabric_hybrid/output/smem/lib64/libmf_smem.so /usr/local/python3.11.15/lib/python3.11/site-packages/memfabric_hybrid/lib/",
+      "details": {
+        "new_lib": "/workspace/3rdparty/memfabric_hybrid/output/smem/lib64/libmf_smem.so（1.3.0版本）",
+        "old_lib": "/usr/local/python3.11.15/lib/python3.11/site-packages/memfabric_hybrid/lib/libmf_smem.so（旧版，缺少符号）",
+        "replaced": "libmf_smem.so/libmf_hybm_core.so/libmf_acc_offload.so + _pymf_hybrid*.so/_pymf_transfer*.so/_pymf_acc_offload*.so",
+        "symlinks": "创建 .so.0 SONAME 符号链接"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "替换后dlsym成功，smem_bm_init success",
+      "result": "成功",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-08-29T22:46:33"
+    },
+    {
+      "action": "修复后逐一执行样例（MMC_DEVICE_ID=1 + host_shm协议 + memfabric库路径）",
+      "command": "python3 test_mmc_demo.py; python3 test_mmc_batch.py; python3 test_mmc_layers.py; ./build/memcache_cpp_test; bash bench_start.sh",
+      "details": {
+        "benchmark": "PASS (write 40960B bw:0.011GB/s, read 40960B bw:0.020GB/s)",
+        "cpp_example": "PASS (PutFrom result:0)",
+        "fixes_applied": [
+          "MMC_DEVICE_ID=1（跳过Critical卡0）",
+          "host_shm协议（单节点回环）",
+          "LD_LIBRARY_PATH添加memfabric lib路径"
+        ],
+        "test_mmc_batch": "PASS (1 test, 4.9s)",
+        "test_mmc_demo": "PASS (1 test, 4.9s)",
+        "test_mmc_layers": "PASS (2 tests, 2.9s)"
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "5个样例全部通过：Python CRUD/batch/layers + C++交互式 + benchmark write/read",
+      "result": "成功",
+      "returncode": 0,
+      "step": "sample_execution",
+      "success": true,
+      "timestamp": "2026-08-29T22:46:33"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "memcache_hybrid-1.3.0_linux_aarch64.run",
+          "path": "/workspace/output/memcache_hybrid-1.3.0_linux_aarch64.run",
+          "size": "33.7MB（35380664字节）",
+          "type": "run包（二进制安装包）"
+        },
+        {
+          "name": "memcache_hybrid-1.3.0-cp311-cp311-linux_aarch64.whl",
+          "path": "/workspace/output/memcache/wheel/memcache_hybrid-1.3.0-cp311-cp311-linux_aarch64.whl",
+          "size": "11.3MB（11871135字节）",
+          "type": "wheel（Python包）"
+        },
+        {
+          "name": "libmf_memcache.so",
+          "path": "/workspace/output/memcache/lib64/libmf_memcache.so",
+          "size": "5.6MB（5830096字节）",
+          "type": "共享库"
+        },
+        {
+          "name": "_pymmc.cpython-311-aarch64-linux-gnu.so",
+          "path": "/workspace/output/memcache/lib64/_pymmc.cpython-311-aarch64-linux-gnu.so",
+          "size": "510KB（522848字节）",
+          "type": "Python绑定模块"
+        },
+        {
+          "name": "mmc_meta_service",
+          "path": "/workspace/output/memcache/bin/mmc_meta_service",
+          "size": "—",
+          "type": "MetaService二进制"
+        }
+      ],
+      "cmake": "cmake 4.3.2（-G Ninja -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_TESTS=OFF -DBUILD_PYTHON=ON -DBUILD_UBSIO=ON）",
+      "compiler": "gcc 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04.3)",
+      "concurrency": 51,
+      "concurrency_ratio": "20%（256核×20%=51，MMC_BUILD_JOBS=51）",
+      "duration_seconds": 269,
+      "notes": "Tier 1 镜像预装全部构建工具链，仅补装 dos2unix/lcov/bc 后一次构建成功。使用仓库提供的 build_and_pack_run.sh 脚本执行 RELEASE 构建，ninja 并行编译约30秒，总耗时约4.5分钟（含 cmake 配置、子模块编译、wheel 打包、run 包打包）。",
+      "status": "success"
+    },
+    "sample": {
+      "duration_seconds": 120,
+      "results": [
+        {
+          "execution_status": "success",
+          "execution_time": "4.9s",
+          "output_summary": "Ran 1 test in 4.927s — OK。put/get验证通过，输出 b'some data!'。CANN at-exit crash (exit=134 tolerated)。",
+          "sample_name": "test_mmc_demo.py（Python基础CRUD）"
+        },
+        {
+          "execution_status": "success",
+          "execution_time": "4.9s",
+          "output_summary": "Ran 1 test in 4.925s — OK。batch put/get操作验证通过，bm register succeed rank=0。",
+          "sample_name": "test_mmc_batch.py（Python批量操作）"
+        },
+        {
+          "execution_status": "success",
+          "execution_time": "2.9s",
+          "output_summary": "Ran 2 tests in 2.938s — OK。object store init res: 0（初始化成功），layers读写验证通过。",
+          "sample_name": "test_mmc_layers.py（Python Layers/torch_npu）"
+        },
+        {
+          "execution_status": "success",
+          "execution_time": "5s",
+          "output_summary": "构建成功（cmake+make）。运行：Initialized with put hash value，Initial PutFrom result: 0（put成功）。CANN at-exit crash (exit code tolerated)。",
+          "sample_name": "memcache_cpp_test（C++交互式测试）"
+        },
+        {
+          "execution_status": "success",
+          "execution_time": "40s",
+          "output_summary": "write: 40960 bytes/10 calls, avg 332.11us, bw:0.011 GB/s。read: 40960 bytes/10 calls, avg 193.58us, bw:0.020 GB/s。READ_EXIT=0。",
+          "sample_name": "benchmark（性能基准测试）"
+        }
+      ],
+      "status": "success"
+    },
+    "ut": {
+      "cpp": {
+        "failed": 0,
+        "note": "53个测试套件，491通过，2跳过（TestMmcServiceError.metaServiceRebuild / TestMmcMetaService.ExistRequest），0失败。gtest执行耗时319秒。覆盖率: 行覆盖72.8%（门禁≥70%通过），分支覆盖41.7%（门禁≥40%通过）。UT_EXIT=0。",
+        "passed": 491,
+        "status": "success",
+        "total": 493
+      },
+      "duration_seconds": 490,
+      "failed": 0,
+      "failures": [],
+      "passed": 491,
+      "skipped": 2,
+      "status": "success",
+      "total": 493
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "memcache-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "Ubuntu 22.04.5 LTS"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920（256核）",
+      "disk": "5GB可用（60G已用/69G总量）",
+      "docker_version": "18.09.0",
+      "memory": "2044GB（2.0Ti）",
+      "npu": {
+        "available": true,
+        "card_count": 8,
+        "mounted_card_id": 1
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "CMakeLists.txt: cmake_minimum_required 3.12, C++17, project memcache, 依赖 memfabric_hybrid 子模块",
+        "from_dockerfile": ".devcontainer/Dockerfile RUN 指令: apt-get install doxygen graphviz gdb valgrind strace ltrace cgdb dos2unix lcov bc; pip install -r requirements.txt (pybind11/wheel/setuptools/memfabric_hybrid/pre-commit/pytest/pytest-xdist/pyyaml)",
+        "from_readme": "AGENTS.md + install_run.md: gcc 11.4+/cmake 3.20.x/python 3.11.10/pybind11 2.10.3/make或ninja + 9个子模块",
+        "mappings": [
+          {
+            "original": "apt-get install doxygen graphviz gdb valgrind strace ltrace cgdb dos2unix lcov bc",
+            "source": ".devcontainer/Dockerfile",
+            "target": "Tier 1 镜像已预装部分，仅补装 dos2unix/lcov/bc（apt-get install -y --no-install-recommends dos2unix lcov bc）"
+          },
+          {
+            "original": "pip install pybind11 wheel setuptools memfabric_hybrid pytest pytest-xdist pyyaml",
+            "source": ".devcontainer/requirements.txt",
+            "target": "Tier 1 镜像已预装 pybind11 3.0.4/pytest 8.3.2，无需额外 pip 安装"
+          }
+        ]
+      },
+      "image_name": "quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1",
+      "selection_reason": "Tier 1 业务预构建镜像：.devcontainer/Dockerfile FROM 指向 quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1（非纯基础 OS 镜像，含 CANN/NPU驱动/PyTorch/vLLM-Ascend），远程 NPU 为 910B3（A2架构），与镜像 a2 版本匹配。镜像预装 gcc 11.4.0/cmake 4.3.2/ninja 1.13.0/python 3.11.15/pybind11 3.0.4/pytest 8.3.2。",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "develop",
+    "commit": "2d82478",
+    "duration_seconds": 3992,
+    "end_time": "2026-08-29T22:46:33",
+    "environment": "远程容器 192.168.9.114 / aarch64 / 昇腾910B3 / Tier1镜像 quay.nju.edu.cn/ascend/vllm-ascend:v0.20.2rc1",
+    "repo_url": "https://gitcode.com/Ascend/memcache.git",
+    "start_time": "2026-08-29T21:40:01",
+    "total_steps": 22,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "pip安装的memfabric_hybrid版本过旧，缺少smem_bm_update_store_url符号，导致local service BM初始化失败（error code -1）",
+      "solution": "用Step3构建的3rdparty/memfabric_hybrid/output中的新库（1.3.0版本）替换pip包中的旧库（libmf_smem.so/libmf_hybm_core.so/libmf_acc_offload.so + pybind模块），并创建.so.0 SONAME符号链接",
+      "source": "test_mmc_demo.py运行时dlsym错误",
+      "timestamp": "2026-08-29T22:46:33"
+    },
+    {
+      "problem": "run_all_examples.sh的detect_npu_info函数选中了状态为Critical的卡0，导致NPU操作失败",
+      "solution": "手动设置MMC_DEVICE_ID=1使用状态OK的卡1。根本原因是--privileged暴露所有设备，npu-smi报告卡0为idle但实际Critical",
+      "source": "run_all_examples.sh NPU检测逻辑",
+      "timestamp": "2026-08-29T22:46:33"
+    },
+    {
+      "problem": "host_rdma协议在单节点127.0.0.1回环环境下无法初始化BM",
+      "solution": "将mmc-local.conf中的protocol从host_rdma降级为host_shm（run_all_examples.sh脚本本身有此逻辑，但手动运行需自行降级）",
+      "source": "单节点环境配置",
+      "timestamp": "2026-08-29T22:46:33"
+    },
+    {
+      "problem": "C++示例运行时找不到libmf_smem.so（dlopen失败）",
+      "solution": "将memfabric pip包的lib目录添加到LD_LIBRARY_PATH：export LD_LIBRARY_PATH=$MF_PIP/lib:$LD_LIBRARY_PATH",
+      "source": "C++示例memcache_cpp_test运行",
+      "timestamp": "2026-08-29T22:46:33"
+    },
+    {
+      "problem": "run包安装后未创建set_env.sh和latest符号链接，find_set_env()无法找到环境配置脚本",
+      "solution": "手动创建/usr/local/memcache_hybrid/set_env.sh，设置MEMCACHE_HYBRID_HOME_PATH和LD_LIBRARY_PATH",
+      "source": "run包安装结构",
+      "timestamp": "2026-08-29T22:46:33"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "火山AI网关/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}
