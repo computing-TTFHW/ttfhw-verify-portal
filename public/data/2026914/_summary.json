@@ -1880,50 +1880,68 @@
   {
     "name": "ubs-virt",
     "displayName": "ubs-virt",
-    "result": "failed",
-    "buildStatus": "failed",
-    "utStatus": "failed",
+    "result": "partial_success",
+    "buildStatus": "success",
+    "utStatus": "partial_success",
     "sampleStatus": "unknown",
-    "totalDuration": 1403,
-    "environmentDuration": 1134,
-    "buildDuration": 44.3,
-    "utDuration": 224.7,
-    "testPassed": 33,
-    "testFailed": 16,
-    "testTotal": 396,
-    "testSkipped": 347,
-    "generatedAt": "2026-09-14T20:47:15",
+    "totalDuration": 1446,
+    "environmentDuration": 1229,
+    "buildDuration": 55.4,
+    "utDuration": 161.6,
+    "testPassed": 227,
+    "testFailed": 79,
+    "testTotal": 578,
+    "testSkipped": 272,
+    "generatedAt": "2026-09-17T09:43:45",
     "environment": "unknown",
     "url": "https://gitcode.com/openeuler/ubs-virt.git",
     "category": "UBSCore",
     "hasStaticAnalysis": false,
-    "file": "verification_report_ubs-virt_20260914.json",
+    "file": "verification_report_ubs-virt_20260917.json",
     "issues": [
       {
-        "problem": "virt-optimizer 构建失败：宿主机内核 4.19.90 无 BTF 支持，bpftool 无法从 /sys/kernel/btf/vmlinux 生成 vmlinux.h，导致 eBPF 程序无法编译",
-        "solution": "环境限制问题，宿主机内核版本不满足 virt-optimizer 的最低要求（需 openEuler 24.03 LTS SP4 内核 6.6 + CONFIG_DEBUG_INFO_BTF=y）。容器共享宿主机内核，无法在容器内解决。建议在满足内核要求的宿主机上执行 virt-optimizer 构建。",
-        "source": "virt-optimizer/build.sh 第 62 行 + virt-optimizer/docs/build_install/构建指导.md 内核配置要求",
-        "timestamp": "2026-09-14T21:00:49"
+        "problem": "vcann-rt UT 因 CANN runtime 版本不匹配导致 hook 函数找不到，212 个测试中 37 个运行后全部失败并段错误",
+        "solution": "预构建镜像中 CANN 9.1.0 的 runtime API 版本与 vcann-rt 代码预设版本不一致。容器内已安装最新 CANN 9.1.0 但 runtime 函数符号缺失。属环境兼容性问题，需业务方对齐 CANN runtime 版本或更新 stub 覆盖范围",
+        "source": "vcann-rt/test/testcase/ascend/device_test.cpp + hook.c:30 Can not find function",
+        "timestamp": "2026-09-17T10:07:07"
       },
       {
-        "problem": "virt-awaresched UT 段错误：TestSocketClient.testCloseConnection 执行期间，libvirt 连接 /var/run/libvirt/libvirt-sock 失败（容器内无 libvirtd 服务），导致空指针访问段错误，148 个测试未运行",
-        "solution": "容器内未运行 libvirtd 服务，libvirt 依赖的 socket 不存在。测试需要完整的 libvirt 运行环境（libvirtd + qemu:///system）。建议在配置了 libvirtd 的环境中运行 UT，或将 libvirt 相关测试标记为集成测试单独运行。",
-        "source": "virt-awaresched/test/cli/socket_client/test_socket_client.cpp + libvirt_helper.cpp",
-        "timestamp": "2026-09-14T21:09:32"
+        "problem": "virt-awaresched UT 因容器内无 libvirtd 服务和终端导致连接失败并段错误，168 个测试中 97 个未运行",
+        "solution": "UT 依赖 libvirt daemon 运行和 /sys CPU 拓扑信息。容器环境无法提供这些运行时依赖。非代码问题，属环境限制。纯逻辑测试（CLI 解析/序列化/工具方法等）69 个通过",
+        "source": "virt-awaresched/test/cli/socket_client/test_socket_client.cpp + libvirt XML-RPC error",
+        "timestamp": "2026-09-17T10:07:07"
       },
       {
-        "problem": "vcann-rt UT 全部失败：CANN 9.1.0 runtime API stub 版本不匹配，HOOK ERROR 显示 undefined symbol（如 rtsStreamEndTaskUpdate），所有 ascend 相关测试返回 500001",
-        "solution": "测试 stub 库与 CANN 9.1.0 runtime 版本不匹配，stub 中预期的部分 runtime API 在当前 CANN 版本中不存在或签名变化。建议检查 test/stub/ 中的 stub 实现是否与 CANN 9.1.0 header 一致，或在 CANN 8.5.0 环境中测试。",
-        "source": "vcann-rt/test/stub/ + vcann-rt/test/testcase/ascend/device_test.cpp",
-        "timestamp": "2026-09-14T21:09:32"
+        "problem": "virt-optimizer test-client VSOCK 测试失败，宿主机内核 4.19.90 不含 vsock 模块",
+        "solution": "宿主机内核 4.19.90（openEuler 20.03 SP4）不含 vsock 内核模块，errno=97。容器与宿主机共享内核，镜像无法提供缺失的内核模块。文档已说明需在宿主机加载 VSOCK 模块",
+        "source": "virt-optimizer/docs/test/单元测试开发指南.md VSOCK 前置要求章节",
+        "timestamp": "2026-09-17T10:07:07"
+      },
+      {
+        "problem": "lcov 不在 openEuler 24.03 软件源中，vcann-rt build_ut.sh 的 coverage.sh 失败",
+        "solution": "openEuler 24.03 LTS SP4 默认软件源不提供 lcov。virt-optimizer 的 run_ut.sh 已优雅处理此情况（跳过覆盖率），但 vcann-rt 的 build_ut.sh 未处理。UT 测试本身不受影响",
+        "source": "vcann-rt/coverage.sh:16 + virt-optimizer/ebpf/run_ut.sh:12",
+        "timestamp": "2026-09-17T10:07:07"
       }
     ],
     "documentationGaps": [
       {
-        "body": "virt-optimizer 的构建指导提到需要 openEuler 24.03 LTS SP4 和内核 6.6，但未明确说明在容器中构建时也需要宿主机内核满足此要求。容器共享宿主机内核，如果宿主机内核版本较低（如 4.19），即使容器是 openEuler 24.03，也无法生成 vmlinux.h 导致构建失败。",
-        "source": "virt-optimizer/docs/build_install/构建指导.md + virt-optimizer/build.sh",
-        "time": "2026-09-14T21:00:49",
-        "title": "virt-optimizer 构建指导未强调容器场景下的内核兼容性限制"
+        "body": "vcann-rt README 列出支持 CANN 8.5.0/9.1.0 但未说明 runtime API 版本兼容性。UT 中 hook 机制依赖特定 runtime 函数符号，CANN 版本不匹配时全部测试失败并段错误。建议文档明确 runtime API 版本要求或增加版本检测",
+        "source": "vcann-rt/README.md 软件版本章节 + hook.c:30",
+        "time": "2026-09-17T10:07:07",
+        "title": "vcann-rt 未说明 CANN runtime API 版本兼容性要求"
+      },
+      {
+        "body": "virt-awaresched README 和 CONTRIBUTING.md 写 UT 命令为 bash build.sh test 但未说明需 libvirtd 运行。UT 中多个测试连接 /var/run/libvirt/libvirt-sock 失败导致段错误。建议文档增加 UT 环境前置条件说明",
+        "source": "virt-awaresched/README.md 开发者测试章节 + CONTRIBUTING.md",
+        "time": "2026-09-17T10:07:07",
+        "title": "virt-awaresched UT 未说明 libvirt daemon 运行前置条件"
+      },
+      {
+        "body": "ubs-virt 顶层 build.sh 仅输出调试信息，无实际构建逻辑。顶层 ubs-virt.spec 调用 bash build.sh 但不执行任何构建。新开发者需自行理解三个子组件需分别构建。建议顶层 README 增加多组件构建说明",
+        "source": "build.sh + ubs-virt.spec",
+        "time": "2026-09-17T10:07:07",
+        "title": "顶层 build.sh 为调试桩，未说明多组件构建入口"
       }
     ]
   },
