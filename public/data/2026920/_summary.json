@@ -734,68 +734,56 @@
   {
     "name": "triton-ascend",
     "displayName": "triton-ascend",
-    "result": "success",
+    "result": "partial_success",
     "buildStatus": "success",
-    "utStatus": "success",
+    "utStatus": "partial_success",
     "sampleStatus": "unknown",
-    "totalDuration": 3268,
-    "environmentDuration": 2010,
-    "buildDuration": 184,
-    "utDuration": 1074,
-    "testPassed": 3716,
-    "testFailed": 0,
-    "testTotal": 3725,
-    "testSkipped": 204,
-    "generatedAt": "2026-09-19T07:46:31",
+    "totalDuration": 809,
+    "environmentDuration": 198,
+    "buildDuration": 3,
+    "utDuration": 608,
+    "testPassed": 3393,
+    "testFailed": 323,
+    "testTotal": 3919,
+    "testSkipped": 201,
+    "generatedAt": "2026-09-21T15:16:43",
     "environment": "unknown",
     "url": "https://github.com/triton-lang/triton-ascend.git",
     "category": "triton",
     "hasStaticAnalysis": false,
-    "file": "verification_report_triton-ascend_20260919.json",
+    "file": "verification_report_triton-ascend_20260921.json",
     "issues": [
       {
-        "problem": "Tier 1 预构建镜像缺少 einops 依赖，导致 test_attn_cp.py 和 test_scalarPointer.py 导入失败（2 个 collection error）",
-        "solution": "pip install einops 安装缺失依赖后重跑，test_scalarPointer.py 1 个测试通过，test_attn_cp.py 3 个测试跳过",
-        "source": "third_party/ascend/unittest/pytest_ut/test_attn_cp.py:145 + test_scalarPointer.py:16 (from einops import rearrange)",
-        "timestamp": "2026-09-19T08:40:37"
+        "timestamp": "2026-09-21T15:30:12",
+        "problem": "NPU 卡0(Critical)、卡1(Alarm) 状态异常，conftest.py 按 worker_id % device_count 分配设备，worker gw0 会分到物理卡0 导致 SetDevice 失败",
+        "solution": "设置 ASCEND_RT_VISIBLE_DEVICES=2,3,4,5,6,7 限制容器只看到 6 张健康卡，device_count() 返回 6，set_device(0) 映射到物理卡2",
+        "source": "conftest.py assign_npu + npu-smi 卡状态"
       },
       {
-        "problem": "Tier 1 预构建镜像缺少 pyelftools 依赖，导致 test_debug_line_rewriter.py 9 个测试失败（RuntimeError: pyelftools is required）",
-        "solution": "pip install 'pyelftools>=0.29' 安装缺失依赖后重跑，全部 30 个测试通过（原 9 失败 + 21 通过 → 30 通过）",
-        "source": "third_party/ascend/backend/debug_line_rewriter.py:173 (raise RuntimeError('pyelftools is required'))",
-        "timestamp": "2026-09-19T08:40:37"
+        "timestamp": "2026-09-21T15:30:12",
+        "problem": ".pth 方式替代 pip install -e . 后 ascend backend 未注册（entry_points 未注册），backends 只有 amd/nvidia",
+        "solution": "设置 TRITON_BACKENDS_IN_TREE=1，triton/backends/__init__.py 快速路径直接扫描 triton/backends/ 目录发现 ascend 后端",
+        "source": "triton/backends/__init__.py _discover_backends()"
       },
       {
-        "problem": "pip install --no-deps 安装 wheel 时跳过了 triton==3.6.0 依赖（triton 3.6.0 是开发版本不在 PyPI 上）",
-        "solution": "triton_ascend 包已包含全部 triton Python 代码和 C 扩展，使用 --no-deps 安装后功能完整，import triton 和 Ascend 后端均正常工作",
-        "source": "setup_ascend.py:413 (install_requires triton==3.6.0) + pip install --no-deps",
-        "timestamp": "2026-09-19T08:40:37"
+        "timestamp": "2026-09-21T15:30:12",
+        "problem": "UT 并发 -n 28 时 323 个测试失败：28 个 worker 争抢 6 张 NPU 卡（每卡 4-5 个 worker），多 worker 同时编译/执行 NPU kernel 导致冲突",
+        "solution": "NPU 测试是设备 I/O 密集型，瓶颈在 NPU 卡数而非 CPU 核数。历史对比：-n 6（1卡1worker）3687 passed/29 failed/821s；-n 8 3695 passed/21 failed/1521s；-n 28（256核/9）3393 passed/323 failed/608s。-n 28 最快但失败最多",
+        "source": "UT 并发对比测试"
       }
     ],
     "documentationGaps": [
       {
-        "body": "README.md 和 installation_guide.md 的源码安装章节写的是 pip install -e .，但 pyproject.toml 的 build-backend 是 setuptools.build_meta（运行 setup.py），而 setup.py 的 backends 列表只含 nvidia 和 amd，不含 ascend。正确的构建入口是 setup_ascend.py（通过 _patch_module 添加 ascend 后端）。CI 也使用 setup_ascend.py bdist_wheel。新开发者按 README 执行 pip install -e . 会得到不含 Ascend 后端的 triton 包，无法在 NPU 上运行。",
-        "source": "README.md 源码安装章节 + setup.py:622 (backends = [*BackendInstaller.copy(['nvidia', 'amd']), ...]) + setup_ascend.py:422 (ascend_backend = mod.BackendInstaller.prepare('ascend'))",
-        "time": "2026-09-19T08:40:37",
-        "title": "README 源码安装命令 pip install -e . 不含 Ascend 后端"
+        "time": "2026-09-21T15:30:12",
+        "title": "UT 并发指南未考虑 NPU 卡数瓶颈",
+        "body": "conftest.py 按 worker_id % device_count 分配 NPU 设备，CI 用 nproc/9 作为并发数。但 NPU 测试是设备 I/O 密集型，并发数超过 NPU 卡数时失败率显著上升（-n 28 失败 323 vs -n 6 失败 29）。安装指南应提示最优并发数 ≈ NPU 卡数",
+        "source": "conftest.py + UT 并发对比"
       },
       {
-        "body": "quay.io/ascend/triton:3.2.2-cann9.1.0-torch_npu2.7.1.post8-910b-ubuntu24.04-py3.11 镜像未预装 einops 和 pyelftools，但 pytest_ut 中的 test_attn_cp.py/test_scalarPointer.py 依赖 einops，test_debug_line_rewriter.py 依赖 pyelftools。requirements.txt 列出了 pyelftools>=0.29，requirements_dev.txt 列出了 einops，但镜像未完整安装这些依赖。",
-        "source": "requirements.txt (pyelftools>=0.29) + requirements_dev.txt (einops) + 镜像内 pip list 验证",
-        "time": "2026-09-19T08:40:37",
-        "title": "预构建镜像缺少 einops 和 pyelftools 依赖"
-      },
-      {
-        "body": "setup_ascend.py 的 install_requires 包含 triton==3.6.0，但 triton 3.6.0 是开发版本不在 PyPI 上。安装 wheel 时需使用 --no-deps 跳过依赖检查。triton_ascend 包已包含全部 triton 代码，功能完整，但 pip 会持续报版本不匹配警告。",
-        "source": "setup_ascend.py:413 (triton==3.6.0) + pip install 输出 (triton-ascend 3.6.0 requires triton==3.6.0, which is not installed)",
-        "time": "2026-09-19T08:40:37",
-        "title": "triton==3.6.0 依赖不在 PyPI 上，pip install 报版本不匹配警告"
-      },
-      {
-        "body": "容器内 npu-smi 报 symbol lookup error: /usr/local/Ascend/driver/lib64/driver/libdrvdsmi_host.so: undefined symbol: drvSetDeviceInfo。这是宿主机驱动版本（25.5.0）与镜像内 npu-smi 工具版本不匹配导致的。不影响 PyTorch torch_npu 的 NPU 访问（torch.npu.is_available()=True, device_count=8），但影响容器内 npu-smi 命令的使用。",
-        "source": "容器内 npu-smi info 输出 + 宿主机 npu-smi 25.5.0 vs 镜像 CANN 9.1.0",
-        "time": "2026-09-19T08:40:37",
-        "title": "npu-smi 在容器内报 symbol lookup error"
+        "time": "2026-09-21T15:30:12",
+        "title": "安装指南未提示 TRITON_BACKENDS_IN_TREE 和 ASCEND_RT_VISIBLE_DEVICES",
+        "body": "TRITON_BACKENDS_IN_TREE=1 可跳过 entry_points 注册直接发现 ascend 后端；ASCEND_RT_VISIBLE_DEVICES 可限制容器可见的 NPU 卡。安装指南未提及这两个关键环境变量",
+        "source": "triton/backends/__init__.py + conftest.py"
       }
     ]
   },
