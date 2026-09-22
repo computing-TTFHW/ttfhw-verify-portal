@@ -546,6 +546,49 @@
     ]
   },
   {
+    "name": "op-plugin",
+    "displayName": "op-plugin",
+    "result": "success",
+    "buildStatus": "success",
+    "utStatus": "success",
+    "sampleStatus": "unknown",
+    "totalDuration": 2069,
+    "environmentDuration": 1289,
+    "buildDuration": 600,
+    "utDuration": 180,
+    "testPassed": 227,
+    "testFailed": 0,
+    "testTotal": 227,
+    "generatedAt": "2026-09-22T09:37:40",
+    "environment": "unknown",
+    "url": "https://gitcode.com/Ascend/op-plugin.git",
+    "category": "PyTorch",
+    "hasStaticAnalysis": false,
+    "file": "verification_report_op-plugin_20260922.json",
+    "issues": [
+      {
+        "timestamp": "2026-09-22T10:12:09",
+        "problem": "首次构建 auditwheel 失败：Cannot repair wheel, because required library libccl_dpu.so could not be located。libccl_dpu.so 位于 /usr/local/Ascend/cann-9.1.0/aarch64-linux/lib64/，但该路径不在默认 LD_LIBRARY_PATH 中。",
+        "solution": "设置 LD_LIBRARY_PATH 含 /usr/local/Ascend/cann-9.1.0/aarch64-linux/lib64 后重新运行 ci/build.sh。ninja 编译缓存命中，仅重打包+auditwheel 步骤，约 120 秒完成。",
+        "source": "auditwheel repair + libccl_dpu.so 路径"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "time": "2026-09-22T10:12:09",
+        "title": "test/requirements.txt 文件缺失",
+        "body": "CONTRIBUTING.md 功能验证章节写明 'pip3 install -r test/requirements.txt' 但仓库中不存在 test/requirements.txt 文件。测试实际依赖 expecttest 和 hypothesis（torch 测试框架隐式依赖），文档未列出。",
+        "source": "CONTRIBUTING.md + test/ 目录"
+      },
+      {
+        "time": "2026-09-22T10:12:09",
+        "title": "ci/build.sh 未设置 CANN lib64 到 LD_LIBRARY_PATH",
+        "body": "ci/build.sh 调用 pytorch/ci/build.sh 执行 auditwheel repair，但未将 /usr/local/Ascend/cann-9.1.0/aarch64-linux/lib64 加入 LD_LIBRARY_PATH，导致 auditwheel 找不到 libccl_dpu.so。构建文档（docker/devel/README.md）未说明需设置此环境变量。",
+        "source": "ci/build.sh + docker/devel/README.md"
+      }
+    ]
+  },
+  {
     "name": "openeuler-jenkins",
     "displayName": "openeuler-jenkins",
     "result": "partial_success",
@@ -610,74 +653,6 @@
         "source": ".devcontainer/README.devcontainer.md 第 42 行 + 全量单测错误日志",
         "time": "2026-09-19T16:17:01",
         "title": "test/ac/acl/license 测试与源码脱节"
-      }
-    ]
-  },
-  {
-    "name": "OpPlugin",
-    "displayName": "OpPlugin",
-    "result": "partial_success",
-    "buildStatus": "success",
-    "utStatus": "partial_success",
-    "sampleStatus": "unknown",
-    "totalDuration": 6152,
-    "environmentDuration": 5522,
-    "buildDuration": 600,
-    "utDuration": 30,
-    "testPassed": 8,
-    "testFailed": 24,
-    "testTotal": 32,
-    "testSkipped": 0,
-    "generatedAt": "2026-09-19T02:03:38",
-    "environment": "unknown",
-    "url": "https://gitcode.com/Ascend/op-plugin.git",
-    "category": "PyTorch",
-    "hasStaticAnalysis": false,
-    "file": "verification_report_OpPlugin_20260919.json",
-    "issues": [
-      {
-        "problem": "import torch_npu 报 c10::ValueError: Duplicated key 'pinned_reserve_segment_size_mb' found in device-specific configuration parser hook registration",
-        "solution": "根因：镜像预装 torch 2.13.0+cu130（CUDA 构建）的 CUDA accelerator 与 torch_npu 重复注册 pinned_reserve_segment_size_mb。解决：pip3 install --force-reinstall --no-deps torch==2.13.0+cpu --index-url https://download.pytorch.org/whl/cpu 换装 CPU 版本；同时删除镜像预装 torch_npu 残留（/opt/_internal/cpython-3.10.21/.../torch_npu）避免两份 libtorch_npu.so 同时加载",
-        "source": "构建后 import 验证",
-        "timestamp": "2026-09-19T02:20:00"
-      },
-      {
-        "problem": "镜像预装 torch_npu 残留在 /opt/_internal/cpython-3.10.21/.../torch_npu，pip3 uninstall 只清除 /opt/python/cp310-cp310 路径，导致两份 libtorch_npu.so 同时加载",
-        "solution": "手动 rm -rf /opt/_internal/cpython-3.10.21/lib/python3.10/site-packages/torch_npu 及其 dist-info，仅保留新构建的 wheel 安装版本",
-        "source": "import torch_npu 排查",
-        "timestamp": "2026-09-19T02:30:00"
-      },
-      {
-        "problem": "UT 测试报 RuntimeError: AclSetCompileopt(aclCompileOpt::ACL_OP_JIT_COMPILE) error code 500001，18/23 test_add 测试失败",
-        "solution": "根因：镜像 CANN 9.1.0_beta.1 为 beta 版本，ATC 编译器不完整，ACL graph engine 内部错误。尝试 JITCOMPILE=disable 环境变量无效（AclSetCompileopt 仍被调用）；尝试挂载宿主机 CANN 9.1.0 失败（libhccl.so 需 GLIBCXX_3.4.30，容器 libstdc++ 仅 3.4.25）。最终判定为镜像 CANN beta 版本限制，不使用 npu_format_cast 的测试可通过，记录为 partial_success",
-        "source": "UT 执行",
-        "timestamp": "2026-09-19T02:40:00"
-      },
-      {
-        "problem": "run_test.py -i test_add 报 invalid choice，CONTRIBUTING.md 的命令示例与实际参数格式不符",
-        "solution": "run_test.py 的 -i 参数需完整模块路径 test_base_ops/test_add（非 test_add），因 argparse choices 校验完整 TEST_CHOICES 列表",
-        "source": "UT 执行",
-        "timestamp": "2026-09-19T02:35:00"
-      }
-    ],
-    "documentationGaps": [
-      {
-        "body": "OpPlugin CONTRIBUTING.md 功能验证指导章节写 'pip3 install -r test/requirements.txt'，但 OpPlugin 仓库 test/ 目录下不存在 requirements.txt 文件。实际测试依赖（expecttest 等）需从 TorchNPU pytorch 仓库的 requirements.txt 获取。文档与实际文件不一致，新手开发者按文档操作会报 ModuleNotFoundError。",
-        "source": "OpPlugin CONTRIBUTING.md + test/ 目录",
-        "time": "2026-09-19T03:46:10",
-        "title": "CONTRIBUTING.md 引用的 test/requirements.txt 不存在"
-      },
-      {
-        "body": "TorchNPU 源码安装指南推荐的 torch-npu-devel:2.13.0-cann9.1.0-910b-manylinux_2_28 镜像，实际预装 torch 2.13.0+cu130（CUDA 构建），而非 Dockerfile 中 pip install torch==2.13.0 --index-url .../whl/cpu 指定的 +cpu 版本。+cu130 的 CUDA accelerator 注册了 pinned_reserve_segment_size_mb 配置项，与 torch_npu 的 registerDeviceConfigParserHook 重复注册冲突，导致 import torch_npu 报 Duplicated key 错误。文档/构建脚本与实际镜像内容不一致。",
-        "source": "TorchNPU building_from_source.md + 镜像实际内容",
-        "time": "2026-09-19T03:46:10",
-        "title": "Tier 1 预构建镜像实际预装 torch 为 +cu130 而非 Dockerfile 指定的 +cpu"
-      },
-      {
-        "body": "镜像 torch-npu-devel:2.13.0-cann9.1.0-910b-manylinux_2_28 预装的 CANN 9.1.0_beta.1 为 beta 版本，ATC 编译器（atc --version 失败）不完整。torch_npu master 的 OpCommand::Run() 无条件调用 AclSetCompileopt(ACL_OP_JIT_COMPILE)，CANN graph engine 返回内部错误 500001。导致所有使用 npu_format_cast 的 UT 测试失败。镜像版本与文档未说明此限制。",
-        "source": "镜像 CANN 9.1.0_beta.1 + torch_npu master OpCommand.cpp",
-        "time": "2026-09-19T03:46:10",
-        "title": "镜像 CANN 9.1.0_beta.1 ATC 编译器不完整，ACL_OP_JIT_COMPILE 不可用"
       }
     ]
   },
