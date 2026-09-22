@@ -767,54 +767,54 @@
     "displayName": "triton-ascend",
     "result": "partial_success",
     "buildStatus": "success",
-    "utStatus": "partial_success",
+    "utStatus": "failed",
     "sampleStatus": "unknown",
-    "totalDuration": 809,
-    "environmentDuration": 198,
-    "buildDuration": 3,
-    "utDuration": 608,
-    "testPassed": 3393,
-    "testFailed": 323,
-    "testTotal": 3919,
+    "totalDuration": 1139,
+    "environmentDuration": 765,
+    "buildDuration": 212,
+    "utDuration": 162,
+    "testPassed": 418,
+    "testFailed": 3312,
+    "testTotal": 3933,
     "testSkipped": 201,
-    "generatedAt": "2026-09-21T15:16:43",
+    "generatedAt": "2026-09-22T14:15:34",
     "environment": "unknown",
     "url": "https://github.com/triton-lang/triton-ascend.git",
     "category": "triton",
     "hasStaticAnalysis": false,
-    "file": "verification_report_triton-ascend_20260921.json",
+    "file": "verification_report_triton-ascend_20260922.json",
     "issues": [
       {
-        "timestamp": "2026-09-21T15:30:12",
-        "problem": "NPU 卡0(Critical)、卡1(Alarm) 状态异常，conftest.py 按 worker_id % device_count 分配设备，worker gw0 会分到物理卡0 导致 SetDevice 失败",
-        "solution": "设置 ASCEND_RT_VISIBLE_DEVICES=2,3,4,5,6,7 限制容器只看到 6 张健康卡，device_count() 返回 6，set_device(0) 映射到物理卡2",
-        "source": "conftest.py assign_npu + npu-smi 卡状态"
+        "timestamp": "2026-09-22T14:34:33",
+        "problem": "pip install -e . 因 triton==3.6.0 依赖找不到失败（新版 commit 2268ec8 新增 triton 依赖，PyPI 无 aarch64 包）",
+        "solution": "使用 --no-deps 跳过依赖解析，镜像已预装所有实际依赖",
+        "source": "pip install -e . 报错 No matching distribution found for triton==3.6.0"
       },
       {
-        "timestamp": "2026-09-21T15:30:12",
-        "problem": ".pth 方式替代 pip install -e . 后 ascend backend 未注册（entry_points 未注册），backends 只有 amd/nvidia",
-        "solution": "设置 TRITON_BACKENDS_IN_TREE=1，triton/backends/__init__.py 快速路径直接扫描 triton/backends/ 目录发现 ascend 后端",
-        "source": "triton/backends/__init__.py _discover_backends()"
+        "timestamp": "2026-09-22T14:34:33",
+        "problem": "容器重启后 pip install 的 .pth/finder 丢失，import triton 失败（ModuleNotFoundError）",
+        "solution": "手动创建 .pth 文件: echo /workspace/python > .../site-packages/_triton_editable.pth + 设置 TRITON_BACKENDS_IN_TREE=1",
+        "source": "UT 报 ModuleNotFoundError: No module named triton"
       },
       {
-        "timestamp": "2026-09-21T15:30:12",
-        "problem": "UT 并发 -n 28 时 323 个测试失败：28 个 worker 争抢 6 张 NPU 卡（每卡 4-5 个 worker），多 worker 同时编译/执行 NPU kernel 导致冲突",
-        "solution": "NPU 测试是设备 I/O 密集型，瓶颈在 NPU 卡数而非 CPU 核数。历史对比：-n 6（1卡1worker）3687 passed/29 failed/821s；-n 8 3695 passed/21 failed/1521s；-n 28（256核/9）3393 passed/323 failed/608s。-n 28 最快但失败最多",
+        "timestamp": "2026-09-22T14:34:33",
+        "problem": "UT 并发 -n 28（256核/9）时 3312 个测试失败（84.3% 失败率），28 worker 争抢 6 张 NPU 卡导致大量编译/执行冲突",
+        "solution": "NPU 测试是设备 I/O 密集型，瓶颈在 NPU 卡数而非 CPU 核数。历史对比：-n 6（1卡1worker）3687 passed/29 failed/821s；-n 8 3695 passed/21 failed/1521s；-n 28（256核/9）418 passed/3312 failed/162s。-n 28 最快但失败率极高，不适合 NPU 测试",
         "source": "UT 并发对比测试"
       }
     ],
     "documentationGaps": [
       {
-        "time": "2026-09-21T15:30:12",
-        "title": "UT 并发指南未考虑 NPU 卡数瓶颈",
-        "body": "conftest.py 按 worker_id % device_count 分配 NPU 设备，CI 用 nproc/9 作为并发数。但 NPU 测试是设备 I/O 密集型，并发数超过 NPU 卡数时失败率显著上升（-n 28 失败 323 vs -n 6 失败 29）。安装指南应提示最优并发数 ≈ NPU 卡数",
-        "source": "conftest.py + UT 并发对比"
+        "time": "2026-09-22T14:34:33",
+        "title": "新版 triton-ascend 新增 triton 依赖但 PyPI 无 aarch64 包",
+        "body": "commit 2268ec8 新增 triton==3.6.0 依赖，但 PyPI 上无 aarch64 包，pip install -e . 报 No matching distribution found。安装指南未说明需用 --no-deps 或手动安装 triton",
+        "source": "pip install -e . 失败"
       },
       {
-        "time": "2026-09-21T15:30:12",
-        "title": "安装指南未提示 TRITON_BACKENDS_IN_TREE 和 ASCEND_RT_VISIBLE_DEVICES",
-        "body": "TRITON_BACKENDS_IN_TREE=1 可跳过 entry_points 注册直接发现 ascend 后端；ASCEND_RT_VISIBLE_DEVICES 可限制容器可见的 NPU 卡。安装指南未提及这两个关键环境变量",
-        "source": "triton/backends/__init__.py + conftest.py"
+        "time": "2026-09-22T14:34:33",
+        "title": "UT 并发指南未考虑 NPU 卡数瓶颈",
+        "body": "CI 用 nproc/9 作为并发数，但 NPU 测试是设备 I/O 密集型。-n 28（256核/9）时 84.3% 失败率，-n 6（1卡1worker）仅 0.8% 失败率。安装指南应提示最优并发数 ≈ NPU 卡数",
+        "source": "UT 并发对比"
       }
     ]
   },
