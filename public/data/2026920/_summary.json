@@ -875,52 +875,64 @@
     "buildStatus": "success",
     "utStatus": "partial_success",
     "sampleStatus": "unknown",
-    "totalDuration": 4917,
-    "environmentDuration": 4839,
-    "buildDuration": 5,
-    "utDuration": 73,
-    "testPassed": 3811,
-    "testFailed": 51,
-    "testTotal": 3920,
-    "testSkipped": 58,
-    "generatedAt": "2026-09-19T00:40:33",
+    "totalDuration": 1799,
+    "environmentDuration": 598,
+    "buildDuration": 1075,
+    "utDuration": 126,
+    "testPassed": 5402,
+    "testFailed": 18,
+    "testTotal": 5454,
+    "testSkipped": 34,
+    "generatedAt": "2026-09-22T11:30:12",
     "environment": "unknown",
     "url": "https://github.com/vllm-project/vllm-ascend.git",
     "category": "MindIE",
     "hasStaticAnalysis": false,
-    "file": "verification_report_vllm-ascend_20260919.json",
+    "file": "verification_report_vllm-ascend_20260922.json",
     "issues": [
       {
-        "problem": "从 Docker 镜像复制源码到宿主机时，docker cp 因 USTAR 格式路径长度限制无法复制 csrc/ 目录下的深层文件 (如 csrc/build/_CPack_Packages/.../block_epilogue_gdn_fwdo_output.hpp)，导致 csrc/build_aclnn.sh、csrc/build.sh、csrc/*.cpp 等关键构建文件缺失",
-        "solution": "使用 docker run --rm <image> tar --format=gnu -cf - -C /vllm-workspace/vllm-ascend csrc | tar xf - -C /home/workspace/vllm-ascend-verify/ 通过管道 tar 复制完整 csrc 目录 (429MB)，绕过 docker cp 的路径长度限制",
-        "source": "步骤 2/3 容器搭建与构建",
-        "timestamp": "2026-09-19T01:56:03"
+        "timestamp": "2026-09-22T12:00:11",
+        "problem": "nightly-main 镜像 vLLM 版本与 verified commit 不匹配",
+        "solution": "ghfast.top 代理 fetch 84030bbe 并 checkout",
+        "source": ".github/vllm-main-verified.commit"
       },
       {
-        "problem": "完整 C++ 重编译 (COMPILE_CUSTOM_KERNELS=1) 耗时超过 30 分钟限制。CANN bisheng 编译器编译 NPU 内核 (auto_gen_mla_preprocess_kernel.cpp 等) 单文件即需数分钟，全部自定义算子编译预估 1+ 小时",
-        "solution": "Tier 1 预构建镜像 nightly-main 已在 Docker 构建时完成完整 C++ 编译 (.so 文件 Sep 9 13:47 生成)。使用 COMPILE_CUSTOM_KERNELS=0 跳过重编译，复用镜像预构建的 .so 文件，pip install -e . 5 秒内完成 Python 包安装",
-        "source": "步骤 3 构建",
-        "timestamp": "2026-09-19T01:56:03"
+        "timestamp": "2026-09-22T12:00:11",
+        "problem": "远程机器无法访问 github.com",
+        "solution": "使用 ghfast.top 代理",
+        "source": "远程机器网络环境"
       },
       {
-        "problem": "单元测试 51 个失败 + 20 个收集错误。失败原因: (1) API 不匹配 (AttributeError): AscendPCPManager.input_buffers vs _input_buffers, HiddenStateCacheSpec.num_states 缺失, 说明 nightly-main 镜像的 vLLM 版本与 main 分支代码存在小幅 API 差异; (2) 缺少测试 fixture 文件 (FileNotFoundError): test_ai_qos_tool.py 的 19 个测试缺少 fixture; (3) tools 模块未安装 (12 个收集错误): tools/ 目录不是 pip 包; (4) vLLM 内部模块缺失 (7 个收集错误): vllm.v1.worker.gpu.spec_decode.extract_hidden_states 模块在当前 vLLM 版本中不存在",
-        "solution": "这些失败属于环境版本差异和测试 fixture 缺失，非代码逻辑错误。3811/3920 测试通过 (97.2%)，核心功能验证通过。API 不匹配问题可通过同步 vLLM 版本到 main 分支 verified commit 解决；tools 模块收集错误可通过安装 tools 为开发包或在 PYTHONPATH 中添加仓库根目录解决",
-        "source": "步骤 4 单元测试",
-        "timestamp": "2026-09-19T02:02:05"
+        "timestamp": "2026-09-22T12:00:11",
+        "problem": "test_profiling_chunk.py 挂起",
+        "solution": "排除该测试文件",
+        "source": "tests/ut/core/test_profiling_chunk.py"
+      },
+      {
+        "timestamp": "2026-09-22T12:00:11",
+        "problem": "镜像未预装测试依赖",
+        "solution": "pip install pytest-timeout pytest-asyncio==0.23.8 pytest-mock pytest-cov coverage",
+        "source": "requirements-dev.txt"
       }
     ],
     "documentationGaps": [
       {
-        "body": "tests/ut/tools/bisect/ 下的测试文件 import tools.bisect 模块，但 tools/ 目录未在 setup.py 的 find_packages 中声明，导致 pip install 不会安装 tools 模块。测试文档中未说明需要额外设置 PYTHONPATH 或安装 tools 包",
-        "source": "tests/ut/tools/bisect/test_*.py 收集错误",
-        "time": "2026-09-19T02:02:05",
-        "title": "tools 模块未在 setup.py 中声明为可安装包"
+        "time": "2026-09-22T12:00:11",
+        "title": "测试指南未说明部分 UT 需要 NPU 硬件",
+        "body": "4个测试调用 NPU 专用算子在 CPU 环境失败",
+        "source": "测试指南 + tests/ut/ops/test_gdn_mixed_batch.py"
       },
       {
-        "body": "nightly-main 镜像中的 vLLM 版本 (0.28.0+empty) 可能与 main 分支 vllm-ascend 代码期望的 vLLM API 存在差异 (如 AscendPCPManager.input_buffers vs _input_buffers, HiddenStateCacheSpec.num_states)。测试文档未说明 nightly-main 镜像的具体 vLLM commit 及与 main 分支的兼容性",
-        "source": "tests/ut/worker/test_model_runner_v2.py, tests/ut/kv_offload/mooncake_v2/test_base_worker.py 失败",
-        "time": "2026-09-19T02:02:05",
-        "title": "nightly-main 镜像 vLLM 版本与 main 分支代码可能存在小幅 API 差异"
+        "time": "2026-09-22T12:00:11",
+        "title": "vllm-ascend main 分支与 vLLM verified commit API 漂移",
+        "body": "14个测试因 vLLM API 不匹配失败（PCP DP/量化方法）",
+        "source": "tests/ut/patch/platform/ + tests/ut/quantization/"
+      },
+      {
+        "time": "2026-09-22T12:00:11",
+        "title": "test_profiling_chunk.py 测试挂起",
+        "body": "需排除该测试文件",
+        "source": "tests/ut/core/test_profiling_chunk.py"
       }
     ]
   }
