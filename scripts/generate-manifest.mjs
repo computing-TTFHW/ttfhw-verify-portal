@@ -399,8 +399,8 @@ async function main() {
   const batchDirs = entries
     .filter(e => e.isDirectory())
     .map(e => e.name)
-    .sort()
-    .reverse() // newest first
+    // 按数字大小降序（newest first）；目录名格式为 YYYYMD（无前导零），如 20261013
+    .sort((a, b) => Number(b) - Number(a))
 
   console.log(`Found ${batchDirs.length} batch directories: ${batchDirs.join(', ')}`)
 
