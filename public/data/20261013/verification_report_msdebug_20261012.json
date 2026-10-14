@@ -1,0 +1,598 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md + dependencies.json + devcontainer.json",
+      "value": "aarch64（昇腾 NPU 算子调试工具，dependencies.json 提供 aarch64 prebuilt 包，远程机器为 aarch64）"
+    },
+    "build_commands": {
+      "source": "docs/zh/install_guide/msdebug_install_guide.md 第2.3.2节 + docs/zh/development_guide/develop_guide.md 第2.1节 + build.py",
+      "value": "python3 build.py（一键式脚本：自动下载依赖 → cmake 配置 → ninja 编译 → 打包，产物输出到 artifacts/ 目录）"
+    },
+    "build_entry": {
+      "source": "build.py BuildManager.run()",
+      "value": "build.py 为唯一构建入口，支持子命令：无参数=全构建、local=跳过依赖下载、test=单元测试、prebuild=全量编译打包 prebuilt 库"
+    },
+    "dependencies": {
+      "source": "CMakeLists.txt + dependencies.json + .gitmodules + build.py + docker_image_build_guide.md",
+      "value": [
+        "cmake \u003e= 3.20.2",
+        "ninja（优先）或 make",
+        "gcc 11.2（镜像预装）",
+        "python3（3.11，镜像预装）",
+        "ccache（镜像预装）",
+        "libedit（third-party/libedit submodule）",
+        "ncurses（third-party/ncurses submodule）",
+        "makeself（third-party/makeself submodule）",
+        "LLVM/Clang prebuilt aarch64 包（build.py 自动从 OBS 下载）",
+        "CANN 9.1.0（镜像预装，含 toolkit 和 ops 包）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库内无 Dockerfile，构建依赖通过 dependencies.json + .gitmodules + CMakeLists.txt 管理",
+      "value": "无 Dockerfile（仓库内）。镜像由 MindStudio 统一镜像制作指南维护，devcontainer.json 直接引用预构建镜像。构建依赖：cmake\u003e=3.20.2、ninja、gcc 11.2、python3、ccache、libedit(submodule)、ncurses(submodule)、makeself(submodule)、LLVM/Clang prebuilt(aarch64)"
+    },
+    "recommended_image": {
+      "source": ".devcontainer/devcontainer.json image 字段",
+      "value": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801（Tier 1 业务预构建镜像，基于 openEuler 24.03 LTS，预装 GCC 11.2 / Python 3.11 / CANN 9.1.0）"
+    },
+    "special_dependencies": {
+      "source": "devcontainer.json + install_guide + docker_image_build_guide.md",
+      "value": [
+        "CANN 9.1.0（昇腾 NPU 驱动和工具包，镜像预装）",
+        "NPU 设备：davinci0/davinci_manager/devmm_svm/hisi_hdc + npu-smi/driver/firmware（调试算子必需）",
+        "prebuilt LLVM/Clang aarch64 包（build.py 从 https://mindstudio-pr.obs.cn-north-4.myhuaweicloud.com 下载）",
+        "openEuler 24.03 LTS（镜像基础 OS）"
+      ]
+    },
+    "ut_commands": {
+      "source": "docs/zh/install_guide/msdebug_install_guide.md 第2.3.3节 + docs/zh/development_guide/develop_guide.md 第3.1节 + build.py _run_unit_tests()",
+      "value": "python3 build.py test（编译 LLDB + gtest 单测可执行并逐个运行，返回码 0 且无 FAILED 表示通过）"
+    },
+    "ut_entry": {
+      "source": "build.py _run_unit_tests()",
+      "value": "build_ut/lldb-standalone-build/unittests/ 下的 *Tests 可执行文件，用 --gtest_brief=1 逐个执行"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "开发指南和安装指南中未提及执行单元测试前需要开启 NPU debug switch (echo 1 \u003e /proc/debug_switch)。AclrtStubSmokeTests 测试依赖该开关才能初始化 msdebug，缺少此步骤会导致测试失败",
+      "source": "docs/zh/development_guide/develop_guide.md 第3节 + docs/zh/install_guide/msdebug_install_guide.md 第2.3.3节",
+      "time": "2026-10-12T23:08:32",
+      "title": "UT 环境前置条件未在文档中说明"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "克隆仓库到本地并查看目录结构",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/Ascend/msdebug.git /tmp/opencode/msdebug",
+      "details": {
+        "branch": "master",
+        "file_count": 57,
+        "repo": "msdebug",
+        "url": "https://gitcode.com/Ascend/msdebug.git"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "仓库包含 LLVM 全栈（clang/llvm/lld/lldb/mlir 等）+ msdebug-mi + build.py + CMakeLists.txt + docs/ + .devcontainer/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T22:53:30"
+    },
+    {
+      "action": "阅读 README.md 提取项目定位和文档链接",
+      "command": "cat /tmp/opencode/msdebug/README.md",
+      "details": {
+        "file": "README.md",
+        "project": "MindStudio Debugger (msDebug)",
+        "type": "LLVM-based 昇腾算子调试工具"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "msDebug 是基于 LLVM 的昇腾 NPU 算子调试工具，支持断点/变量打印/单步调试。链接：快速入门、安装指南、使用指南、贡献指南、FAQ",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T22:53:30"
+    },
+    {
+      "action": "阅读 .devcontainer/devcontainer.json 探测镜像信号",
+      "command": "cat /tmp/opencode/msdebug/.devcontainer/devcontainer.json",
+      "details": {
+        "file": ".devcontainer/devcontainer.json",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "remote_user": "mindstudio",
+        "run_args": [
+          "--network=host",
+          "--privileged",
+          "--ipc=host"
+        ],
+        "signal": "image 字段指向非基础 OS 的业务预构建镜像",
+        "tier": 1,
+        "workspace": "/workspace"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "image=swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801，基于 openEuler，预装 CANN/gcc11/python3.11",
+      "result": "成功（Tier 1 信号命中）",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T22:53:30"
+    },
+    {
+      "action": "阅读安装指南提取构建和 UT 命令",
+      "command": "cat /tmp/opencode/msdebug/docs/zh/install_guide/msdebug_install_guide.md",
+      "details": {
+        "artifacts_dir": "artifacts/",
+        "build_cmd": "python3 build.py",
+        "file": "docs/zh/install_guide/msdebug_install_guide.md",
+        "image_guide_link": "https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/docker_image_build_guide.md",
+        "ut_cmd": "python3 build.py test"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "源码安装需用 MindStudio 标准构建环境镜像。构建：python3 build.py，产物在 artifacts/。UT：python3 build.py test。容器须用 ctr_in.py 启动",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T22:53:30"
+    },
+    {
+      "action": "阅读贡献指南和开发指南提取构建/UT 详细流程",
+      "command": "cat /tmp/opencode/msdebug/docs/zh/development_guide/develop_guide.md",
+      "details": {
+        "build_one_click": "python3 build.py",
+        "build_step_by_step": "python3 download_dependencies.py \u0026\u0026 python3 build.py local",
+        "clean_build": "rm -rf build",
+        "clean_ut": "rm -rf build_ut",
+        "files": [
+          "docs/zh/contributing/contributing_guide.md",
+          "docs/zh/development_guide/develop_guide.md"
+        ],
+        "ut_cmd": "python3 build.py test"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "两种构建方式：一键式 python3 build.py（下载依赖+编译+打包）；分步骤：download_dependencies.py + build.py local。UT: python3 build.py test",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T22:53:30"
+    },
+    {
+      "action": "分析 build.py 构建系统和 CMakeLists.txt 依赖",
+      "command": "cat /tmp/opencode/msdebug/build.py \u0026\u0026 cat /tmp/opencode/msdebug/CMakeLists.txt",
+      "details": {
+        "build_system": "CMake + Ninja(优先) / Make",
+        "ccache": "自动检测使用",
+        "cmake_min": "3.20.2",
+        "prebuilt_mode": "默认 USE_PREBUILT_LLVM=ON（下载 aarch64 prebuilt LLVM/Clang .a 包）",
+        "source_mode": "--no-prebuilt 全量编译 LLVM/Clang",
+        "targets": [
+          "ncurses_project",
+          "libedit_project",
+          "llvm_project",
+          "msdebug_mi_project"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "build.py 管理：依赖拉取→CMake配置→Ninja编译→安装/测试。默认预编译模式。CMakeLists.txt 依赖 ncurses/libedit/LLVM/msdebug-mi",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-10-12T22:53:30"
+    },
+    {
+      "action": "分析 dependencies.json 和 .gitmodules 提取依赖来源",
+      "command": "cat /tmp/opencode/msdebug/dependencies.json \u0026\u0026 cat /tmp/opencode/msdebug/.gitmodules",
+      "details": {
+        "prebuilt_artifacts": [
+          "aarch64-abi0",
+          "aarch64-abi1",
+          "x86_64-abi0",
+          "x86_64-abi1"
+        ],
+        "prebuilt_url_aarch64": "https://mindstudio-pr.obs.cn-north-4.myhuaweicloud.com/msdebug/prebuilt/",
+        "submodules": [
+          "third-party/makeself",
+          "third-party/libedit",
+          "third-party/ncurses"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "dependencies.json: 4个prebuilt包(aarch64/x86_64 × abi0/abi1)。submodules: makeself/libedit/ncurses",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-10-12T22:53:30"
+    },
+    {
+      "action": "跟踪 MindStudio 统一镜像制作指南（文档闭包：安装指南指向的外部链接）",
+      "command": "WebFetch https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/docker_image_build_guide.md",
+      "details": {
+        "base_os": "openEuler 24.03 LTS",
+        "cann": "9.1.0 (toolkit + ops)",
+        "ctr_in_py": "https://inst.obs.cn-north-4.myhuaweicloud.com/env/ctr_in.py",
+        "gcc": "11.2",
+        "python": "3.8-3.13 (3.11)",
+        "tier2_fallback": "可用 build_image.py 从 openEuler 基础镜像构建环境镜像",
+        "url": "https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/docker_image_build_guide.md"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "镜像分层：openEuler→GCC11→Python311→CANN9.1.0。Tier1 预构建镜像 pull 失败时可降级 Tier2/3 用 build_image.py 构建",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T22:53:30"
+    },
+    {
+      "action": "汇总文档闭包结果，确定镜像 Tier 和 NPU 需求",
+      "command": "汇总分析",
+      "details": {
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "npu_required": true,
+        "npu_signals": [
+          "README: 昇腾/NPU/算子调试",
+          "devcontainer.json: CANN 环境",
+          "install_guide: CANN 依赖"
+        ],
+        "selection_reason": "devcontainer.json image 字段指向华为云 SWR 业务预构建镜像（非基础 OS）",
+        "tier": 1,
+        "tier2_fallback": "docker_image_build_guide.md 的 build_image.py 从 openEuler 构建",
+        "tier3_fallback": "openEuler 24.03 LTS 基础镜像从零安装"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "Tier 1: swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801。NPU required=true",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-10-12T22:53:30"
+    },
+    {
+      "action": "检查远程机器上是否已有 Tier 1 预构建镜像",
+      "command": "ssh root@192.168.9.114 \"docker images | grep mindstudio-build\"",
+      "details": {
+        "already_pulled": true,
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "size": "4.34GB",
+        "tier": 1
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build  26.2.0-0801  4.34GB",
+      "result": "成功（镜像已存在，无需拉取）",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-10-12T22:58:28"
+    },
+    {
+      "action": "克隆仓库到远程机器 /home/workspace/msdebug-verify",
+      "command": "ssh root@192.168.9.114 \"git clone --depth 1 --branch master https://gitcode.com/Ascend/msdebug.git /home/workspace/msdebug-verify\"",
+      "details": {
+        "branch": "master",
+        "path": "/home/workspace/msdebug-verify",
+        "url": "https://gitcode.com/Ascend/msdebug.git"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "146759 个文件克隆完成",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-10-12T22:58:28"
+    },
+    {
+      "action": "启动 Tier 1 容器（挂载 NPU 设备 + 工作目录）",
+      "command": "docker run -d --name msdebug-ttfhw --privileged --network=host --ipc=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /home/workspace/msdebug-verify:/workspace -v /usr/local/sbin:/usr/local/sbin:ro -v /usr/local/Ascend/driver:/usr/local/Ascend/driver -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801 sleep infinity",
+      "details": {
+        "container_name": "msdebug-ttfhw",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "npu_devices": [
+          "/dev/davinci0",
+          "/dev/davinci_manager",
+          "/dev/devmm_svm",
+          "/dev/hisi_hdc"
+        ],
+        "npu_mounts": [
+          "/usr/local/sbin",
+          "/usr/local/Ascend/driver",
+          "/usr/local/Ascend/firmware"
+        ],
+        "run_args": [
+          "--privileged",
+          "--network=host",
+          "--ipc=host"
+        ],
+        "startup_command_source": "default_挂卡",
+        "workspace_mount": "/home/workspace/msdebug-verify:/workspace"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "容器 msdebug-ttfhw 已启动，状态 Up",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-10-12T22:58:28"
+    },
+    {
+      "action": "验证容器内预装依赖（Tier 1 跳过安装）",
+      "command": "docker exec msdebug-ttfhw bash -lc 'gcc --version \u0026\u0026 cmake --version \u0026\u0026 ninja --version \u0026\u0026 python3 --version \u0026\u0026 ccache --version \u0026\u0026 ls /usr/local/Ascend/cann'",
+      "details": {
+        "arch": "aarch64",
+        "cann": "9.1.0 (/usr/local/Ascend/cann)",
+        "ccache": "4.8.3",
+        "cmake": "3.31.10",
+        "gcc": "11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility)",
+        "gcc_path": "/opt/gcc11-glibc2.17/wrapper/bin/gcc",
+        "ninja": "1.11.1",
+        "nproc": 256,
+        "os": "openEuler 24.03 (LTS-SP3)",
+        "python3": "3.11.15"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "GCC 11.2.0, CMake 3.31.10, Ninja 1.11.1, Python 3.11.15, ccache 4.8.3, CANN 9.1.0 — 全部预装",
+      "result": "成功（全部依赖已预装）",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-10-12T22:58:28"
+    },
+    {
+      "action": "首次执行构建 python3 build.py（下载依赖 + cmake + ninja 编译 + 打包）",
+      "command": "docker exec msdebug-ttfhw bash -lc 'cd /workspace \u0026\u0026 export CMAKE_BUILD_PARALLEL_LEVEL=102 \u0026\u0026 export GCC11_NO_RPATH=1 \u0026\u0026 python3 build.py'",
+      "details": {
+        "cause": "容器以 mindstudio(uid=20001) 运行，挂载目录属主为 root",
+        "command": "python3 build.py",
+        "concurrency": 102,
+        "env": {
+          "CMAKE_BUILD_PARALLEL_LEVEL": "102",
+          "GCC11_NO_RPATH": "1"
+        },
+        "error": "PermissionError: [Errno 13] Permission denied: '/workspace/prebuilt'"
+      },
+      "duration_seconds": 3,
+      "error": "PermissionError: [Errno 13] Permission denied: '/workspace/prebuilt'",
+      "output": "下载 prebuilt LLVM 包成功(77.55M)，解压后创建 /workspace/prebuilt 目录时权限拒绝",
+      "result": "失败（权限错误）",
+      "returncode": 1,
+      "step": "build_attempt",
+      "success": false,
+      "timestamp": "2026-10-12T23:03:26"
+    },
+    {
+      "action": "修复权限问题：chown 工作目录为 mindstudio 用户(20001:20001)",
+      "command": "ssh root@192.168.9.114 'chown -R 20001:20001 /home/workspace/msdebug-verify'",
+      "details": {
+        "gid": 20001,
+        "host_path": "/home/workspace/msdebug-verify",
+        "uid": 20001
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "工作目录属主改为 20001:20001",
+      "result": "成功",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-10-12T23:03:26"
+    },
+    {
+      "action": "重试构建 python3 build.py（权限修复后）",
+      "command": "docker exec msdebug-ttfhw bash -lc 'cd /workspace \u0026\u0026 export CMAKE_BUILD_PARALLEL_LEVEL=102 \u0026\u0026 export GCC11_NO_RPATH=1 \u0026\u0026 time python3 build.py'",
+      "details": {
+        "artifact": "mindstudio-debugger_26.2.0_aarch64.run (64M)",
+        "command": "python3 build.py",
+        "concurrency": 102,
+        "duration": "2m25.859s",
+        "sha256": "0af924b1778f13f181b0ac7a2c47c5dc6b4af45e837528bdeb032328ff8a07b7",
+        "steps": [
+          "下载 prebuilt LLVM/Clang aarch64-abi1 包 (77.55M)",
+          "初始化 submodules: makeself/libedit/ncurses",
+          "ABI 兼容性校验通过",
+          "CMake 配置 (Ninja, Release, USE_PREBUILT_LLVM=ON)",
+          "编译 LLDB + msdebug-mi (76个编译目标)",
+          "makeself 打包 .run 安装包"
+        ]
+      },
+      "duration_seconds": 146,
+      "error": "",
+      "output": "构建成功。产物: mindstudio-debugger_26.2.0_aarch64.run (64M)。编译 76 个目标，打包 .run 安装包",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-10-12T23:03:26"
+    },
+    {
+      "action": "首次执行单元测试 python3 build.py test（编译 + 运行 gtest 单测）",
+      "command": "docker exec msdebug-ttfhw bash -lc 'cd /workspace \u0026\u0026 export CMAKE_BUILD_PARALLEL_LEVEL=102 \u0026\u0026 export GCC11_NO_RPATH=1 \u0026\u0026 time python3 build.py test'",
+      "details": {
+        "command": "python3 build.py test",
+        "concurrency": 102,
+        "failed_cases_detail": "9 tests: 0 passed, 9 skipped (初始化失败导致全部跳过)",
+        "failed_executables": 1,
+        "failed_test": "AclrtStubSmokeTests",
+        "failure_reason": "msdebug failed to initialize, please run echo 1 \u003e /proc/debug_switch to turn on the switch. (error code: 0x20102)",
+        "test_executables": 42,
+        "total_cases": 1356
+      },
+      "duration_seconds": 156,
+      "error": "RuntimeError: 以下单测失败: AclrtStubSmokeTests(1)",
+      "output": "42个可执行，1356用例，1个失败(AclrtStubSmokeTests exit=1)。错误: msdebug failed to initialize, 需开启 debug switch",
+      "result": "部分成功（1个可执行失败）",
+      "returncode": 1,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-10-12T23:08:32"
+    },
+    {
+      "action": "开启 NPU debug switch 修复 AclrtStubSmokeTests 初始化失败",
+      "command": "ssh root@192.168.9.114 'echo 1 \u003e /proc/debug_switch' \u0026\u0026 docker exec msdebug-ttfhw bash -lc 'AclrtStubSmokeTests --gtest_brief=1'",
+      "details": {
+        "fix": "echo 1 \u003e /proc/debug_switch",
+        "root_cause": "AclrtStubSmokeTests 需要 /proc/debug_switch 开启才能初始化 msdebug",
+        "verification": "单独运行 AclrtStubSmokeTests，9 tests 全部 PASSED"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "debug_switch_status = 1。AclrtStubSmokeTests: 9 tests PASSED",
+      "result": "成功",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-10-12T23:08:32"
+    },
+    {
+      "action": "重试单元测试 python3 build.py test local（debug switch 开启后）",
+      "command": "docker exec msdebug-ttfhw bash -lc 'cd /workspace \u0026\u0026 export CMAKE_BUILD_PARALLEL_LEVEL=102 \u0026\u0026 export GCC11_NO_RPATH=1 \u0026\u0026 time python3 build.py test local'",
+      "details": {
+        "command": "python3 build.py test local",
+        "duration": "20.148s（编译缓存命中，仅重跑测试）",
+        "failed": 0,
+        "passed": 1356,
+        "skipped": 0,
+        "test_executables": 42,
+        "total_cases": 1356
+      },
+      "duration_seconds": 20,
+      "error": "",
+      "output": "单测汇总: 共 42 个可执行，用例总数 1356，失败 0 个",
+      "result": "成功（全部通过）",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-10-12T23:08:32"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "mindstudio-debugger_26.2.0_aarch64.run",
+          "path": "artifacts/mindstudio-debugger_26.2.0_aarch64.run",
+          "size": "64M",
+          "type": "binary"
+        },
+        {
+          "name": "lldb-server",
+          "path": "output/bin/lldb-server",
+          "size": "37M",
+          "type": "binary"
+        },
+        {
+          "name": "msdebug-mi.bin",
+          "path": "output/bin/msdebug-mi.bin",
+          "size": "3.1M",
+          "type": "binary"
+        },
+        {
+          "name": "msdebug.bin",
+          "path": "output/bin/msdebug.bin",
+          "size": "515K",
+          "type": "binary"
+        }
+      ],
+      "cmake": "3.31.10 (Ninja 1.11.1, USE_PREBUILT_LLVM=ON, CMAKE_BUILD_TYPE=Release)",
+      "compiler": "gcc 11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility)",
+      "concurrency": 102,
+      "concurrency_ratio": "40% (256核 × 40% = 102)",
+      "duration_seconds": 146,
+      "notes": "预编译模式（USE_PREBUILT_LLVM=ON），下载 aarch64 prebuilt LLVM/Clang .a 包，编译 LLDB + msdebug-mi，用 makeself 打包 .run 安装包",
+      "status": "success"
+    },
+    "ut": {
+      "duration_seconds": 156,
+      "failed": 0,
+      "failures": [],
+      "passed": 1356,
+      "skipped": 0,
+      "status": "success",
+      "total": 1356
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "msdebug-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "openEuler 24.03 (LTS-SP3)"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "69G (root, 3.2G可用) / 6.9T (home, 6.3T可用)",
+      "docker_version": "18.09.0",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 7,
+        "mounted_card_id": 0
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "CMakeLists.txt: cmake\u003e=3.20.2, ccache, ncurses, libedit, LLVM, msdebug-mi",
+        "from_dockerfile": "无 Dockerfile（仓库内），镜像由 MindStudio 统一镜像制作指南维护",
+        "from_readme": "build.py + dependencies.json: prebuilt LLVM/Clang aarch64 包, makeself/libedit/ncurses submodules",
+        "mappings": []
+      },
+      "image_name": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+      "selection_reason": "Tier 1 业务预构建镜像（devcontainer.json image 字段指向华为云 SWR 预构建镜像，预装 GCC 11.2 / CMake 3.31 / Ninja 1.11 / Python 3.11 / ccache 4.8 / CANN 9.1.0，镜像已存在于远程机器）",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "",
+    "duration_seconds": 1140,
+    "end_time": "2026-10-12T23:09:01",
+    "environment": "远程容器验证 (192.168.9.114)，Tier 1 预构建镜像 mindstudio-build:26.2.0-0801，aarch64/256核/2.0Ti内存/NPU 910B3",
+    "repo_url": "https://gitcode.com/Ascend/msdebug.git",
+    "start_time": "2026-10-12T22:50:01",
+    "total_steps": 19,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "容器以 mindstudio 用户(uid=20001)运行，但挂载的工作目录 /workspace 属主为 root，导致 build.py 创建 /workspace/prebuilt 目录时 Permission denied",
+      "solution": "在宿主机执行 chown -R 20001:20001 /home/workspace/msdebug-verify 修改工作目录属主为 mindstudio 用户",
+      "source": "构建步骤首次执行",
+      "timestamp": "2026-10-12T23:03:26"
+    },
+    {
+      "problem": "单元测试 AclrtStubSmokeTests 失败，错误信息: msdebug failed to initialize, please run echo 1 \u003e /proc/debug_switch to turn on the switch (error code: 0x20102)。该测试需要 NPU debug switch 开启才能初始化 msdebug 调试工具",
+      "solution": "在宿主机执行 echo 1 \u003e /proc/debug_switch 开启 NPU debug switch，之后重试 AclrtStubSmokeTests 9 个用例全部通过，完整 UT 42 个可执行 1356 个用例 0 失败",
+      "source": "单元测试步骤",
+      "timestamp": "2026-10-12T23:08:32"
+    }
+  ],
+  "session_export_file": "",
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "火山AI网关/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

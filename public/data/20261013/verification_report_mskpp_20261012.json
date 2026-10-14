@@ -1,0 +1,650 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "devcontainer.json image 字段 + dev_env_setup.md 第3章 + docker_image_build_guide.md",
+      "value": "aarch64/x86_64 多架构（镜像 tag 26.2.0-0801 无架构后缀，为多架构 manifest 自动适配）"
+    },
+    "build_commands": {
+      "source": "README.md 安装指南 + install_guide.md 第2.3.2节 + develop_guide.md 第2章 + build.py",
+      "value": "python3 build.py（自动下载依赖 + cmake + make -j + wheel 打包，产物输出到 artifacts/ 目录）"
+    },
+    "dependencies": {
+      "source": "CMakeLists.txt + setup.py + dependencies.json + build.py + dev_env_setup.md",
+      "value": [
+        "cmake \u003e= 3.16 (CMakeLists.txt cmake_minimum_required)",
+        "Python 开发库 (CMakeLists.txt find_package(Python REQUIRED COMPONENTS Development))",
+        "GCC C++11 (CMakeLists.txt -std=c++11)",
+        "ccache (CMakeLists.txt find_program, 可选)",
+        "plotly \u003e= 5.11.0 (setup.py install_requires)",
+        "pandas \u003e= 1.0.0 (setup.py install_requires)",
+        "测试依赖: boost 1.81.0 (dependencies.json artifact, download_dependencies.py 下载)",
+        "测试依赖: googletest 1.12.1 (dependencies.json artifact, download_dependencies.py 下载)",
+        "测试依赖: mockcpp (git submodule thirdparty/mockcpp)",
+        "测试依赖: coverage3, pytest (build.py UT 流程)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库内无 Dockerfile",
+      "value": "无 Dockerfile（仓库未提供 Dockerfile，依赖通过 devcontainer.json 预构建镜像和 download_dependencies.py 管理）"
+    },
+    "recommended_image": {
+      "source": "devcontainer.json image 字段 + dev_env_setup.md 第3章 docker pull 命令",
+      "value": "Tier 1 业务预构建镜像: swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801（基于 openEuler 24.03 LTS，含 GCC 11.2.0/CANN 9.1.0/Python 3.11/ccache/clangd）"
+    },
+    "special_dependencies": {
+      "source": "dev_env_setup.md 第3章 + devcontainer.json + docker_image_build_guide.md",
+      "value": [
+        "docker pull swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801（dev_env_setup.md 第3章明确给出）",
+        "预构建镜像含 GCC 11.2.0/CANN 9.1.0/Python 3.11/ccache/clangd（devcontainer.json + docker_image_build_guide.md 第1章）",
+        "镜像仅用于编译不支持 NPU 程序运行（dev_env_setup.md 注意事项明确说明）",
+        "download_dependencies.py 下载 boost/googletest 测试依赖（dependencies.json）"
+      ]
+    },
+    "ut_commands": {
+      "source": "install_guide.md 第2.3.3节 + develop_guide.md 第3章 + build.py _build_and_run_tests",
+      "value": "python3 build.py test（下载测试依赖 + cmake -DBUILD_TESTS=ON + make -j + C++ gtest mskpp_test_c + Python pytest test/cases/）"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "setup.py 中 packages='[\"mskpp\"]' 只包含顶层包，未包含 mskpp.core、mskpp.core.common、mskpp.core.metric、mskpp.intrisic_api、mskpp.prof_data、mskpp.test.cases、mskpp.utils 等子包。虽然通过 include_package_data=True 和 package_data 最终将所有文件打入了 wheel，但构建过程产生大量 setuptools 警告，影响日志可读性。建议改用 find_namespace_packages() 或在 packages 列表中显式列出所有子包。",
+      "source": "setup.py packages 配置 + 构建日志 setuptools 警告",
+      "time": "2026-10-12T21:54:22",
+      "title": "setup.py packages 配置不完整，wheel 打包时产生大量 setuptools 警告"
+    },
+    {
+      "body": "dev_env_setup.md 第5章明确说明\"本镜像仅用于编译，不支持 NPU 程序运行\"，而 quick_start 第2.1节要求\"仅支持标准化 CANN 容器环境\"。新手开发者可能使用编译镜像运行示例代码而遇到 CANN 运行时缺失的问题。文档建议补充说明编译镜像与运行镜像的区别，或在 quick_start 中明确指向运行镜像的获取方式。",
+      "source": "dev_env_setup.md 第5章注意事项 + quick_start 第2.1节",
+      "time": "2026-10-12T21:54:22",
+      "title": "dev_env_setup.md 声明镜像仅用于编译不支持 NPU 程序运行，但 quick_start 要求 CANN 容器环境"
+    },
+    {
+      "body": "安装指南第2.3.1节要求使用 ctr_in.py 启动容器，但未说明以普通用户（mindstudio）进入容器时 /workspace 目录的权限归属问题。直接使用 docker run 挂载宿主目录时，目录默认归 root 所有，mindstudio 用户无法写入，导致 build.py 执行时 PermissionError。建议在文档中补充权限设置说明或提醒使用 ctr_in.py。",
+      "source": "install_guide.md 第2.3.1节 + 实际构建中遇到的 PermissionError",
+      "time": "2026-10-12T21:54:22",
+      "title": "安装指南未明确说明容器内工作目录权限问题"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "读取 README.md 提取仓库简介、安装指南、贡献指南等链接",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/Ascend/mskpp.git /tmp/opencode/mskpp",
+      "details": {
+        "file": "README.md",
+        "key_links": [
+          "docs/zh/quick_start/mskpp_quick_start.md",
+          "docs/zh/install_guide/mskpp_install_guide.md",
+          "docs/zh/contributing/contributing_guide.md"
+        ],
+        "sections_read": [
+          "简介",
+          "快速入门",
+          "安装指南",
+          "贡献指南"
+        ]
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "MindStudio Kernel Performance Prediction，昇腾 AI 算子设计工具，性能仿真工具",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T21:40:37"
+    },
+    {
+      "action": "读取 .devcontainer/devcontainer.json 提取预构建镜像信息",
+      "command": "cat .devcontainer/devcontainer.json",
+      "details": {
+        "file": ".devcontainer/devcontainer.json",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "tier": "Tier 1 信号"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "image: swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801, workspaceFolder: /workspace, runArgs: --network=host --privileged --ipc=host",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T21:40:37"
+    },
+    {
+      "action": "读取 CMakeLists.txt 提取构建依赖和编译选项",
+      "command": "cat CMakeLists.txt",
+      "details": {
+        "build_tests": "BUILD_TESTS=ON 启用测试",
+        "ccache": "可选",
+        "cmake_min_version": "3.16",
+        "cpp_standard": "c++11",
+        "file": "CMakeLists.txt",
+        "python_dev": "find_package(Python REQUIRED COMPONENTS Development)"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "cmake_minimum_required(VERSION 3.16), project(mskpp_c CXX C), add_library(mskpp_c SHARED), 输出 _C.so, install 到 lib64 和 mskpp/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T21:40:37"
+    },
+    {
+      "action": "读取 setup.py 提取 Python 依赖",
+      "command": "cat setup.py",
+      "details": {
+        "file": "setup.py",
+        "install_requires": [
+          "plotly\u003e=5.11.0",
+          "pandas\u003e=1.0.0"
+        ],
+        "package": "mindstudio-kpp",
+        "python_requires": "\u003e=3.7"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "name=mindstudio-kpp, install_requires=[plotly\u003e=5.11.0, pandas\u003e=1.0.0], package_data={mskpp: [_C.so]}",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T21:40:37"
+    },
+    {
+      "action": "读取 build.py 提取构建和测试入口命令",
+      "command": "cat build.py",
+      "details": {
+        "build_cmd": "python3 build.py",
+        "build_jobs": "multiprocessing.cpu_count()",
+        "file": "build.py",
+        "ut_cmd": "python3 build.py test",
+        "ut_flow": "cmake -DBUILD_TESTS=ON + make + mskpp_test_c + pytest"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "BuildManager: build.py 全构建, build.py local 本地构建, build.py test 单元测试, build_jobs=cpu_count()",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T21:40:37"
+    },
+    {
+      "action": "读取 dependencies.json 和 download_dependencies.py 提取测试依赖",
+      "command": "cat dependencies.json \u0026\u0026 cat download_dependencies.py",
+      "details": {
+        "file": "dependencies.json",
+        "prod_deps": "无",
+        "test_artifacts": [
+          "boost 1.81.0",
+          "googletest 1.12.1"
+        ],
+        "test_submodules": [
+          "thirdparty/mockcpp"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "test 依赖: artifacts=[boost, googletest], submodules=[thirdparty/mockcpp]; prod 依赖为空",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T21:40:37"
+    },
+    {
+      "action": "读取安装指南 mskpp_install_guide.md 提取源码安装流程",
+      "command": "cat docs/zh/install_guide/mskpp_install_guide.md",
+      "details": {
+        "build_cmd": "python3 build.py",
+        "env_ref": "MindStudio 统一构建镜像制作指南",
+        "file": "docs/zh/install_guide/mskpp_install_guide.md",
+        "ut_cmd": "python3 build.py test"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "源码安装: 环境准备(统一构建镜像) -\u003e python3 build.py -\u003e artifacts/ -\u003e pip install whl; UT: python3 build.py test",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T21:40:37"
+    },
+    {
+      "action": "读取贡献指南 contributing_guide.md（文档闭包强制项）",
+      "command": "cat docs/zh/contributing/contributing_guide.md",
+      "details": {
+        "file": "docs/zh/contributing/contributing_guide.md",
+        "links": [
+          "msot contribute_workflow.md",
+          "architecture.md",
+          "develop_guide.md"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "贡献流程参考 msot 仓库; 开发指南指向 develop_guide.md; 构建命令 python3 build.py; UT python3 build.py test",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T21:40:37"
+    },
+    {
+      "action": "读取开发指南 develop_guide.md 提取构建和 UT 命令",
+      "command": "cat docs/zh/development_guide/develop_guide.md",
+      "details": {
+        "build_cmd": "python3 build.py",
+        "expected_ut": "37 tests from 6 test cases",
+        "file": "docs/zh/development_guide/develop_guide.md",
+        "ut_cmd": "python3 build.py test"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "构建: python3 build.py; UT: python3 build.py test; 预期: 37 tests from 6 test cases ran",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T21:40:37"
+    },
+    {
+      "action": "WebFetch 失败后 git clone msot 仓库读取 dev_env_setup.md",
+      "command": "git clone --depth 1 https://gitcode.com/Ascend/msot.git /tmp/opencode/msot \u0026\u0026 cat docs/zh/common/dev_env_setup.md",
+      "details": {
+        "docker_pull": "docker pull swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "file": "msot/docs/zh/common/dev_env_setup.md",
+        "npu_note": "镜像仅用于编译不支持 NPU 程序运行"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "docker pull swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801; 镜像基于 openEuler 24.03, GCC 11.2.0, CANN 9.1.0, Python 3.11",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T21:40:37"
+    },
+    {
+      "action": "读取镜像制作指南 docker_image_build_guide.md 确认镜像组成",
+      "command": "cat docs/zh/common/docker_image_build_guide.md",
+      "details": {
+        "base_os": "openEuler 24.03 LTS",
+        "ctr_in_required": true,
+        "file": "msot/docs/zh/common/docker_image_build_guide.md",
+        "layers": [
+          "openEuler",
+          "GCC 11.2",
+          "Python 3.8-3.13",
+          "CANN 9.1.0"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "镜像分层: openEuler 24.03 -\u003e GCC 11.2 -\u003e Python 3.8-3.13 -\u003e CANN 9.1.0; 必须用 ctr_in.py 启动容器",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T21:40:37"
+    },
+    {
+      "action": "扫描仓库内 Dockerfile（glob 搜索），确认无 Dockerfile",
+      "command": "glob **/Dockerfile*",
+      "details": {
+        "dockerfile_found": false,
+        "npu_required": false,
+        "tier": "Tier 1（devcontainer.json 预构建镜像）"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "仓库内无 Dockerfile; devcontainer.json 有预构建镜像; mskpp 是性能仿真工具无需 NPU 硬件",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-10-12T21:40:37"
+    },
+    {
+      "action": "根据文档闭包结果确定镜像策略：Tier 1 业务预构建镜像",
+      "command": "docker pull swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+      "details": {
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "npu_reason": "mskpp 是性能仿真工具，dev_env_setup.md 明确说明镜像仅用于编译不支持 NPU 程序运行",
+        "npu_required": false,
+        "source": "devcontainer.json image 字段 + dev_env_setup.md 第3章",
+        "tag_analysis": "tag 26.2.0-0801 无架构后缀，为多架构 manifest，自动适配 aarch64",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 120,
+      "error": "",
+      "output": "镜像拉取成功，Digest: sha256:0908fa5f540352a258539683b1770d701b8b8374159c4de55d86aefe37daf222",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-10-12T21:46:17"
+    },
+    {
+      "action": "在远程机器 clone 仓库到 /home/workspace/mskpp-verify",
+      "command": "ssh root@192.168.9.114 \"mkdir -p /home/workspace \u0026\u0026 git clone --depth 1 --branch master https://gitcode.com/Ascend/mskpp.git /home/workspace/mskpp-verify\"",
+      "details": {
+        "branch": "master",
+        "remote_path": "/home/workspace/mskpp-verify",
+        "repo_url": "https://gitcode.com/Ascend/mskpp.git"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "Cloning into /home/workspace/mskpp-verify...",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-10-12T21:46:17"
+    },
+    {
+      "action": "启动 mskpp-ttfhw 容器（Tier 1 预构建镜像，挂载 /home/workspace/mskpp-verify 到 /workspace）",
+      "command": "docker run -d --name mskpp-ttfhw --network=host --privileged --ipc=host --ulimit nproc=65535:65535 --security-opt seccomp=unconfined -v /home/workspace/mskpp-verify:/workspace -w /workspace swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801 sleep infinity",
+      "details": {
+        "container_name": "mskpp-ttfhw",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "mount": "/home/workspace/mskpp-verify:/workspace",
+        "npu_mounted": false,
+        "run_args": "--network=host --privileged --ipc=host --ulimit nproc=65535:65535 --security-opt seccomp=unconfined",
+        "startup_command_source": "default（README 未提供 docker run 命令，采用 devcontainer.json runArgs 参数 + 默认挂卡命令）"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Container ID: 3d1eee661d809a993be2f2910b838611736dc29198be044526a59c4e1d5a3894",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-10-12T21:46:17"
+    },
+    {
+      "action": "验证容器内关键构建依赖（Tier 1 预构建镜像已含依赖）",
+      "command": "docker exec mskpp-ttfhw bash -lc \"gcc --version \u0026\u0026 python3 --version \u0026\u0026 cmake --version \u0026\u0026 ccache --version \u0026\u0026 pytest --version \u0026\u0026 coverage3 --version\"",
+      "details": {
+        "auditwheel": "6.6.0",
+        "cann": "ASCEND_HOME_PATH=/usr/local/Ascend/cann-9.1.0",
+        "ccache": "4.8.3",
+        "cmake": "3.31.10",
+        "coverage": "7.15.2 (coverage3)",
+        "gcc": "11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility)",
+        "pandas": "未安装（需安装）",
+        "pip": "26.1",
+        "plotly": "未安装（需安装）",
+        "pytest": "9.1.1",
+        "python": "3.11.15"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "gcc 11.2.0, python 3.11.15, cmake 3.31.10, ccache 4.8.3, pytest 9.1.1, coverage 7.15.2, CANN 9.1.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-10-12T21:46:17"
+    },
+    {
+      "action": "安装 Python 运行时依赖 plotly 和 pandas（setup.py install_requires，镜像未预装）",
+      "command": "docker exec mskpp-ttfhw bash -lc \"pip3 install plotly\u003e=5.11.0 pandas\u003e=1.0.0\"",
+      "details": {
+        "installed_versions": [
+          "plotly 7.1.0",
+          "pandas 3.0.6",
+          "numpy 2.4.6",
+          "narwhals 2.27.1"
+        ],
+        "packages": [
+          "plotly\u003e=5.11.0",
+          "pandas\u003e=1.0.0"
+        ],
+        "source": "setup.py install_requires"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "Successfully installed narwhals-2.27.1 numpy-2.4.6 pandas-3.0.6 plotly-7.1.0 python-dateutil-2.9.0.post0 six-1.17.0",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-10-12T21:46:17"
+    },
+    {
+      "action": "首次构建尝试：python3 build.py（并发 102 = 256×40%，通过 sitecustomize.py 补丁限制 cpu_count）",
+      "command": "cd /workspace \u0026\u0026 PYTHONPATH=/tmp/patch python3 build.py",
+      "details": {
+        "build_duration": "7s",
+        "build_script": "build.py",
+        "ccache": "4.8.3",
+        "cmake_version": "3.31.10",
+        "compiler": "GCC 11.2.0",
+        "concurrency": 102,
+        "concurrency_method": "sitecustomize.py 补丁 multiprocessing.cpu_count = lambda: 102",
+        "concurrency_ratio": "40%",
+        "exit_code": 0,
+        "first_attempt_failed": true,
+        "first_failure_reason": "PermissionError: /workspace/build 权限不足（mindstudio 用户无法写入 root 所属目录）",
+        "fix": "chown -R mindstudio:mindstudio /workspace"
+      },
+      "duration_seconds": 7,
+      "error": "",
+      "output": "cmake 配置成功(0.7s), make -j102 编译 12 个 C++ 源文件为 _C.so(2.0M), wheel 打包成功(630K), auditwheel 修复成功, BUILD_EXIT_CODE=0, BUILD_DURATION=7s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-10-12T21:51:03"
+    },
+    {
+      "action": "修复构建权限问题：/workspace 目录归 root 所有，mindstudio 用户无写权限",
+      "command": "docker exec -u root mskpp-ttfhw chown -R mindstudio:mindstudio /workspace",
+      "details": {
+        "cause": "容器以 mindstudio 用户(uid=20001)运行，/workspace 挂载的宿主目录归 root 所有",
+        "problem": "PermissionError: [Errno 13] Permission denied: /workspace/build",
+        "solution": "docker exec -u root mskpp-ttfhw chown -R mindstudio:mindstudio /workspace",
+        "source": "build.py _build_product product_build_dir.mkdir(exist_ok=True)"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "chown done",
+      "result": "已解决",
+      "returncode": 0,
+      "step": "problem_resolution",
+      "success": true,
+      "timestamp": "2026-10-12T21:51:03"
+    },
+    {
+      "action": "执行单元测试：python3 build.py test（下载测试依赖 + cmake BUILD_TESTS=ON + make -j102 + C++ gtest + Python pytest + coverage 覆盖率报告）",
+      "command": "cd /workspace \u0026\u0026 PYTHONPATH=/tmp/patch python3 build.py test",
+      "details": {
+        "concurrency": 102,
+        "concurrency_method": "sitecustomize.py 补丁 multiprocessing.cpu_count = lambda: 102",
+        "coverage": "81% (5817 stmts, 892 missed)",
+        "cpp_tests": {
+          "duration_ms": 246,
+          "failed": 0,
+          "passed": 37,
+          "suites": 6,
+          "total": 37
+        },
+        "exit_code": 0,
+        "python_tests": {
+          "duration_s": 4.63,
+          "failed": 0,
+          "passed": 129,
+          "total": 129
+        },
+        "test_deps_downloaded": [
+          "boost 1.81.0 (artifact)",
+          "googletest 1.12.1 (artifact)",
+          "mockcpp (git submodule)"
+        ],
+        "total_duration_s": 79,
+        "ut_script": "build.py test"
+      },
+      "duration_seconds": 79,
+      "error": "",
+      "output": "C++ gtest: [==========] 37 tests from 6 test suites ran. (246 ms total) [  PASSED  ] 37 tests. | Python pytest: 129 passed in 4.63s | Coverage: 81% | UT_EXIT_CODE=0 UT_DURATION=79s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-10-12T21:53:22"
+    },
+    {
+      "action": "停止并删除远程容器 mskpp-ttfhw",
+      "command": "ssh root@192.168.9.114 \"docker rm -f mskpp-ttfhw\"",
+      "details": {
+        "container_name": "mskpp-ttfhw",
+        "remote_host": "192.168.9.114"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "mskpp-ttfhw",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-10-12T21:56:16"
+    },
+    {
+      "action": "生成验证报告并全量校验通过",
+      "command": "python3 validate_report.py --jsonschema report_schema.json",
+      "details": {
+        "output_file": "json_tmp/mskpp/verification_report_mskpp_20261012.json",
+        "total_execution_log": 22,
+        "validation": "全量校验 + JSON Schema 校验均通过"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "✅ 全量校验: 通过",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-10-12T21:56:16"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "mindstudio-kpp wheel",
+          "path": "artifacts/mindstudio_kpp-0.0.0.dev0-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_38_aarch64.whl",
+          "size": "630K",
+          "type": "wheel"
+        },
+        {
+          "name": "_C.so（共享库）",
+          "path": "build/_C.so",
+          "size": "2.0M",
+          "type": "library"
+        },
+        {
+          "name": "_C.so（安装到 mskpp/）",
+          "path": "mskpp/_C.so",
+          "size": "2.0M",
+          "type": "library"
+        }
+      ],
+      "cmake": "cmake 3.31.10, 配置耗时 0.7s",
+      "compiler": "GCC 11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility)",
+      "concurrency": 102,
+      "concurrency_ratio": "40%（256 核 × 40% = 102，通过 sitecustomize.py 补丁限制 multiprocessing.cpu_count）",
+      "duration_seconds": 7,
+      "notes": "使用仓库提供的 build.py 脚本构建，自动完成依赖下载（prod 无依赖）+ cmake + make -j102 + wheel 打包 + auditwheel 修复。构建含 12 个 C++ 源文件编译为 _C.so 共享库，Python wheel 包含 mskpp 包所有模块。",
+      "status": "success"
+    },
+    "ut": {
+      "cpp": {
+        "failed": 0,
+        "note": "C++ gtest: 6 个测试套件（ArchInfo 10, ArchModule 12, ProfDataTest 4, ScheduleTest 8, DataAdapter 2, LinearInterpolateTest 1），246ms",
+        "passed": 37,
+        "status": "success",
+        "total": 37
+      },
+      "duration_seconds": 79,
+      "failed": 0,
+      "failures": [],
+      "passed": 166,
+      "python": {
+        "failed": 0,
+        "modules": [
+          {
+            "note": "Python pytest: 55 个测试文件覆盖算子指令测试（vadd/vsub/vmul/vdiv/vmax 等），4.63s，覆盖率 81%"
+          }
+        ],
+        "passed": 129,
+        "status": "success",
+        "total": 129
+      },
+      "skipped": 0,
+      "status": "success",
+      "total": 166
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "mskpp-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "openEuler 24.03 (LTS-SP3)"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "69G（/ 分区 3.2G 可用，/home 分区 6.3T 可用，Docker 数据目录在 /home/docker-images）",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 14,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "CMakeLists.txt: cmake \u003e= 3.16, Python Development, ccache（可选）",
+        "from_dockerfile": "仓库无 Dockerfile，依赖通过预构建镜像和 download_dependencies.py 管理",
+        "from_readme": "setup.py install_requires: plotly\u003e=5.11.0, pandas\u003e=1.0.0; dependencies.json 测试依赖: boost 1.81.0, googletest 1.12.1, mockcpp",
+        "mappings": []
+      },
+      "image_name": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+      "selection_reason": "Tier 1 业务预构建镜像（devcontainer.json image 字段 + dev_env_setup.md 第3章 docker pull 命令确认），镜像基于 openEuler 24.03 LTS 含 GCC 11.2.0/CANN 9.1.0/Python 3.11.15/ccache 4.8.3/cmake 3.31.10",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "",
+    "duration_seconds": 1038,
+    "end_time": "2026-10-12T21:54:22",
+    "environment": "Tier 1 业务预构建镜像 mindstudio-build:26.2.0-0801 (openEuler 24.03 LTS, GCC 11.2.0, CANN 9.1.0, Python 3.11.15)",
+    "repo_url": "https://gitcode.com/Ascend/mskpp.git",
+    "start_time": "2026-10-12T21:37:04",
+    "total_steps": 22,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "构建首次尝试失败：容器以 mindstudio 用户运行，/workspace 目录归 root 所有导致 PermissionError",
+      "solution": "通过 docker exec -u root 执行 chown -R mindstudio:mindstudio /workspace 修复目录权限",
+      "source": "build.py _build_product: product_build_dir.mkdir(exist_ok=True) → PermissionError",
+      "timestamp": "2026-10-12T21:51:03"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 85000,
+    "model": "glm-5.2",
+    "output_tokens": 25000,
+    "tool": "opencode"
+  }
+}

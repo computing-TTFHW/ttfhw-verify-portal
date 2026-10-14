@@ -1,0 +1,727 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "devcontainer.json + dev_env_setup.md + docker_image_build_guide.md",
+      "value": "aarch64（远程机器为 aarch64，镜像支持 ARM64/AMD64 多架构自动选择）"
+    },
+    "build_commands": {
+      "source": "docs/zh/install_guide/msopgen_install_guide.md 第2.3.2节 + docs/zh/development_guide/develop_guide.md 第3章 + build.py",
+      "value": "python3 build.py（自动拉取依赖 thirdparty/asc-tools + 符号链接模板 + 打 whl 包到 artifacts/ 目录）"
+    },
+    "build_entry": {
+      "source": "build.py BuildManager.run()",
+      "value": "build.py 为统一构建入口：拉取依赖(download_dependencies.py) → 链接 asc-tools 模板 → setup.py bdist_wheel 打 msopgen 和 msopst 两个 whl 包"
+    },
+    "dependencies": {
+      "source": "requirements.txt + dependencies.json + .gitmodules + install_guide.md",
+      "value": [
+        "pytest\u003e=7.0.0 (pip)",
+        "pytest-cov\u003e=4.1.0 (pip)",
+        "xlrd==1.2.0 (pip)",
+        "tensorflow (pip)",
+        "onnx (pip)",
+        "numpy (pip)",
+        "thirdparty/asc-tools (git submodule, https://gitcode.com/cann/asc-tools.git, branch master)",
+        "Python 3.7-3.11 (install_guide.md 第6章)",
+        "MindStudio 构建镜像内置: GCC 11.2 / CANN 9.1.0 / openEuler 24.03 LTS"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库内无 Dockerfile（.devcontainer/devcontainer.json 使用 image 字段指向预构建镜像）",
+      "value": "无 Dockerfile（Tier 1 预构建镜像已包含全部编译依赖）"
+    },
+    "recommended_image": {
+      "source": ".devcontainer/devcontainer.json image 字段 + msot/docs/zh/common/dev_env_setup.md 第3章",
+      "value": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801（Tier 1 业务预构建镜像，基于 openEuler 24.03 LTS，含 GCC 11.2 / Python 3.8-3.13 / CANN 9.1.0）"
+    },
+    "special_dependencies": {
+      "source": "dependencies.json + .gitmodules + dev_env_setup.md",
+      "value": [
+        "git submodule thirdparty/asc-tools (build.py 自动通过 download_dependencies.py 拉取)",
+        "MindStudio 统一构建镜像 (swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801)",
+        "NPU 非必需（dev_env_setup.md 明确说明镜像仅用于编译，不支持 NPU 程序运行）"
+      ]
+    },
+    "ut_commands": {
+      "source": "docs/zh/install_guide/msopgen_install_guide.md 第2.3.3节 + docs/zh/development_guide/develop_guide.md 第5章 + test/run_test.py",
+      "value": "python3 build.py test（拉取依赖 + pip install -r requirements.txt + 执行 test/run_test.py，运行 test_msopgen/ut 和 test_msopst/ut 的 pytest 测试）"
+    },
+    "ut_entry": {
+      "source": "test/run_test.py + .vscode/tasks.json",
+      "value": "test/run_test.py 为 UT 入口脚本：设置 PYTHONPATH 后分别对 test_msopgen/ut 和 test_msopst/ut 执行 pytest --cov"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "安装指南第2.3.1节明确要求'必须使用统一镜像制作指南第7章给出的 ctr_in.py 命令'启动容器，'不得使用普通 docker run 创建容器'。但 ctr_in.py 需要交互式 TTY，不适合自动化验证场景。文档未提供等效的 docker run 命令和必要的环境初始化步骤（如 bash -lc 加载 profile.d）。",
+      "source": "docs/zh/install_guide/msopgen_install_guide.md 第2.3.1节",
+      "time": "2026-10-13T00:04:53",
+      "title": "安装指南要求使用 ctr_in.py 启动容器，未提供 docker run 替代命令"
+    },
+    {
+      "body": "devcontainer.json 的 runArgs 和 mounts 中未包含 NPU 设备挂载（davinci0/davinci_manager 等），而镜像预装了 CANN 9.1.0。dev_env_setup.md 说明镜像'仅用于编译，不支持 NPU 程序运行'，但对于需要 NPU 的测试场景文档未提供明确指导。",
+      "source": ".devcontainer/devcontainer.json + msot/docs/zh/common/dev_env_setup.md 第5章",
+      "time": "2026-10-13T00:04:53",
+      "title": "devcontainer.json 未挂载 NPU 设备，但镜像包含 CANN 环境"
+    },
+    {
+      "body": "requirements.txt 中 tensorflow 未指定版本，安装时拉取了 2.21.0（281.8MB），可能导致安装时间较长。文档未说明 tensorflow 在测试中的具体用途，以及是否可以用更轻量的替代方案。",
+      "source": "requirements.txt",
+      "time": "2026-10-13T00:04:53",
+      "title": "requirements.txt 中 tensorflow 依赖未说明版本要求和用途"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "git clone 仓库到本地读取 README.md，提取安装指南、快速入门、贡献指南等文档链接",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/Ascend/msopgen.git /tmp/opencode/msopgen",
+      "details": {
+        "branch": "master",
+        "files_read": [
+          "README.md"
+        ],
+        "repo_url": "https://gitcode.com/Ascend/msopgen.git"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "仓库克隆成功，README.md 包含安装指南、使用指南、贡献指南等链接",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T23:55:59"
+    },
+    {
+      "action": "读取 .devcontainer/devcontainer.json 提取预构建镜像信息",
+      "command": "cat .devcontainer/devcontainer.json",
+      "details": {
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "remoteUser": "mindstudio",
+        "runArgs": [
+          "--network=host",
+          "--privileged",
+          "--ipc=host"
+        ],
+        "tier": "Tier 1 业务预构建镜像",
+        "workspaceFolder": "/workspace"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "image 字段指向华为云 SWR 预构建镜像 mindstudio-build:26.2.0-0801，基于 openEuler，含 CANN/GCC11/Python3.11",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T23:55:59"
+    },
+    {
+      "action": "读取 .devcontainer/README.md 了解 Dev Container 构建和测试流程",
+      "command": "cat .devcontainer/README.md",
+      "details": {
+        "build_command": "python3 build.py",
+        "image_source": "预构建镜像",
+        "test_command": "python3 build.py test"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "README 说明 Dev Container 开箱即用，编译命令 python3 build.py，测试命令 python3 build.py test，镜像为预构建",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T23:55:59"
+    },
+    {
+      "action": "读取 .devcontainer/post-create.sh 了解容器环境初始化流程",
+      "command": "cat .devcontainer/post-create.sh",
+      "details": {
+        "cann": "预装",
+        "gcc": "11",
+        "os": "openEuler",
+        "python": "3.11",
+        "yum_mirror": "mirrors.huaweicloud.com/openeuler"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "post-create.sh 配置华为云 openEuler 软件源、Python 3.11、GCC 11、CANN 环境，镜像基于 openEuler",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T23:55:59"
+    },
+    {
+      "action": "读取 docs/zh/install_guide/msopgen_install_guide.md 提取源码编译和 UT 命令",
+      "command": "cat docs/zh/install_guide/msopgen_install_guide.md",
+      "details": {
+        "artifacts": "artifacts/ 目录下 mindstudio_opgen 和 mindstudio_opst whl 包",
+        "build_command": "python3 build.py",
+        "image_guide": "MindStudio 统一构建镜像制作指南",
+        "python_version": "3.7-3.11",
+        "ut_command": "python3 build.py test"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "安装指南说明源码编译使用 MindStudio 标准构建环境，build.py 构建产物在 artifacts/，UT 用 python3 build.py test",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T23:55:59"
+    },
+    {
+      "action": "读取 docs/zh/contributing/contributing_guide.md 和 docs/zh/development_guide/develop_guide.md",
+      "command": "cat docs/zh/contributing/contributing_guide.md docs/zh/development_guide/develop_guide.md",
+      "details": {
+        "contributing_guide": "引用 msot 仓库的统一贡献流程",
+        "develop_guide": "一键构建 python3 build.py，UT python3 build.py test",
+        "project_structure": "msopgen/ 源码, tools/msopst/ ST工具, test/ 测试, example/ 样例"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "贡献指南引用 msot 仓库流程；开发指南确认 build.py 为构建入口，test/run_test.py 为 UT 入口",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T23:55:59"
+    },
+    {
+      "action": "读取 build.py 和 download_dependencies.py 了解构建和依赖下载流程",
+      "command": "cat build.py download_dependencies.py",
+      "details": {
+        "build_flow": "download_dependencies.py 拉取 submodule → _link_asc_tools_template 链接模板 → setup.py bdist_wheel 打包",
+        "submodule": "thirdparty/asc-tools",
+        "test_flow": "download_dependencies.py 拉取 submodule → pip install -r requirements.txt → test/run_test.py 执行 pytest"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "build.py 为统一构建入口，非 local 模式先通过 download_dependencies.py 拉取 thirdparty/asc-tools submodule，再打 whl 包",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T23:55:59"
+    },
+    {
+      "action": "读取 requirements.txt 和 dependencies.json 提取 Python 依赖和 submodule 配置",
+      "command": "cat requirements.txt dependencies.json",
+      "details": {
+        "force_latest_submodules": [
+          "thirdparty/asc-tools"
+        ],
+        "requirements": [
+          "pytest\u003e=7.0.0",
+          "pytest-cov\u003e=4.1.0",
+          "xlrd==1.2.0",
+          "tensorflow",
+          "onnx",
+          "numpy"
+        ],
+        "submodules": [
+          "thirdparty/asc-tools"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "requirements.txt: pytest/pytest-cov/xlrd/tensorflow/onnx/numpy; dependencies.json: thirdparty/asc-tools submodule",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T23:55:59"
+    },
+    {
+      "action": "读取 test/run_test.py 了解 UT 执行流程",
+      "command": "cat test/run_test.py",
+      "details": {
+        "pythonpath_setup": "设置 PYTHONPATH 包含 tools/ 和 test 目录",
+        "test_framework": "pytest --cov",
+        "test_script": "test/run_test.py",
+        "test_targets": [
+          "test_msopgen/ut",
+          "test_msopst/ut"
+        ]
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "run_test.py 查找 tools/msopst 目录，设置 PYTHONPATH，分别对 test_msopgen/ut 和 test_msopst/ut 执行 pytest --cov",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T23:55:59"
+    },
+    {
+      "action": "git clone msot 仓库读取 dev_env_setup.md 和 docker_image_build_guide.md（Tier 1 镜像确认 + Tier 2/3 回退候选）",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/Ascend/msot.git /tmp/opencode/msot",
+      "details": {
+        "npu_note": "镜像仅用于编译，不支持 NPU 程序运行",
+        "tier1_image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "tier1_pull_command": "docker pull swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "tier3_base_os": "openEuler 24.03 LTS",
+        "ubuntu_variant": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801-ubuntu22.04"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "dev_env_setup.md 确认 Tier 1 镜像 docker pull 命令；docker_image_build_guide.md 提供 Tier 3 回退方案（openEuler 基础镜像构建）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-12T23:55:59"
+    },
+    {
+      "action": "分析仓库镜像信号，确定 Tier 选择",
+      "command": "",
+      "details": {
+        "final_tier": "Tier 1",
+        "npu_required": false,
+        "tier1_signals": [
+          "devcontainer.json image 字段指向非基础 OS 镜像",
+          "dev_env_setup.md 含 docker pull 预构建镜像命令",
+          "链接匹配 swr.cn-north-4.myhuaweicloud.com (华为云 SWR 镜像仓库)"
+        ],
+        "tier2_signals": "仓库内无 Dockerfile",
+        "tier3_fallback": "docker_image_build_guide.md 提供 openEuler 24.03 基础镜像构建方案"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "Tier 1 命中：devcontainer.json image 字段 + dev_env_setup.md docker pull 命令 + 华为云 SWR 镜像仓库链接。NPU 非必需（镜像仅用于编译）。",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-10-12T23:55:59"
+    },
+    {
+      "action": "根据文档闭包结果选择 Tier 1 业务预构建镜像",
+      "command": "docker pull swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+      "details": {
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "npu_reason": "dev_env_setup.md 明确说明镜像仅用于编译，不支持 NPU 程序运行；msopgen 为 Python 代码生成工具，构建和测试不需要 NPU",
+        "npu_required": false,
+        "signals": [
+          "devcontainer.json image 字段指向非基础 OS 镜像",
+          "dev_env_setup.md 含 docker pull 预构建镜像命令",
+          "链接匹配 swr.cn-north-4.myhuaweicloud.com 华为云 SWR 镜像仓库"
+        ],
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "镜像已存在（Status: Image is up to date），拉取成功",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-10-13T00:00:32"
+    },
+    {
+      "action": "在远程机器创建工作目录并 clone 仓库到 /home/workspace/msopgen-verify",
+      "command": "ssh root@192.168.9.114 \"mkdir -p /home/workspace \u0026\u0026 git clone --depth 1 --branch master https://gitcode.com/Ascend/msopgen.git /home/workspace/msopgen-verify\"",
+      "details": {
+        "branch": "master",
+        "clone_depth": 1,
+        "remote_path": "/home/workspace/msopgen-verify",
+        "repo_url": "https://gitcode.com/Ascend/msopgen.git"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "仓库克隆成功，包含 build.py、requirements.txt、test/、tools/ 等目录文件",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-10-13T00:00:32"
+    },
+    {
+      "action": "启动容器 msopgen-ttfhw，挂载工作目录到 /workspace",
+      "command": "docker run -d --name msopgen-ttfhw --privileged --network=host --ipc=host --ulimit nproc=65535:65535 --security-opt seccomp=unconfined -v /home/workspace/msopgen-verify:/workspace -w /workspace swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801 sleep infinity",
+      "details": {
+        "container_name": "msopgen-ttfhw",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "mounts": "/home/workspace/msopgen-verify:/workspace",
+        "npu_mounted": false,
+        "npu_reason": "msopgen 为 Python 代码生成工具，构建和测试不需要 NPU",
+        "run_args": [
+          "--privileged",
+          "--network=host",
+          "--ipc=host",
+          "--ulimit nproc=65535:65535",
+          "--security-opt seccomp=unconfined"
+        ],
+        "startup_command_source": "default_无挂卡"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "容器启动成功，ID: 05cf984ad8bc0ce74fa3794823be1b75fe582fa97535c7e17f68d4b2b21badfc",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-10-13T00:00:32"
+    },
+    {
+      "action": "修复工作目录权限：chown 到 mindstudio 用户 UID 20001",
+      "command": "ssh root@192.168.9.114 \"chown -R 20001:20001 /home/workspace/msopgen-verify\"",
+      "details": {
+        "issue": "容器 mindstudio 用户 (UID 20001) 无法写入 /workspace（宿主文件属主为 root）",
+        "solution": "宿主机执行 chown -R 20001:20001 /home/workspace/msopgen-verify"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "权限修复成功，mindstudio 用户可写入 /workspace",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-10-13T00:00:32"
+    },
+    {
+      "action": "Tier 1 预构建镜像：验证关键编译依赖已存在（Python 3.11.15 / GCC 11.2.0 / CANN 9.1.0 / git 2.54.0 / pip 26.1 / setuptools 83.0.0 / pytest 9.1.1）",
+      "command": "docker exec msopgen-ttfhw bash -lc 'python3 --version \u0026\u0026 gcc --version | head -1 \u0026\u0026 git --version \u0026\u0026 pip3 --version \u0026\u0026 python3 -m pip list | grep -iE \"pytest|setuptools\"'",
+      "details": {
+        "need_install_by_build": [
+          "pytest-cov\u003e=4.1.0",
+          "xlrd==1.2.0",
+          "tensorflow",
+          "onnx",
+          "numpy"
+        ],
+        "note": "build.py test 会自动 pip install -r requirements.txt 安装缺失的 Python 包",
+        "pre_installed": {
+          "cann": "9.1.0 (ASCEND_HOME_PATH=/usr/local/Ascend/cann-9.1.0)",
+          "gcc": "11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility)",
+          "git": "2.54.0",
+          "pip": "26.1",
+          "pytest": "9.1.1",
+          "python": "3.11.15",
+          "setuptools": "83.0.0"
+        },
+        "skip_installation": true,
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Python 3.11.15, GCC 11.2.0, git 2.54.0, pip 26.1, setuptools 83.0.0, pytest 9.1.1 均已预装",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-10-13T00:00:32"
+    },
+    {
+      "action": "验证容器环境完整性：OS / 架构 / CPU / 内存 / CANN 环境 / 工作目录可写",
+      "command": "docker exec msopgen-ttfhw bash -lc 'cat /etc/os-release | head -5 \u0026\u0026 uname -m \u0026\u0026 nproc \u0026\u0026 free -h | grep Mem \u0026\u0026 echo ASCEND_HOME_PATH=$ASCEND_HOME_PATH \u0026\u0026 touch /workspace/.write_test \u0026\u0026 rm /workspace/.write_test \u0026\u0026 echo WRITE_OK'",
+      "details": {
+        "cann_env": "ASCEND_HOME_PATH=/usr/local/Ascend/cann-9.1.0",
+        "container_arch": "aarch64",
+        "container_cpu": 256,
+        "container_memory": "2.0Ti",
+        "container_os": "openEuler 24.03 (LTS-SP3)",
+        "workspace_writable": true
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "openEuler 24.03 LTS-SP3, aarch64, 256 cores, 2.0Ti memory, CANN 环境已激活, /workspace 可写",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-10-13T00:00:32"
+    },
+    {
+      "action": "执行 python3 build.py 构建项目（拉取依赖 + 打 whl 包）",
+      "command": "docker exec msopgen-ttfhw bash -lc 'cd /workspace \u0026\u0026 time python3 build.py'",
+      "details": {
+        "artifacts": [
+          "mindstudio_opgen-26.0.0-py3-none-any.whl (113K)",
+          "mindstudio_opst-26.0.0-py3-none-any.whl (172K)"
+        ],
+        "build_command": "python3 build.py",
+        "build_flow": "download_dependencies.py 拉取 thirdparty/asc-tools → _link_asc_tools_template 符号链接 → setup.py bdist_wheel 打 msopgen whl → tools/setup.py bdist_wheel 打 msopst whl → 归档到 artifacts/",
+        "concurrency": 102,
+        "concurrency_ratio": "40%",
+        "duration_seconds": 4.165,
+        "submodule_download": "成功（thirdparty/asc-tools 从 gitcode.com/cann/asc-tools.git 克隆）",
+        "warnings": "setuptools 包发现警告（msopst 子目录未在 packages 配置中），不影响产物完整性"
+      },
+      "duration_seconds": 4.2,
+      "error": "",
+      "output": "git submodule 下载成功 → setup.py bdist_wheel 打包成功 → 归档 mindstudio_opgen-26.0.0-py3-none-any.whl 和 mindstudio_opst-26.0.0-py3-none-any.whl 到 artifacts/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-10-13T00:02:03"
+    },
+    {
+      "action": "pip install -r requirements.txt 安装测试依赖（pytest-cov, xlrd, tensorflow, onnx, numpy）",
+      "command": "docker exec msopgen-ttfhw bash -lc 'cd /workspace \u0026\u0026 python3 -m pip install -r requirements.txt'",
+      "details": {
+        "conflict_warnings": "镜像内其他包(superkernel/opc-tool/te等)缺少 attrs/decorator/psutil/scipy 依赖，不影响 msopgen 测试",
+        "installed_packages": [
+          "pytest-cov-7.1.0",
+          "xlrd-1.2.0",
+          "tensorflow-2.21.0",
+          "onnx-1.23.2",
+          "numpy-2.4.6",
+          "keras-3.15.1",
+          "protobuf-7.36.2",
+          "grpcio-1.84.0",
+          "h5py-3.14.0",
+          "libclang-18.1.1"
+        ],
+        "pip_index": "https://repo.huaweicloud.com/repository/pypi/simple/"
+      },
+      "duration_seconds": 37,
+      "error": "",
+      "output": "Successfully installed tensorflow-2.21.0 onnx-1.23.2 numpy-2.4.6 pytest-cov-7.1.0 xlrd-1.2.0 等 31 个包",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-10-13T00:04:53"
+    },
+    {
+      "action": "执行 python3 build.py test 运行全量单元测试和系统测试（UT + ST）",
+      "command": "docker exec msopgen-ttfhw bash -lc 'cd /workspace \u0026\u0026 time python3 build.py test'",
+      "details": {
+        "coverage_reports": [
+          "/workspace/output/test_msopst/coverage_ut/",
+          "/workspace/output/test_msopgen/coverage_ut/",
+          "/workspace/output/test_msopst/coverage_st/",
+          "/workspace/output/test_msopgen/coverage_st/"
+        ],
+        "failed": 0,
+        "passed": 232,
+        "skipped": 3,
+        "summary": "msopst UT: 通过, msopgen UT: 通过, msopst ST: 通过, msopgen ST: 通过, 所有测试通过",
+        "test_command": "python3 build.py test",
+        "test_results": {
+          "msopgen_ST": {
+            "duration": "3.02s",
+            "failed": 0,
+            "passed": 40,
+            "skipped": 2,
+            "total": 42
+          },
+          "msopgen_UT": {
+            "duration": "2.43s",
+            "failed": 0,
+            "passed": 45,
+            "total": 45
+          },
+          "msopst_ST": {
+            "duration": "9.19s",
+            "failed": 0,
+            "passed": 66,
+            "skipped": 1,
+            "total": 67
+          },
+          "msopst_UT": {
+            "duration": "8.26s",
+            "failed": 0,
+            "passed": 81,
+            "total": 81
+          }
+        },
+        "test_runner": "test/run_test.py (pytest --cov)",
+        "total": 235,
+        "warnings": [
+          "DeprecationWarning: invalid escape sequence in gen_ascendc_test.py (非关键)",
+          "RuntimeWarning: overflow encountered in exp in data_generator.py (非关键)"
+        ]
+      },
+      "duration_seconds": 63.5,
+      "error": "",
+      "output": "所有测试通过！msopst UT: 81 passed, msopgen UT: 45 passed, msopst ST: 66 passed 1 skipped, msopgen ST: 40 passed 2 skipped",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-10-13T00:04:53"
+    },
+    {
+      "action": "清理远程容器 msopgen-ttfhw",
+      "command": "ssh root@192.168.9.114 \"docker rm -f msopgen-ttfhw\"",
+      "details": {
+        "action": "docker rm -f",
+        "container_name": "msopgen-ttfhw"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "容器已停止并删除",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-10-13T00:05:27"
+    },
+    {
+      "action": "生成验证报告 verification_report_msopgen_20261012.json",
+      "command": "",
+      "details": {
+        "build_status": "success",
+        "failed": 0,
+        "output_file": "json_tmp/msopgen/verification_report_msopgen_20261012.json",
+        "passed": 232,
+        "skipped": 3,
+        "total_tests": 235,
+        "ut_status": "success"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "验证报告已生成，构建成功，全部测试通过",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-10-13T00:05:27"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "mindstudio_opgen-26.0.0-py3-none-any.whl",
+          "path": "artifacts/mindstudio_opgen-26.0.0-py3-none-any.whl",
+          "size": "113K",
+          "type": "wheel"
+        },
+        {
+          "name": "mindstudio_opst-26.0.0-py3-none-any.whl",
+          "path": "artifacts/mindstudio_opst-26.0.0-py3-none-any.whl",
+          "size": "172K",
+          "type": "wheel"
+        }
+      ],
+      "compiler": "GCC 11.2.0 (Built-for-MindStudio-glibc-2.17-Compatibility)",
+      "concurrency": 102,
+      "concurrency_ratio": "40% (256核 × 40% = 102，Python wheel 构建无显式并发参数)",
+      "duration_seconds": 4.2,
+      "notes": "build.py 自动完成依赖下载(git submodule thirdparty/asc-tools) + 模板符号链接 + setup.py bdist_wheel 打包。构建过程有 setuptools 包发现警告(msopst 子目录未在 packages 配置中)，不影响产物完整性。",
+      "status": "success"
+    },
+    "ut": {
+      "cpp": {
+        "failed": 0,
+        "note": "项目为 Python 工具，无 C/C++ 测试",
+        "passed": 0,
+        "status": "not_run",
+        "total": 0
+      },
+      "duration_seconds": 63.5,
+      "failed": 0,
+      "failures": [],
+      "passed": 232,
+      "python": {
+        "failed": 0,
+        "modules": [
+          {
+            "failed": 0,
+            "name": "msopst UT",
+            "passed": 81,
+            "skipped": 0,
+            "total": 81
+          },
+          {
+            "failed": 0,
+            "name": "msopgen UT",
+            "passed": 45,
+            "skipped": 0,
+            "total": 45
+          },
+          {
+            "failed": 0,
+            "name": "msopst ST",
+            "passed": 66,
+            "skipped": 1,
+            "total": 67
+          },
+          {
+            "failed": 0,
+            "name": "msopgen ST",
+            "passed": 40,
+            "skipped": 2,
+            "total": 42
+          }
+        ],
+        "passed": 232,
+        "status": "success",
+        "total": 235
+      },
+      "skipped": 3,
+      "status": "success",
+      "total": 235
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "msopgen-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "openEuler 24.03 (LTS-SP3)"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "6.9T (6.3T 可用)",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 14,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "无 CMakeLists.txt，项目为 Python setuptools 构建",
+        "from_dockerfile": "无 Dockerfile，Tier 1 预构建镜像已包含全部编译环境依赖",
+        "from_readme": "requirements.txt: pytest\u003e=7.0.0, pytest-cov\u003e=4.1.0, xlrd==1.2.0, tensorflow, onnx, numpy。镜像已预装 pytest 9.1.1 和 setuptools 83.0.0，其余由 build.py test 自动安装",
+        "mappings": []
+      },
+      "image_name": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+      "selection_reason": "Tier 1 业务预构建镜像：devcontainer.json image 字段指向华为云 SWR 预构建镜像，dev_env_setup.md 第3章确认 docker pull 命令。镜像基于 openEuler 24.03 LTS，预装 GCC 11.2 / Python 3.11.15 / CANN 9.1.0，NPU 非必需（镜像仅用于编译）",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "",
+    "duration_seconds": 763,
+    "end_time": "2026-10-13T00:05:27",
+    "environment": "openEuler 24.03 LTS-SP3 / aarch64 / Kunpeng-920 256核 / 2.0Ti 内存 / CANN 9.1.0 / Python 3.11.15 / GCC 11.2.0",
+    "repo_url": "https://gitcode.com/Ascend/msopgen.git",
+    "start_time": "2026-10-12T23:52:44",
+    "total_steps": 22,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "容器 mindstudio 用户 (UID 20001) 无法写入 /workspace 目录（宿主文件属主为 root）",
+      "solution": "在宿主机执行 chown -R 20001:20001 /home/workspace/msopgen-verify 修复权限",
+      "source": "容器启动后写入测试",
+      "timestamp": "2026-10-13T00:04:53"
+    },
+    {
+      "problem": "pip install requirements.txt 时出现依赖冲突警告：镜像内预装的 superkernel/opc-tool/te 等包缺少 attrs/decorator/psutil/scipy 依赖",
+      "solution": "非关键警告，不影响 msopgen 的构建和测试。这些是镜像内其他 CANN 工具的依赖冲突，与 msopgen 无关",
+      "source": "pip install -r requirements.txt 输出",
+      "timestamp": "2026-10-13T00:04:53"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "火山AI网关/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

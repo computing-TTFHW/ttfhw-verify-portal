@@ -1,0 +1,610 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "hcom.spec (ExclusiveArch: aarch64) + README.md",
+      "value": "aarch64"
+    },
+    "build_commands": {
+      "source": "README.md 第4节 + build.sh",
+      "value": "./build.sh（CMake 构建，默认 release 模式，并发数 nproc）"
+    },
+    "dependencies": {
+      "source": "hcom.spec BuildRequires + CMakeLists.txt + build.sh + securec/CMakeLists.txt + install_test_tools.sh",
+      "value": [
+        "make (构建工具)",
+        "gcc/g++ (C/C++ 编译器，C++11)",
+        "cmake \u003e= 3.14.1 (CMakeLists.txt cmake_minimum_required)",
+        "openssl / openssl-devel (TLS 加密，hcom.spec BuildRequires)",
+        "rdma-core-devel (RDMA 传输，HCOM_BUILD_RDMA=on 默认开启，提供 libibverbs/librdmacm)",
+        "libboundscheck (安全库，securec/CMakeLists.txt 先查系统包再从源码构建)",
+        "git (克隆测试工具 googletest/mockcpp 及 FetchContent)",
+        "googletest 1.12.1 (UT 框架，install_test_tools.sh 从华为 codehub 克隆)",
+        "mockcpp v2.7 (mock 框架，install_test_tools.sh 从华为 codehub 克隆，需 arm64 补丁)"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库无 Dockerfile（全仓库搜索未找到）",
+      "value": "无 Dockerfile"
+    },
+    "recommended_image": {
+      "source": "仓库无 Dockerfile/.devcontainer/预构建镜像，hcom.spec 为 openEuler RPM 包，HCOM-Tutorial-Demo.md 提及 openEuler-20.03-LTS-aarch64",
+      "value": "Tier 3 基础 OS 从零安装 — openEuler 24.03 LTS (hub.oepkgs.net/openeuler/openeuler:24.03-lts)"
+    },
+    "special_dependencies": {
+      "source": "build/install_test_tools.sh + src/hcom/3rdparty/securec/CMakeLists.txt",
+      "value": [
+        "googletest: 从 https://codehub.devcloud.cn-north-4.huaweicloud.com/.../googletest.git 克隆 release-1.12.1（华为内部 codehub，可能不可访问）",
+        "mockcpp: 从 https://codehub.devcloud.cn-north-4.huaweicloud.com/.../mockcpp.git 克隆 v2.7 + arm64 补丁（华为内部 codehub，可能不可访问）",
+        "libboundscheck: securec/CMakeLists.txt 先查系统包(/usr/include/securec.h)，找不到则从 https://atomgit.com/openeuler/libboundscheck.git 克隆源码构建"
+      ]
+    },
+    "ut_commands": {
+      "source": "README.md 第6节 + build/generate_gtest_report.sh",
+      "value": "export HCOM_BUILD_TYPE=debug \u0026\u0026 export HCOM_BUILD_TESTS=on \u0026\u0026 ./build.sh \u0026\u0026 ./build/generate_gtest_report.sh"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "README 第4节仅说明执行 ./build.sh 即可编译，未列出所需的系统级依赖（如 gcc、cmake、openssl-devel、rdma-core-devel、libboundscheck）。这些依赖仅在 hcom.spec 的 BuildRequires 中列出，外部新手开发者如果仅看 README 不会知道需要预装这些包。",
+      "source": "README.md 第4节 vs hcom.spec BuildRequires",
+      "time": "2026-10-13T06:16:15",
+      "title": "README 未明确列出系统构建依赖"
+    },
+    {
+      "body": "build/install_test_tools.sh 从华为内部 codehub (codehub.devcloud.cn-north-4.huaweicloud.com) 克隆 googletest 和 mockcpp。这些 URL 对外部开发者可能不可访问，导致 UT 构建失败。建议提供公开镜像或将测试工具源码内嵌到仓库中。",
+      "source": "build/install_test_tools.sh 第43行和第55行",
+      "time": "2026-10-13T06:16:15",
+      "title": "install_test_tools.sh 使用华为内部 codehub URL"
+    },
+    {
+      "body": "README.md 第104行引用的路径 'lingqu\\test\\tools\\perf_test\\README.md' 使用了反斜杠（Windows 路径分隔符），而实际仓库中该路径不存在（test/tools/perf_test/ 目录在仓库中未找到）。这可能是一个遗留错误。",
+      "source": "README.md 第104行",
+      "time": "2026-10-13T06:16:15",
+      "title": "README 中 perf_test 路径使用了 Windows 路径分隔符"
+    },
+    {
+      "body": "hcom.spec BuildRequires 列出了 umdk-urma-devel，这是 UB 传输模块的依赖。虽然 build.sh 默认关闭 UB (HCOM_BUILD_UB=off)，但 hcom.spec 的 %build 段开启了 UB，外部开发者如果按照 RPM 构建方式操作可能遇到此依赖缺失问题。",
+      "source": "hcom.spec BuildRequires vs build.sh HCOM_BUILD_UB=off",
+      "time": "2026-10-13T06:16:15",
+      "title": "hcom.spec 中 umdk-urma-devel 依赖未在 README 中说明"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "阅读 README.md 提取构建入口和 UT 命令",
+      "command": "cat README.md",
+      "details": {
+        "file": "README.md",
+        "sections": [
+          "源码下载",
+          "源码目录结构",
+          "编译",
+          "编译和执行UT用例"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "README 说明：构建入口为 ./build.sh，UT 需 export HCOM_BUILD_TYPE=debug HCOM_BUILD_TESTS=on 后执行 ./build.sh，再执行 ./build/generate_gtest_report.sh。支持 RDMA/TCP/SHM/UB 通信协议。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:19:05"
+    },
+    {
+      "action": "阅读 CONTRIBUTING.md 检查贡献指南中的 UT 和环境信息",
+      "command": "cat CONTRIBUTING.md",
+      "details": {
+        "file": "CONTRIBUTING.md",
+        "key_links": [
+          "gitee.com/openeuler/community 贡献指南"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "CONTRIBUTING.md 指向 doc/ 目录下的用户指南和 openEuler 社区贡献指南，未包含具体的构建/依赖信息。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:19:05"
+    },
+    {
+      "action": "阅读 hcom.spec 提取 RPM 构建依赖和架构要求",
+      "command": "cat hcom.spec",
+      "details": {
+        "BuildRequires": [
+          "make",
+          "gcc",
+          "cmake",
+          "libboundscheck",
+          "rdma-core-devel",
+          "umdk-urma-devel",
+          "openssl",
+          "openssl-devel"
+        ],
+        "ExclusiveArch": "aarch64",
+        "file": "hcom.spec"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "hcom.spec: ExclusiveArch aarch64, BuildRequires: make gcc cmake libboundscheck rdma-core-devel umdk-urma-devel openssl openssl-devel。%build 中 export HCOM_BUILD_UB=on HCOM_BUILD_HTRACER=on。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:19:05"
+    },
+    {
+      "action": "阅读 build.sh 确认构建流程和环境变量",
+      "command": "cat build.sh",
+      "details": {
+        "cmake_options": [
+          "BUILD_HCOM",
+          "CMAKE_BUILD_TYPE",
+          "BUILD_TESTS",
+          "BUILD_WITH_RDMA=on",
+          "BUILD_WITH_SOCK=on",
+          "BUILD_WITH_SHM=on",
+          "BUILD_WITH_UB=off"
+        ],
+        "file": "build.sh"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "build.sh: cmake + cmake --build + cmake --target install + make_software_package.sh + build_umq_and_ubsocket.sh。UT 开启时先调用 install_test_tools.sh。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:19:05"
+    },
+    {
+      "action": "阅读 CMakeLists.txt 和 src/hcom/CMakeLists.txt 确认编译依赖",
+      "command": "cat CMakeLists.txt src/hcom/CMakeLists.txt",
+      "details": {
+        "3rdparty": [
+          "securec",
+          "urma(UB only)"
+        ],
+        "cmake_min_version": "3.14.1",
+        "link_libs": [
+          "pthread",
+          "dl",
+          "rt",
+          "boundscheck"
+        ],
+        "project": "hcom CXX C"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "CMake 最低版本 3.14.1，项目名 hcom。链接 pthread/dl/rt/boundscheck。3rdparty 包含 securec(libboundscheck) 和 urma(仅 UB)。默认启用 RDMA/SOCK/SHM，UB 默认关闭。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:19:05"
+    },
+    {
+      "action": "阅读 build/install_test_tools.sh 确认 UT 测试工具来源",
+      "command": "cat build/install_test_tools.sh",
+      "details": {
+        "googletest_source": "https://codehub.devcloud.cn-north-4.huaweicloud.com/.../googletest.git (release-1.12.1)",
+        "mockcpp_source": "https://codehub.devcloud.cn-north-4.huaweicloud.com/.../mockcpp.git (v2.7 + arm64 patch)"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "install_test_tools.sh 从华为内部 codehub 克隆 googletest 1.12.1 和 mockcpp v2.7（含 arm64 补丁 mockcpp_support_arm64.patch）。URL 可能不可访问。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:19:05"
+    },
+    {
+      "action": "阅读 securec/CMakeLists.txt 确认 libboundscheck 来源",
+      "command": "cat src/hcom/3rdparty/securec/CMakeLists.txt",
+      "details": {
+        "fallback_source": "https://atomgit.com/openeuler/libboundscheck.git (master)"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "securec/CMakeLists.txt: 先查系统包 libboundscheck(/usr/include/securec.h + /usr/lib64/libboundscheck.so)，找不到则从 atomgit.com/openeuler/libboundscheck.git 克隆源码构建。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:19:05"
+    },
+    {
+      "action": "阅读 generate_gtest_report.sh 确认 UT 执行方式",
+      "command": "cat build/generate_gtest_report.sh",
+      "details": {
+        "report_format": "XML gtest report",
+        "test_binaries": [
+          "hcom_ut",
+          "hcom_test"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "generate_gtest_report.sh: 执行 ./hcom_ut 和 ./hcom_test 生成 XML 报告，汇总 tests/failures/errors。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:19:05"
+    },
+    {
+      "action": "搜索全仓库 Dockerfile/.devcontainer/镜像引用",
+      "command": "find . -name 'Dockerfile*' -o -name '.devcontainer' | grep -v .git",
+      "details": {
+        "devcontainer_found": false,
+        "docker_pull_found": false,
+        "dockerfile_found": false
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "全仓库搜索未找到 Dockerfile、.devcontainer、docker pull 命令。HCOM-Tutorial-Demo.md 中的'镜像'指操作系统 ISO 镜像而非 Docker 镜像。",
+      "result": "未找到",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:19:05"
+    },
+    {
+      "action": "扫描 NPU/CANN/Ascend 相关依赖",
+      "command": "grep -ri 'CANN|Ascend|torch_npu|npu|davinci|910|310|昇腾' --include='*.md' --include='*.txt' --include='*.cmake' .",
+      "details": {
+        "npu_keywords_matched": false
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "仓库中未发现 CANN/Ascend/NPU/davinci/910/310 相关依赖。HCOM 是通信库，不依赖 NPU。",
+      "result": "未找到 NPU 依赖",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:19:05"
+    },
+    {
+      "action": "确认镜像选择 Tier（无 Dockerfile → Tier 3 基础 OS）",
+      "command": "",
+      "details": {
+        "os_reason": "hcom.spec 为 openEuler RPM 包，ExclusiveArch aarch64，Tutorial 提及 openEuler",
+        "reason": "仓库无 Dockerfile、无 .devcontainer、无预构建镜像引用",
+        "selected_os": "openEuler 24.03 LTS",
+        "tier": 3
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "Tier 3：选择 openEuler 24.03 LTS 作为基础镜像（hub.oepkgs.net/openeuler/openeuler:24.03-lts）",
+      "result": "Tier 3 基础 OS 从零安装",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-10-13T06:19:05"
+    },
+    {
+      "action": "根据文档闭包结果选择镜像 Tier（无 Dockerfile/预构建镜像 → Tier 3 基础 OS）",
+      "command": "docker pull hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+      "details": {
+        "reason": "仓库无 Dockerfile/预构建镜像，hcom.spec 为 openEuler RPM 包",
+        "selected_image": "hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+        "tier": 3
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "Digest: sha256:ace677... Status: Downloaded newer image for hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+      "result": "Tier 3 基础 OS 从零安装",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-10-13T06:23:43"
+    },
+    {
+      "action": "在远程机器 clone 仓库并启动 openEuler 容器",
+      "command": "git clone --depth 1 --branch br_BeiMing.26.0.RC1 https://gitcode.com/openeuler/ubs-comm.git /home/workspace/ubs-comm-verify \u0026\u0026 docker run -d --privileged --name ubs-comm-ttfhw -v /home/workspace/ubs-comm-verify:/workspace -w /workspace hub.oepkgs.net/openeuler/openeuler:24.03-lts sleep infinity",
+      "details": {
+        "container_name": "ubs-comm-ttfhw",
+        "image": "hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+        "mount": "/home/workspace/ubs-comm-verify:/workspace",
+        "startup_command_source": "default",
+        "workspace": "/home/workspace/ubs-comm-verify"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "output": "Container ID: 00217ab6f1a6, openEuler 24.03 (LTS), 256 CPU cores",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-10-13T06:23:43"
+    },
+    {
+      "action": "安装系统工具链（gcc gcc-c++ make cmake git）",
+      "command": "dnf install -y gcc gcc-c++ make cmake git",
+      "details": {
+        "packages": [
+          "gcc",
+          "gcc-c++",
+          "make",
+          "cmake",
+          "git"
+        ],
+        "source": "openEuler dnf 仓库"
+      },
+      "duration_seconds": 45,
+      "error": "",
+      "output": "gcc 12.3.1, cmake 3.27.9, make 4.4.1, git 已安装",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-10-13T06:23:43"
+    },
+    {
+      "action": "安装构建依赖（openssl openssl-devel rdma-core-devel，来自 hcom.spec BuildRequires）",
+      "command": "dnf install -y openssl openssl-devel rdma-core-devel",
+      "details": {
+        "packages": [
+          "openssl",
+          "openssl-devel",
+          "rdma-core-devel"
+        ],
+        "source": "openEuler dnf 仓库"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "OpenSSL 3.0.12, rdma-core-50.0-44.oe2403, libibverbs headers at /usr/include/infiniband/verbs.h",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-10-13T06:23:43"
+    },
+    {
+      "action": "安装 libboundscheck（来自 hcom.spec BuildRequires，securec CMakeLists.txt 优先查找系统包）",
+      "command": "dnf install -y libboundscheck",
+      "details": {
+        "package": "libboundscheck-v1.1.11-6.oe2403.aarch64",
+        "source": "openEuler dnf 仓库"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "libboundscheck v1.1.11-6 安装成功, /usr/include/securec.h + /usr/lib64/libboundscheck.so",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-10-13T06:23:43"
+    },
+    {
+      "action": "验证所有构建依赖已安装",
+      "command": "gcc --version \u0026\u0026 cmake --version \u0026\u0026 make --version \u0026\u0026 openssl version \u0026\u0026 ls /usr/include/infiniband/verbs.h \u0026\u0026 ls /usr/include/securec.h \u0026\u0026 ls /usr/lib64/libboundscheck.so",
+      "details": {
+        "cmake": "3.27.9",
+        "gcc": "12.3.1",
+        "libboundscheck": "v1.1.11-6",
+        "libibverbs": "OK",
+        "make": "4.4.1",
+        "openssl": "3.0.12"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "所有依赖已确认安装：gcc 12.3.1, cmake 3.27.9, make 4.4.1, OpenSSL 3.0.12, libibverbs OK, libboundscheck v1.1.11-6",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-10-13T06:23:43"
+    },
+    {
+      "action": "使用仓库 build.sh 脚本执行 release 构建（并发数 102，40%）",
+      "command": "cd /workspace \u0026\u0026 PATH=/tmp/fakebin:$PATH bash build.sh",
+      "details": {
+        "build_dir": "tmp_build_dir",
+        "build_script": "build.sh",
+        "build_type": "release",
+        "cmake": "3.27.9",
+        "compiler": "gcc 12.3.1",
+        "concurrency": 102,
+        "concurrency_ratio": "40%",
+        "install_dir": "dist/hcom",
+        "modules_built": [
+          "RDMA",
+          "SOCK",
+          "SHM"
+        ],
+        "modules_skipped": [
+          "UB (默认关闭)",
+          "UMQ (默认关闭)",
+          "UBSOCKET (默认关闭)"
+        ]
+      },
+      "duration_seconds": 24,
+      "error": "",
+      "output": "[100%] Built target hcom_static. [100%] Built target hcom. Install configuration: release. [build.sh] build.sh succeeds",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-10-13T06:27:18"
+    },
+    {
+      "action": "使用仓库提供的 build/generate_gtest_report.sh 执行 UT 测试（hcom_ut + hcom_test）",
+      "command": "cd /workspace \u0026\u0026 bash build/generate_gtest_report.sh",
+      "details": {
+        "build_mode": "debug (mock 需要符号信息)",
+        "combined": {
+          "errors": 0,
+          "failed": 0,
+          "passed": 1246,
+          "time_seconds": 315.547,
+          "total": 1246
+        },
+        "hcom_test": {
+          "errors": 0,
+          "failed": 0,
+          "passed": 306,
+          "time_seconds": 301.755,
+          "total": 306
+        },
+        "hcom_ut": {
+          "errors": 0,
+          "failed": 0,
+          "passed": 940,
+          "time_seconds": 13.792,
+          "total": 940
+        },
+        "report_file": "tmp_build_dir/gtest_report.xml",
+        "test_framework": "GoogleTest 1.12.1 + mockcpp v2.7"
+      },
+      "duration_seconds": 316,
+      "error": "",
+      "output": "hcom_ut: 940 tests, 0 failures. hcom_test: 306 tests from 29 test suites, 0 failures. Combined: 1246 tests, 0 failures, 0 errors.",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-10-13T06:35:42"
+    },
+    {
+      "action": "停止并删除远程容器 ubs-comm-ttfhw",
+      "command": "docker rm -f ubs-comm-ttfhw",
+      "details": {
+        "container_name": "ubs-comm-ttfhw"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "ubs-comm-ttfhw 已清理",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-10-13T06:36:15"
+    },
+    {
+      "action": "生成验证报告并运行全量校验",
+      "command": "python3 validate_report.py verification_report_ubs-comm_20261013.json --jsonschema report_schema.json",
+      "details": {
+        "output_file": "verification_report_ubs-comm_20261013.json"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "output": "全量校验通过",
+      "result": "成功",
+      "returncode": 0,
+      "step": "report_generation",
+      "success": true,
+      "timestamp": "2026-10-13T06:36:15"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "libhcom.so.0.0.1",
+          "path": "dist/hcom/lib/libhcom.so.0.0.1",
+          "size": "49MB",
+          "type": "library"
+        },
+        {
+          "name": "libhcom_static.a",
+          "path": "dist/hcom/lib/libhcom_static.a",
+          "size": "125MB",
+          "type": "library"
+        },
+        {
+          "name": "BoostKit-hcom_1.0.0_aarch64.tar.gz",
+          "path": "dist/BoostKit-hcom_1.0.0_aarch64.tar.gz",
+          "size": "42MB",
+          "type": "package"
+        }
+      ],
+      "cmake": "cmake 3.27.9 (\u003e= 3.14.1 满足要求)",
+      "compiler": "gcc 12.3.1 (openEuler 12.3.1-38.oe2403)",
+      "concurrency": 102,
+      "concurrency_ratio": "40% (256核 × 0.4 = 102)",
+      "duration_seconds": 24,
+      "notes": "使用仓库提供的 build.sh 脚本构建，release 模式。通过 fake nproc 限制并发数为 102。构建生成 libhcom.so 共享库、libhcom_static.a 静态库和 BoostKit-hcom 软件包。",
+      "status": "success"
+    },
+    "ut": {
+      "cpp": {
+        "failed": 0,
+        "note": "包含 hcom_ut（单元测试 940 个）和 hcom_test（LLT 测试 306 个）两组测试",
+        "passed": 1246,
+        "status": "success",
+        "total": 1246
+      },
+      "duration_seconds": 316,
+      "failed": 0,
+      "failures": [],
+      "passed": 1246,
+      "skipped": 0,
+      "status": "success",
+      "total": 1246
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "ubs-comm-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti (无限制)",
+      "os": "openEuler 24.03 (LTS)"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "69G (3.1G available on /, 6.2T available on /home)",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 14,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "CMakeLists.txt: cmake_minimum_required 3.14.1, 链接 pthread/dl/rt/boundscheck, 3rdparty 含 securec(libboundscheck)",
+        "from_dockerfile": "仓库无 Dockerfile，依赖来源为 hcom.spec BuildRequires + CMakeLists.txt + build.sh",
+        "from_readme": "README.md: 构建入口 ./build.sh, UT 通过 export HCOM_BUILD_TYPE=debug HCOM_BUILD_TESTS=on \u0026\u0026 ./build.sh \u0026\u0026 ./build/generate_gtest_report.sh",
+        "mappings": [
+          {
+            "original": "make gcc cmake libboundscheck rdma-core-devel openssl openssl-devel (hcom.spec BuildRequires)",
+            "source": "hcom.spec BuildRequires → openEuler dnf",
+            "target": "dnf install -y gcc gcc-c++ make cmake git openssl openssl-devel rdma-core-devel libboundscheck (openEuler 原生包，无需翻译)"
+          }
+        ]
+      },
+      "image_name": "hub.oepkgs.net/openeuler/openeuler:24.03-lts",
+      "selection_reason": "Tier 3 基础 OS 从零安装 — 仓库无 Dockerfile/预构建镜像，hcom.spec 为 openEuler RPM 包（ExclusiveArch aarch64），选择 openEuler 24.03 LTS 作为基础镜像",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "br_BeiMing.26.0.RC1",
+    "commit": "",
+    "duration_seconds": 1200,
+    "end_time": "2026-10-13T06:36:15",
+    "environment": "远程容器验证 (192.168.9.114) — openEuler 24.03 LTS aarch64, Kunpeng-920 256核, 2.0Ti 内存",
+    "repo_url": "https://gitcode.com/openeuler/ubs-comm.git",
+    "start_time": "2026-10-13T06:16:15",
+    "total_steps": 21,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

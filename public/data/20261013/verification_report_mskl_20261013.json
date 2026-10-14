@@ -1,0 +1,594 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "CI 配置 .gitcode/workflows/PR-pipeline_full.yml 同时支持 x64 和 arm64 构建镜像；远程验证机器为 aarch64",
+      "value": "aarch64（CI 同时支持 x86 和 arm64）"
+    },
+    "build_commands": {
+      "source": "docs/zh/install_guide/mskl_install_guide.md 2.3.2 + docs/zh/development_guide/develop_guide.md 2. + .vscode/tasks.json Build: Release Mode",
+      "value": "python3 build.py（完整构建：拉取依赖+打包 whl，产物输出到 artifacts/ 目录）"
+    },
+    "dependencies": {
+      "source": "setup.py install_requires + architecture.md 外部依赖表 + build.py UT 依赖 + conftest.py mock 依赖",
+      "value": [
+        "numpy\u003c=1.26.4（setup.py install_requires，CANN 的 Python 扩展基于 numpy 1.x 编译）",
+        "CANN 软件包（通过 ASCEND_HOME_PATH 环境变量定位，镜像预装）",
+        "acl（AscendCL 设备管理，镜像预装）",
+        "mspti（昇腾 Kernel 性能监控，镜像预装）",
+        "coverage3（UT 覆盖率工具，build.py 使用）",
+        "pytest（UT 测试框架，build.py 使用）",
+        "GCC 11.2（镜像预装，C++ 编译）",
+        "Python 3.8-3.13（镜像预装多版本，默认使用 3.11）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "仓库内无 Dockerfile，依赖由 MindStudio 统一构建镜像预装",
+      "value": "无 Dockerfile（仓库内不含 Dockerfile，构建环境由 mindstudio-build 预构建镜像提供）"
+    },
+    "recommended_image": {
+      "source": ".devcontainer/devcontainer.json image 字段 + docs/zh/install_guide/mskl_install_guide.md 源码安装章节",
+      "value": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801（Tier 1 业务预构建镜像，devcontainer.json 直接指定）"
+    },
+    "special_dependencies": {
+      "source": "architecture.md 外部依赖表 + conftest.py + .devcontainer/devcontainer.json runArgs",
+      "value": [
+        "CANN 软件包（NPU 驱动和运行时，通过 ASCEND_HOME_PATH 定位）",
+        "acl（AscendCL 设备管理，conftest.py 中 mock）",
+        "mspti（昇腾 Kernel 性能监控，conftest.py 中 mock）",
+        "NPU 设备（davinci0/davinci_manager/devmm_svm/hisi_hdc，验证机器已提供 14 张卡）"
+      ]
+    },
+    "ut_commands": {
+      "source": "docs/zh/install_guide/mskl_install_guide.md 2.3.3 + docs/zh/development_guide/develop_guide.md 3.1 + .vscode/tasks.json Test: Run Unit Tests",
+      "value": "python3 build.py test（拉取依赖+执行 pytest，build.py 内部用 coverage3 run -m pytest test/launcher test/op_tune --junitxml=report/final.xml）"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "开发指南 develop_guide.md 3.1 节提到「全部通过时输出类似 59 tests」，但实际执行 python3 build.py test 收集到 150 个用例。文档中的用例数已过时，可能导致开发者对测试规模产生误判。",
+      "source": "docs/zh/development_guide/develop_guide.md 3.1 节",
+      "time": "2026-10-13T04:44:00",
+      "title": "开发指南 UT 用例数与实际不一致"
+    },
+    {
+      "body": "setup.py 的 install_requires 明确要求 numpy\u003c=1.26.4（因 CANN 的 Python 扩展基于 numpy 1.x 编译），但 build.py 的 _run_unit_tests 方法仅执行 pip install numpy 不带版本约束，导致实际安装了 numpy 2.4.6。虽然 UT 因 mock 机制仍全部通过，但在真实 NPU 场景下可能导致 acl.so 导入失败。",
+      "source": "build.py 第108行 + setup.py 第47行",
+      "time": "2026-10-13T04:44:15",
+      "title": "build.py UT 步骤未约束 numpy 版本"
+    },
+    {
+      "body": "安装指南 2.3.1 节强调必须使用 ctr_in.py 启动容器而非普通 docker run，否则可能跳过 Python、GCC 和 CANN 环境初始化。但对于自动化验证场景，ctr_in.py 需要交互式 TTY 且需从 OBS 下载，增加了环境搭建复杂度。文档未提供非交互式启动的替代方案。",
+      "source": "docs/zh/install_guide/mskl_install_guide.md 2.3.1 节",
+      "time": "2026-10-13T04:45:00",
+      "title": "安装指南要求使用 ctr_in.py 启动容器但未提供直接 docker run 替代方案"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "git clone 仓库到本地并读取目录结构",
+      "command": "git clone --depth 1 --branch master https://gitcode.com/Ascend/mskl.git /tmp/opencode/mskl-src",
+      "details": {
+        "branch": "master",
+        "repo": "mskl",
+        "url": "https://gitcode.com/Ascend/mskl.git"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "Cloning into '/tmp/opencode/mskl-src'... 仓库根目录包含 README.md、setup.py、build.py、requirement.txt、mskl/、test/、docs/、.devcontainer/、.gitcode/workflows/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T04:42:30"
+    },
+    {
+      "action": "读取 README.md 了解项目定位和文档入口",
+      "command": "cat /tmp/opencode/mskl-src/README.md",
+      "details": {
+        "file": "README.md",
+        "sections_read": [
+          "简介",
+          "功能介绍",
+          "快速入门",
+          "安装指南",
+          "贡献指南"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "MindStudio Kernel Launcher（msKL），算子 Kernel 轻量化调用工具。文档入口：快速入门 docs/zh/quick_start/、安装指南 docs/zh/install_guide/、贡献指南 docs/zh/contributing/。外部链接：ReadTheDocs、DeepWiki、昇腾社区。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T04:43:00"
+    },
+    {
+      "action": "读取 .devcontainer/devcontainer.json 提取镜像和容器配置",
+      "command": "cat /tmp/opencode/mskl-src/.devcontainer/devcontainer.json",
+      "details": {
+        "file": ".devcontainer/devcontainer.json",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "image: swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801。workspaceFolder: /workspace。runArgs: --network=host --privileged --ipc=host。remoteUser: mindstudio。postCreateCommand: bash -lc '/workspace/.devcontainer/post-create.sh'",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T04:43:15"
+    },
+    {
+      "action": "读取 docs/zh/install_guide/mskl_install_guide.md 了解源码安装流程",
+      "command": "cat /tmp/opencode/mskl-src/docs/zh/install_guide/mskl_install_guide.md",
+      "details": {
+        "build_cmd": "python3 build.py",
+        "file": "docs/zh/install_guide/mskl_install_guide.md",
+        "ut_cmd": "python3 build.py test"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "源码安装使用 MindStudio 标准构建环境，需用 ctr_in.py 启动容器。编译命令：python3 build.py，产物在 artifacts/。UT 命令：python3 build.py test。引用 MindStudio 统一构建镜像制作指南（openEuler 基础镜像构建）。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T04:43:30"
+    },
+    {
+      "action": "读取 docs/zh/contributing/contributing_guide.md 跟进贡献指南",
+      "command": "cat /tmp/opencode/mskl-src/docs/zh/contributing/contributing_guide.md",
+      "details": {
+        "file": "docs/zh/contributing/contributing_guide.md",
+        "links_followed": [
+          "docs/zh/development_guide/develop_guide.md",
+          "https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/contribute_workflow.md"
+        ]
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "贡献流程参考 msot 仓库的 contribute_workflow.md，开发指南指向 development_guide/develop_guide.md。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T04:43:45"
+    },
+    {
+      "action": "读取 docs/zh/development_guide/develop_guide.md 和 architecture.md 了解编译和测试流程",
+      "command": "cat /tmp/opencode/mskl-src/docs/zh/development_guide/develop_guide.md",
+      "details": {
+        "build_cmd": "python3 build.py",
+        "expected_tests": "约59个",
+        "file": "develop_guide.md",
+        "ut_cmd": "python3 build.py test"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "编译：python3 build.py，产物在 artifacts/。UT：python3 build.py test，全部通过约59个用例。外部依赖：numpy、torch（可选）、mspti、acl、CANN。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T04:44:00"
+    },
+    {
+      "action": "读取 build.py 了解构建和 UT 执行机制",
+      "command": "cat /tmp/opencode/mskl-src/build.py",
+      "details": {
+        "build_action": "python3 build.py → setup.py bdist_wheel",
+        "file": "build.py",
+        "ut_action": "python3 build.py test → coverage3 run -m pytest test/launcher test/op_tune"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "build.py: 完整构建拉取依赖+打包 whl 到 output/ 再归档到 artifacts/。UT: coverage3 run --branch -m pytest test/launcher test/op_tune --junitxml=report/final.xml。依赖：pip install numpy、coverage3。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T04:44:15"
+    },
+    {
+      "action": "读取 setup.py 和 conftest.py 了解 Python 依赖和 UT mock 机制",
+      "command": "cat /tmp/opencode/mskl-src/setup.py /tmp/opencode/mskl-src/test/conftest.py",
+      "details": {
+        "conftest": "mock acl 和 mspti 模块",
+        "file": "setup.py",
+        "install_requires": "numpy\u003c=1.26.4",
+        "python_requires": "\u003e=3.6"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "setup.py: install_requires=['numpy\u003c=1.26.4']。conftest.py: 全局 mock sys.modules['acl'] 和 sys.modules['mspti']，UT 不依赖真实 NPU 硬件执行。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T04:44:30"
+    },
+    {
+      "action": "读取 .gitcode/workflows/ CI 配置了解官方构建和测试流程",
+      "command": "cat /tmp/opencode/mskl-src/.gitcode/workflows/*.yml",
+      "details": {
+        "ci_image": "mindstudio-build:26.1.0",
+        "files": [
+          "PR-pipeline_full.yml",
+          ".build_mindstudio_job.yml",
+          ".ut_mindstudio_job.yml",
+          ".ut_job.yml",
+          ".build_job.yml"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "CI 构建使用 swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.1.0 镜像，支持 x64 和 arm64。UT 通过 MindStudio-CI 工具包执行。旧 .ut_job.yml 中 UT 脚本：bash scripts/download_thirdparty.sh ut + bash scripts/execute_py_test_case.sh。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T04:44:45"
+    },
+    {
+      "action": "WebFetch 跟踪 MindStudio 统一构建镜像制作指南（外部链接）",
+      "command": "WebFetch https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/docker_image_build_guide.md",
+      "details": {
+        "base_os": "openEuler 24.03 LTS",
+        "cann": "9.1.0",
+        "gcc": "11.2",
+        "python": "3.8-3.13",
+        "url": "https://gitcode.com/Ascend/msot/blob/master/docs/zh/common/docker_image_build_guide.md"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "MindStudio 统一构建镜像基于 openEuler 24.03 LTS，分层构建（OS→GCC11→Python→CANN）。构建脚本从 OBS 下载 dockerfile.tar.gz，用 build_image.py 构建。启动容器用 ctr_in.py。CANN 版本 9.1.0。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T04:45:00"
+    },
+    {
+      "action": "确认仓库内无 Dockerfile，镜像信号探测汇总",
+      "command": "find /tmp/opencode/mskl-src -name 'Dockerfile*'",
+      "details": {
+        "npu_required": true,
+        "npu_signals": [
+          "CANN",
+          "Ascend",
+          "acl",
+          "mspti",
+          "davinci",
+          "NPU"
+        ],
+        "tier1_signal": "devcontainer.json image 字段指向非基础镜像 swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "tier2_signal": "仓库内无 Dockerfile，外部镜像制作指南可从 openEuler 基础镜像构建但耗时较长",
+        "tier3_fallback": "可回退到 openEuler 24.03 LTS 基础镜像从零安装 GCC/Python/CANN"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "仓库内无 Dockerfile。devcontainer.json 指定预构建镜像 mindstudio-build:26.2.0-0801，判定为 Tier 1。NPU 依赖确认：CANN/acl/mspti/davinci 均命中，npu_required=true。",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "dockerfile_analysis",
+      "success": true,
+      "timestamp": "2026-10-13T04:45:15"
+    },
+    {
+      "action": "Tier 1 选择预构建镜像 mindstudio-build:26.2.0-0801",
+      "command": "docker images | grep mindstudio-build",
+      "details": {
+        "already_pulled": true,
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "reason": "devcontainer.json image 字段直接指向非基础镜像",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build  26.2.0-0801  713461922b5a  7 weeks ago  4.34GB（镜像已存在于本地）",
+      "result": "Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-10-13T04:46:00"
+    },
+    {
+      "action": "git clone 仓库到远程工作路径 /home/workspace/mskl-verify",
+      "command": "ssh root@192.168.9.114 \"git clone --depth 1 --branch master https://gitcode.com/Ascend/mskl.git /home/workspace/mskl-verify\"",
+      "details": {
+        "branch": "master",
+        "commit": "2d1c6c6940b92388aaff7cf8d5220d4be3c226e4",
+        "remote_path": "/home/workspace/mskl-verify"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "Cloning into '/home/workspace/mskl-verify'... 成功 clone 到 /home/workspace/mskl-verify",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-10-13T04:46:30"
+    },
+    {
+      "action": "启动 Tier 1 预构建镜像容器 mskl-ttfhw（含 NPU 设备挂载）",
+      "command": "docker run -d --name mskl-ttfhw --privileged --network=host --ipc=host --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/sbin/npu-smi:/usr/local/sbin/npu-smi -v /usr/local/Ascend/driver:/usr/local/Ascend/driver -v /usr/local/Ascend/firmware:/usr/local/Ascend/firmware -v /home/workspace/mskl-verify:/workspace -w /workspace --user root mindstudio-build:26.2.0-0801 sleep infinity",
+      "details": {
+        "container_name": "mskl-ttfhw",
+        "image": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+        "npu_mounts": [
+          "/dev/davinci0",
+          "/dev/davinci_manager",
+          "/dev/devmm_svm",
+          "/dev/hisi_hdc"
+        ],
+        "run_args": [
+          "--privileged",
+          "--network=host",
+          "--ipc=host",
+          "--user root"
+        ],
+        "startup_command_source": "default_挂卡",
+        "volume_mounts": [
+          "/usr/local/sbin/npu-smi",
+          "/usr/local/Ascend/driver",
+          "/usr/local/Ascend/firmware",
+          "/home/workspace/mskl-verify:/workspace"
+        ]
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "容器 ID: 41f5c9066daab4dbed29019c2bf5bba36501299b5bbb0e90d62c923d9d9eb31d，状态 Up",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-10-13T04:47:00"
+    },
+    {
+      "action": "验证 Tier 1 镜像预装的关键依赖",
+      "command": "docker exec mskl-ttfhw bash -lc 'python3 --version \u0026\u0026 gcc --version \u0026\u0026 echo ASCEND_HOME_PATH=$ASCEND_HOME_PATH \u0026\u0026 python3 -m pytest --version \u0026\u0026 which coverage3 \u0026\u0026 pip3 --version \u0026\u0026 python3 -c \"import numpy\"'",
+      "details": {
+        "cann": "9.1.0 (ASCEND_HOME_PATH=/usr/local/Ascend/cann-9.1.0) ✅",
+        "coverage3": "/opt/python/cp311-cp311/bin/coverage3 ✅",
+        "gcc": "11.2.0 ✅",
+        "numpy": "未安装 ❌（build.py UT 步骤会自动 pip install numpy）",
+        "pip3": "pip 26.1 ✅",
+        "pytest": "9.1.1 ✅",
+        "python3": "3.11.15 ✅"
+      },
+      "duration_seconds": 10,
+      "error": "",
+      "output": "Python 3.11.15, GCC 11.2.0, CANN 9.1.0, pytest 9.1.1, coverage3 均已就绪。numpy 未安装但 build.py UT 步骤会自动安装。",
+      "result": "部分成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-10-13T04:47:30"
+    },
+    {
+      "action": "使用仓库 build.py 入口脚本执行构建（python3 build.py，编译并发 256×40%=102）",
+      "command": "docker exec mskl-ttfhw bash -lc 'cd /workspace \u0026\u0026 time python3 build.py'",
+      "details": {
+        "artifact": "mindstudio_kl-26.0.0-py3-none-any.whl",
+        "artifact_size": "67K",
+        "build_command": "python3 build.py",
+        "build_entry": "build.py → setup.py bdist_wheel",
+        "concurrency": 102,
+        "concurrency_ratio": "40%"
+      },
+      "duration_seconds": 0.47,
+      "error": "",
+      "output": "running bdist_wheel... creating '/workspace/output/mindstudio_kl-26.0.0-py3-none-any.whl'... Archiving artifact to /workspace/artifacts/. real 0m0.469s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-10-13T04:48:30"
+    },
+    {
+      "action": "执行单元测试（python3 build.py test，build.py 自动 pip install numpy 后用 coverage3+pytest 执行）",
+      "command": "docker exec mskl-ttfhw bash -lc 'cd /workspace \u0026\u0026 time python3 build.py test'",
+      "details": {
+        "coverage": "78%",
+        "failed": 0,
+        "numpy_installed": "numpy 2.4.6（setup.py 要求 \u003c=1.26.4 但 build.py 未指定版本约束，UT 仍全部通过）",
+        "passed": 150,
+        "pytest_version": "9.1.1",
+        "total": 150,
+        "ut_command": "python3 build.py test",
+        "ut_entry": "build.py → coverage3 run -m pytest test/launcher test/op_tune"
+      },
+      "duration_seconds": 11.84,
+      "error": "",
+      "output": "collected 150 items ... 150 passed in 1.91s。覆盖率 78%。numpy 2.4.6 安装成功（有版本冲突告警但 UT 通过）。real 0m11.839s",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-10-13T04:49:37"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "mindstudio_kl-26.0.0-py3-none-any.whl",
+          "path": "/workspace/artifacts/mindstudio_kl-26.0.0-py3-none-any.whl",
+          "size": "67K",
+          "type": "wheel"
+        }
+      ],
+      "compiler": "GCC 11.2.0",
+      "concurrency": 102,
+      "concurrency_ratio": "40%（256核×40%=102，Python whl 打包不涉及并行编译）",
+      "duration_seconds": 0.47,
+      "notes": "使用仓库 build.py 入口脚本执行构建，内部调用 setup.py bdist_wheel 打包为 whl。构建无报错，SetuptoolsDeprecationWarning 为已知弃用提示不影响构建。",
+      "status": "success"
+    },
+    "ut": {
+      "duration_seconds": 11.84,
+      "failed": 0,
+      "failures": [],
+      "passed": 150,
+      "python": {
+        "failed": 0,
+        "modules": [
+          {
+            "name": "test/launcher/test_code_generator.py",
+            "passed": 2,
+            "total": 2
+          },
+          {
+            "name": "test/launcher/test_compiler.py",
+            "passed": 3,
+            "total": 3
+          },
+          {
+            "name": "test/launcher/test_config.py",
+            "passed": 39,
+            "total": 39
+          },
+          {
+            "name": "test/launcher/test_driver.py",
+            "passed": 34,
+            "total": 34
+          },
+          {
+            "name": "test/launcher/test_launcher_utils.py",
+            "passed": 12,
+            "total": 12
+          },
+          {
+            "name": "test/launcher/test_opgen_workflow.py",
+            "passed": 10,
+            "total": 10
+          },
+          {
+            "name": "test/op_tune/test_autotune.py",
+            "passed": 26,
+            "total": 26
+          },
+          {
+            "name": "test/op_tune/test_autotune_utils.py",
+            "passed": 7,
+            "total": 7
+          },
+          {
+            "name": "test/op_tune/test_kernel_modifier.py",
+            "passed": 3,
+            "total": 3
+          },
+          {
+            "name": "test/op_tune/test_kernel_prof.py",
+            "passed": 2,
+            "total": 2
+          },
+          {
+            "name": "test/op_tune/test_logger.py",
+            "passed": 4,
+            "total": 4
+          },
+          {
+            "name": "test/op_tune/test_safe_check.py",
+            "passed": 8,
+            "total": 8
+          }
+        ],
+        "passed": 150,
+        "status": "success",
+        "total": 150
+      },
+      "skipped": 0,
+      "status": "success",
+      "total": 150
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "mskl-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "openEuler 24.03 LTS-SP3"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "69G（根分区 3.1G 可用）/ 6.9T（/home 分区 6.3T 可用）",
+      "docker_version": "Docker version 18.09.0, build 05c4df4",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 14,
+        "mounted_card_id": 0
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_dockerfile": "仓库内无 Dockerfile，依赖由 MindStudio 统一构建镜像预装",
+        "from_readme": "setup.py install_requires: numpy\u003c=1.26.4；build.py UT 依赖: coverage3、pytest；architecture.md 外部依赖: CANN、acl、mspti",
+        "mappings": [
+          {
+            "original": "numpy\u003c=1.26.4（setup.py）",
+            "source": "setup.py install_requires + build.py _run_unit_tests",
+            "target": "pip install numpy（build.py UT 步骤自动安装）"
+          },
+          {
+            "original": "CANN 9.1.0（architecture.md）",
+            "source": "容器内验证",
+            "target": "镜像预装，ASCEND_HOME_PATH=/usr/local/Ascend/cann-9.1.0"
+          },
+          {
+            "original": "GCC 11.2（镜像制作指南）",
+            "source": "容器内验证",
+            "target": "镜像预装 gcc 11.2.0"
+          },
+          {
+            "original": "pytest（build.py）",
+            "source": "容器内验证",
+            "target": "镜像预装 pytest 9.1.1"
+          },
+          {
+            "original": "coverage3（build.py）",
+            "source": "容器内验证",
+            "target": "镜像预装 /opt/python/cp311-cp311/bin/coverage3"
+          }
+        ]
+      },
+      "image_name": "swr.cn-north-4.myhuaweicloud.com/mindstudio-image/mindstudio-build:26.2.0-0801",
+      "selection_reason": "Tier 1 业务预构建镜像：.devcontainer/devcontainer.json 的 image 字段直接指向 mindstudio-build:26.2.0-0801（非基础 OS 镜像），镜像已预装 CANN 9.1.0、GCC 11.2、Python 3.11.15、pytest、coverage3 等全部构建和测试依赖",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "2d1c6c6940b92388aaff7cf8d5220d4be3c226e4",
+    "duration_seconds": 496,
+    "end_time": "2026-10-13T04:50:30",
+    "environment": "远程容器验证（openEuler 24.03 LTS-SP3 / CANN 9.1.0 / NPU 910B3）",
+    "repo_url": "https://gitcode.com/Ascend/mskl.git",
+    "start_time": "2026-10-13T04:42:14",
+    "total_steps": 17,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "build.py UT 步骤安装 numpy 2.4.6 与 setup.py 要求的 numpy\u003c=1.26.4 版本冲突",
+      "solution": "build.py 的 _run_unit_tests 方法执行 pip install numpy 时不带版本约束，导致安装了 numpy 2.4.6。由于 conftest.py 使用 unittest.mock 对 acl 和 mspti 模块做了全局 mock，UT 不依赖真实 CANN 运行时，因此 numpy 2.x 不影响 UT 执行结果，150 个用例全部通过。但在真实 NPU 场景下需注意版本约束。",
+      "source": "build.py 第108行: self._execute_command([sys.executable, \"-m\", \"pip\", \"install\", \"numpy\"], env=env)",
+      "timestamp": "2026-10-13T04:49:40"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "火山AI网关/glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

@@ -1,0 +1,526 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "README.md §6.2 + 构建指导 §1 + AGENTS.md",
+      "value": "aarch64 (ARM64)，推荐 openEuler 24.03 LTS SP3/SP4"
+    },
+    "build_commands": {
+      "source": "README.md §6.2 + 构建指导 §3.2 + AGENTS.md + build.sh",
+      "value": "bash build.sh (Release 默认构建)；bash build.sh -D (Debug)；bash build.sh package (打包 RPM)"
+    },
+    "dependencies": {
+      "source": "ubs-engine.spec BuildRequires + docker/ubs-engine.Dockerfile + 构建指导 §3.1",
+      "value": [
+        "gcc \u003e= 10.3",
+        "gcc-c++ \u003e= 10.3",
+        "cmake \u003e= 3.22",
+        "make \u003e= 4.3",
+        "python3-setuptools",
+        "glibc-devel \u003e= 2.34",
+        "libstdc++-devel \u003e= 10.3",
+        "systemd-devel \u003e= 249",
+        "libboundscheck \u003e= v1.1",
+        "libxml2-devel \u003e= 2.9",
+        "openssl-devel \u003e= 3.0",
+        "cpp-httplib-devel \u003e= 0.40.0",
+        "rapidjson-devel \u003e= 1.1.0",
+        "ubs-comm-devel \u003e= 1.0.0-27 (SP3) / \u003e= 1.0.1-7 (SP4)",
+        "numactl-libs \u003e= 2.0",
+        "numactl-devel",
+        "ninja-build \u003e= 1.10",
+        "libvirt-devel \u003e= 9.0",
+        "kernel-devel",
+        "gtest",
+        "gtest-devel",
+        "gmock",
+        "gmock-devel",
+        "bc",
+        "coreutils",
+        "sudo",
+        "util-linux-user",
+        "patch",
+        "bash"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "docker/ubs-engine.Dockerfile RUN + ubs-engine.spec BuildRequires",
+      "value": [
+        {
+          "original": "dnf install gcc gcc-c++ make cmake git python3 python3-pip",
+          "target_equivalent": "dnf install -y gcc gcc-c++ make cmake git python3 python3-pip"
+        },
+        {
+          "original": "dnf builddep ubs-engine.spec",
+          "target_equivalent": "dnf builddep -y ubs-engine.spec"
+        },
+        {
+          "original": "dnf install numactl-devel gtest gtest-devel gmock gmock-devel python3-setuptools util-linux-user patch bc bash coreutils sudo tar",
+          "target_equivalent": "dnf install -y numactl-devel gtest gtest-devel gmock gmock-devel python3-setuptools util-linux-user patch bc bash coreutils sudo tar"
+        },
+        {
+          "original": "spec BuildRequires: libboundscheck libxml2-devel openssl-devel cpp-httplib-devel rapidjson-devel ubs-comm-devel numactl-libs systemd-devel libvirt-devel kernel-devel ninja-build",
+          "target_equivalent": "dnf install -y libboundscheck libxml2-devel openssl-devel cpp-httplib-devel rapidjson-devel ubs-comm-devel numactl-libs systemd-devel libvirt-devel kernel-devel ninja-build"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": ".devcontainer/ubse/devcontainer.json image 字段 + docker/ubs-engine.Dockerfile FROM",
+      "value": "Tier 1 预构建镜像: swr.cn-north-4.myhuaweicloud.com/opentile/ubs-engine:24.03-sp3-1.0.1；Tier 2 备选: Dockerfile FROM hub.oepkgs.net/openeuler/openeuler:24.03-lts-sp3"
+    },
+    "special_dependencies": {
+      "source": "构建指导 §3.1.2 + docker/build_env.sh + 单元测试开发指南 §5",
+      "value": [
+        "ubs-comm-devel: openEuler 24.03 LTS SP3/SP4 仓库可能不提供，需从源码编译 (git clone https://gitcode.com/src-openeuler/ubs-comm.git -b openEuler-24.03-LTS-SP4, rpmbuild -ba)",
+        "64K 内存页兼容性: 宿主机页大小 65536 (64K)，mockcpp 在非 4K 页环境 UT 执行会被自动跳过 (单元测试开发指南 §5)，编译不受影响"
+      ]
+    },
+    "ut_commands": {
+      "source": "README.md §6.4.2 + 构建指导 §3.3 + 单元测试开发指南 §4 + AGENTS.md",
+      "value": "bash build.sh ut (编译并运行全部 UT)；bash build.sh ut --skip-run-tests (只编译不执行)；bash build.sh ut -- --gtest_filter=\"TestSuite.*\" (运行部分用例)。5 个独立 UT 二进制: ubs-engine_ut / ubs-engine_ucache_plugin_ut / ubs-engine_rmrs_plugin_ut / ubs-engine_virtagent_ut / ubs-engine_process_mem_ut"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "项目使用 mockcpp 作为 Mock 框架，其 mprotect 按 4K 页硬编码地址对齐（mockcpp_support_arm64.patch 中 ADDR_ALIGN_UP/ADDR_ALIGN_DOWN）。在 64K 内存页环境（如鲲鹏 920 默认配置）下 UT 无法执行，CMake 宏自动跳过。这意味着在鲲鹏 920 服务器上无法运行单元测试验证代码质量，仅能验证编译通过。建议 mockcpp 补丁适配运行时页大小（sysconf(_SC_PAGESIZE)）而非硬编码 4K。",
+      "source": "docs/test/单元测试开发指南.md §5 + 容器内 getconf PAGESIZE=65536",
+      "time": "2026-10-13T06:14:27",
+      "title": "64K 页环境 UT 执行限制（mockcpp 不兼容）"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "在远程机器 clone 仓库并读取 README.md",
+      "command": "ssh root@192.168.9.114 \"git clone --depth 1 --branch master https://gitcode.com/openeuler/ubs-engine.git /home/workspace/ubs-engine-verify \u0026\u0026 cat README.md\"",
+      "details": {
+        "commit": "9f047d0",
+        "file": "README.md",
+        "repo": "ubs-engine"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "output": "UBS-Engine (UB Service Core Engine) 内存池化资源调度引擎。推荐 openEuler Linux (ARM64) 构建。构建命令 bash build.sh，UT 命令 bash build.sh ut。5 个独立 UT 二进制。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:06:55"
+    },
+    {
+      "action": "读取 Dockerfile、devcontainer.json、build_env.sh 进行镜像信号探测",
+      "command": "ssh root@192.168.9.114 \"cat docker/ubs-engine.Dockerfile .devcontainer/ubse/devcontainer.json docker/build_env.sh\"",
+      "details": {
+        "devcontainer_image": "swr.cn-north-4.myhuaweicloud.com/opentile/ubs-engine:24.03-sp3-1.0.1 (预构建镜像)",
+        "dockerfile_from": "hub.oepkgs.net/openeuler/openeuler:24.03-lts-sp3 (基础 OS)",
+        "tier": "Tier 1 优先尝试 devcontainer 预构建镜像，失败降级 Tier 2 Dockerfile 构建"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "Dockerfile FROM hub.oepkgs.net/openeuler/openeuler:24.03-lts-sp3，RUN dnf install + builddep + gtest。devcontainer image 指向 swr.cn-north-4.myhuaweicloud.com/opentile/ubs-engine:24.03-sp3-1.0.1 预构建镜像。",
+      "result": "成功 - 发现 Tier 1 预构建镜像信号",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:06:55"
+    },
+    {
+      "action": "读取构建指导文档 docs/build_install/构建指导.md",
+      "command": "ssh root@192.168.9.114 \"cat docs/build_install/构建指导.md\"",
+      "details": {
+        "build_cmd": "bash build.sh",
+        "file": "docs/build_install/构建指导.md",
+        "os": "openEuler 24.03 LTS SP3/SP4",
+        "ut_cmd": "bash build.sh ut"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "仅支持 openEuler。依赖分两类: spec BuildRequires (dnf builddep) + UT 依赖 (gtest/gmock)。ubs-comm-devel 版本要求 SP3\u003e=1.0.0-27, SP4\u003e=1.0.1-7，不满足需源码编译 ubs-comm。构建 bash build.sh，UT bash build.sh ut。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:06:55"
+    },
+    {
+      "action": "读取单元测试开发指南 docs/test/单元测试开发指南.md",
+      "command": "ssh root@192.168.9.114 \"cat docs/test/单元测试开发指南.md\"",
+      "details": {
+        "file": "docs/test/单元测试开发指南.md",
+        "framework": "GTest + MockCpp",
+        "page_size_issue": "64K 页环境 mockcpp UT 自动跳过"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "GTest + MockCpp 框架。§5 64K 内存页兼容性: mockcpp mprotect 按 4K 页硬编码，64K 页环境 UT 执行自动跳过 (echo 替代)，编译不受影响。宿主机 getconf PAGESIZE=65536 确认为 64K 页环境。",
+      "result": "成功 - 发现 64K 页兼容性问题",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:06:55"
+    },
+    {
+      "action": "读取 AGENTS.md、ubs-engine.spec BuildRequires、CMakeLists.txt",
+      "command": "ssh root@192.168.9.114 \"cat AGENTS.md \u0026\u0026 grep BuildRequires ubs-engine.spec \u0026\u0026 cat CMakeLists.txt\"",
+      "details": {
+        "cmake_version": "3.22",
+        "cxx_standard": "C++17",
+        "spec_buildrequires": "cmake\u003e=3.22, gcc-c++\u003e=10.3, libboundscheck, libxml2-devel, openssl-devel, cpp-httplib-devel, rapidjson-devel, ubs-comm-devel, numactl-libs, systemd-devel, libvirt-devel, kernel-devel, ninja-build, gtest, gmock"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "C++17/C11 CMake 项目。spec BuildRequires 列出全部依赖。CMakeLists cmake_minimum_required 3.22，project ubs-engine VERSION 1.0。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:06:55"
+    },
+    {
+      "action": "NPU 需求检测和页大小确认",
+      "command": "ssh root@192.168.9.114 \"grep -rinE 'cann|ascend|torch_npu|davinci|910|310|昇腾' README.md docker/ubs-engine.Dockerfile ubs-engine.spec .devcontainer/ubse/devcontainer.json; getconf PAGESIZE\"",
+      "details": {
+        "grep_scope": "README.md + Dockerfile + spec + devcontainer.json",
+        "npu_required": false,
+        "page_size": 65536
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "output": "未在 README/Dockerfile/spec/devcontainer 中找到 CANN/Ascend/torch_npu/davinci/910/310/昇腾 关键词。npu_required=false。getconf PAGESIZE=65536 (64K 页)。",
+      "result": "成功 - 无 NPU 需求，确认 64K 页",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-13T06:06:55"
+    },
+    {
+      "action": "尝试拉取 Tier 1 预构建镜像 swr.cn-north-4.myhuaweicloud.com/opentile/ubs-engine:24.03-sp3-1.0.1",
+      "command": "ssh root@192.168.9.114 \"docker pull swr.cn-north-4.myhuaweicloud.com/opentile/ubs-engine:24.03-sp3-1.0.1\"",
+      "details": {
+        "image": "swr.cn-north-4.myhuaweicloud.com/opentile/ubs-engine:24.03-sp3-1.0.1",
+        "pull_status": "success",
+        "source": ".devcontainer/ubse/devcontainer.json",
+        "tier": "Tier 1"
+      },
+      "duration_seconds": 30,
+      "error": "",
+      "output": "Pulling from opentile/ubs-engine... Digest: sha256:e79a27a7f08cf1390462879b66c59b1cedb9744eaebb597231d35a1fc8929a7a. Status: Downloaded newer image.",
+      "result": "成功 - Tier 1 业务预构建镜像",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-10-13T06:09:18"
+    },
+    {
+      "action": "启动容器 ubs-engine-ttfhw，挂载工作目录 /home/workspace/ubs-engine-verify 到 /workspace",
+      "command": "ssh root@192.168.9.114 \"docker run -d --privileged --name ubs-engine-ttfhw -v /home/workspace/ubs-engine-verify:/workspace swr.cn-north-4.myhuaweicloud.com/opentile/ubs-engine:24.03-sp3-1.0.1 sleep infinity\"",
+      "details": {
+        "container_name": "ubs-engine-ttfhw",
+        "image": "swr.cn-north-4.myhuaweicloud.com/opentile/ubs-engine:24.03-sp3-1.0.1",
+        "mount": "/home/workspace/ubs-engine-verify:/workspace",
+        "npu_mounted": false,
+        "npu_required": false,
+        "startup_command_source": "default（devcontainer workspaceMount 配置 + skill 默认 sleep infinity）"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Container ID: af433cd56447, Status: Up",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-10-13T06:09:18"
+    },
+    {
+      "action": "执行 devcontainer postCreateCommand: 安装 ninja-build",
+      "command": "ssh root@192.168.9.114 \"docker exec ubs-engine-ttfhw dnf install -y ninja-build\"",
+      "details": {
+        "ninja_version": "1.11.1",
+        "postCreateCommand": "dnf install -y ninja-build"
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "output": "Package ninja-build-1.11.1-1.oe2403sp3.aarch64 is already installed. Nothing to do. Complete!",
+      "result": "成功 - ninja-build 已预装",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-10-13T06:09:18"
+    },
+    {
+      "action": "验证容器内构建工具链（gcc/g++/cmake/make/python3/git）",
+      "command": "ssh root@192.168.9.114 \"docker exec ubs-engine-ttfhw bash -c 'which gcc g++ cmake make python3 git; gcc --version | head -1; cmake --version | head -1; ninja --version'\"",
+      "details": {
+        "cmake": "3.27.9",
+        "gcc": "12.3.1",
+        "git": "installed",
+        "ninja": "1.11.1",
+        "python3": "installed"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "gcc 12.3.1 (openEuler 12.3.1-111.oe2403sp3), cmake 3.27.9, ninja 1.11.1",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-10-13T06:09:18"
+    },
+    {
+      "action": "验证 UT 测试框架 gtest/gmock 已预装",
+      "command": "ssh root@192.168.9.114 \"docker exec ubs-engine-ttfhw rpm -q gtest gtest-devel gmock gmock-devel\"",
+      "details": {
+        "gmock": "1.14.0-2.oe2403sp3",
+        "gmock-devel": "1.14.0-2.oe2403sp3",
+        "gtest": "1.14.0-2.oe2403sp3",
+        "gtest-devel": "1.14.0-2.oe2403sp3"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "gtest-1.14.0, gtest-devel-1.14.0, gmock-1.14.0, gmock-devel-1.14.0 均已安装",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-10-13T06:09:18"
+    },
+    {
+      "action": "验证关键库依赖（libboundscheck/libxml2/openssl/cpp-httplib/rapidjson/ubs-comm-devel 等）",
+      "command": "ssh root@192.168.9.114 \"docker exec ubs-engine-ttfhw rpm -q libboundscheck libxml2-devel openssl-devel cpp-httplib-devel rapidjson-devel ubs-comm-devel systemd-devel libvirt-devel kernel-devel numactl-devel numactl-libs\"",
+      "details": {
+        "cpp-httplib-devel": "0.46.0-1",
+        "kernel-devel": "6.6.0-145.3.29.160",
+        "libboundscheck": "v1.1.11-6",
+        "libvirt-devel": "9.10.0-37",
+        "libxml2-devel": "2.11.9-14",
+        "numactl-devel": "2.0.16-14",
+        "numactl-libs": "2.0.16-14",
+        "openssl-devel": "3.0.12-53",
+        "rapidjson-devel": "1.1.0-14",
+        "systemd-devel": "255-59",
+        "ubs-comm-devel": "1.0.0-27 (满足 SP3 要求 \u003e=1.0.0-27)"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "output": "全部 11 个关键库依赖均已预装。ubs-comm-devel 1.0.0-27 满足 SP3 版本要求。",
+      "result": "成功 - 全部依赖已预装",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": true,
+      "timestamp": "2026-10-13T06:09:18"
+    },
+    {
+      "action": "使用仓库 build.sh 入口脚本执行 Release 构建，并发数 102 (256核×40%)",
+      "command": "ssh root@192.168.9.114 \"docker exec ubs-engine-ttfhw bash -c 'cd /workspace \u0026\u0026 time bash build.sh -j 102'\"",
+      "details": {
+        "build_dir": "cmake-build-release",
+        "build_script": "build.sh",
+        "build_type": "Release",
+        "cmake": "3.27.9",
+        "compiler": "gcc 12.3.1",
+        "concurrency": 102,
+        "concurrency_ratio": "40%",
+        "entry_source": "仓库提供的 build.sh + 构建指导 §3.2 + AGENTS.md",
+        "generator": "Ninja",
+        "targets_built": 558,
+        "targets_total": 558
+      },
+      "duration_seconds": 32.5,
+      "error": "",
+      "output": "[558/558] Linking CXX shared library lib/libmempooling.so. Build completed in 32.527s. real 0m32.538s, user 28m23.494s, sys 2m19.290s.",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_attempt",
+      "success": true,
+      "timestamp": "2026-10-13T06:11:28"
+    },
+    {
+      "action": "编译全部 UT 测试二进制（bash build.sh ut --skip-run-tests -j 102）",
+      "command": "ssh root@192.168.9.114 \"docker exec ubs-engine-ttfhw bash -c 'cd /workspace \u0026\u0026 bash build.sh ut --skip-run-tests -j 102'\"",
+      "details": {
+        "build_dir": "cmake-build-debug",
+        "concurrency": 102,
+        "targets_built": 947,
+        "targets_total": 947,
+        "ut_binaries": [
+          "ubs-engine_ut (399M)",
+          "ubs-engine_ucache_plugin_ut (34M)",
+          "ubs-engine_rmrs_plugin_ut (218M)",
+          "ubs-engine_virtagent_ut (215M)",
+          "ubs-engine_process_mem_ut (18M)"
+        ]
+      },
+      "duration_seconds": 76.6,
+      "error": "",
+      "output": "[947/947] Linking CXX executable bin/ubs-engine_ut. Build completed in 76.618s. 5 个 UT 二进制全部编译链接成功。",
+      "result": "成功 - 5 个 UT 二进制全部编译通过",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-10-13T06:14:27"
+    },
+    {
+      "action": "运行全部 UT 测试（bash build.sh ut -j 102）",
+      "command": "ssh root@192.168.9.114 \"docker exec ubs-engine-ttfhw bash -c 'cd /workspace \u0026\u0026 bash build.sh ut -j 102'\"",
+      "details": {
+        "documentation_reference": "docs/test/单元测试开发指南.md §5",
+        "incompatible_reason": "mockcpp mprotect 按 4K 页硬编码地址对齐，64K 页环境调用 mprotect 失败导致 SIGSEGV",
+        "page_size": 65536,
+        "required_page_size": 4096,
+        "skip_behavior": "CMake add_ut 宏在配置阶段检测 getconf PAGESIZE，非 4K 页时将 UT 执行命令替换为 echo 跳过提示",
+        "skip_message": "SKIP_UT: page size 65536 is not 4096, mockcpp incompatible, UT skipped, see docs/test",
+        "ut_targets_skipped": 5
+      },
+      "duration_seconds": 1.5,
+      "error": "",
+      "output": "CMake 配置阶段输出 20 次 'Page size is 65536 (not 4K), mockcpp incompatible, skip running UT'。执行阶段 5 个 UT target 均输出 'SKIP_UT: page size 65536 is not 4096, mockcpp incompatible, UT skipped, see docs/test'。Build completed in 1.481s。",
+      "result": "跳过 - 64K 页环境 mockcpp 不兼容，UT 执行被 CMake 宏自动跳过",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-10-13T06:14:27"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "ubse",
+          "path": "cmake-build-release/bin/ubse",
+          "size": "12M",
+          "type": "binary (主守护进程)"
+        },
+        {
+          "name": "ubsectl",
+          "path": "cmake-build-release/bin/ubsectl",
+          "size": "1.3M",
+          "type": "binary (CLI 工具)"
+        },
+        {
+          "name": "libmempooling.so",
+          "path": "cmake-build-release/lib/libmempooling.so",
+          "size": "4.2M",
+          "type": "library (内存池化)"
+        },
+        {
+          "name": "libprocess_mem.so",
+          "path": "cmake-build-release/lib/libprocess_mem.so",
+          "size": "724K",
+          "type": "library (processmem 插件)"
+        },
+        {
+          "name": "libubs-virt-agent.so.1.0.1",
+          "path": "cmake-build-release/lib/libubs-virt-agent.so.1.0.1",
+          "size": "958K",
+          "type": "library (虚拟化代理)"
+        },
+        {
+          "name": "libubse-client.so.1.0.1",
+          "path": "cmake-build-release/lib/libubse-client.so.1.0.1",
+          "size": "802K",
+          "type": "library (客户端 SDK)"
+        },
+        {
+          "name": "libucache_plugin.so",
+          "path": "cmake-build-release/lib/libucache_plugin.so",
+          "size": "865K",
+          "type": "library (ucache 插件)"
+        },
+        {
+          "name": "libvirtagent.so",
+          "path": "cmake-build-release/lib/libvirtagent.so",
+          "size": "1.8M",
+          "type": "library (虚拟化代理)"
+        },
+        {
+          "name": "libstrategy.so",
+          "path": "cmake-build-release/lib/libstrategy.so",
+          "size": "146K",
+          "type": "library"
+        },
+        {
+          "name": "libubse-client.a",
+          "path": "cmake-build-release/lib/libubse-client.a",
+          "size": "294K",
+          "type": "library (静态库)"
+        }
+      ],
+      "cmake": "3.27.9",
+      "compiler": "gcc 12.3.1 (openEuler 12.3.1-111.oe2403sp3)",
+      "concurrency": 102,
+      "concurrency_ratio": "40% (256核 × 40% = 102)",
+      "duration_seconds": 32.5,
+      "notes": "Release 默认构建，558 个目标全部编译链接成功。使用 Ninja 构建器。build.sh 入口脚本，-j 102 并发。",
+      "status": "success"
+    },
+    "ut": {
+      "cpp": {
+        "failed": 0,
+        "note": "5 个 UT 二进制全部编译成功（ubs-engine_ut/ubs-engine_ucache_plugin_ut/ubs-engine_rmrs_plugin_ut/ubs-engine_virtagent_ut/ubs-engine_process_mem_ut），但执行被跳过：宿主机页大小 65536 (64K)，mockcpp mprotect 按 4K 页硬编码导致不兼容，CMake add_ut 宏自动将 UT 执行替换为跳过提示。详见 docs/test/单元测试开发指南.md §5。",
+        "passed": 0,
+        "status": "not_run",
+        "total": 0
+      },
+      "duration_seconds": 76.6,
+      "failed": 0,
+      "failures": [],
+      "passed": 0,
+      "skipped": 0,
+      "status": "not_run",
+      "total": 0
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64",
+      "container_name": "ubs-engine-ttfhw",
+      "cpu_cores": 256,
+      "memory": "2.0Ti",
+      "os": "openEuler 24.03 LTS-SP3"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 256,
+      "cpu_model": "Kunpeng-920",
+      "disk": "/home 6.9T (可用 6.3T)",
+      "docker_version": "18.09.0",
+      "memory": "2.0Ti",
+      "npu": {
+        "available": true,
+        "card_count": 14,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "image_name": "swr.cn-north-4.myhuaweicloud.com/opentile/ubs-engine:24.03-sp3-1.0.1",
+      "selection_reason": "Tier 1 业务预构建镜像：.devcontainer/ubse/devcontainer.json image 字段指向华为云 SWR 预构建镜像，docker pull 成功，容器内所有构建依赖（gcc/cmake/gtest/ubs-comm-devel 等）均已预装，跳过依赖安装直接进入构建",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "master",
+    "commit": "9f047d0449551eb67ad19a8e444701234f4aba4b",
+    "duration_seconds": 708,
+    "end_time": "2026-10-13T06:15:01",
+    "environment": "远程容器验证：openEuler 24.03 LTS-SP3 (aarch64)，Kunpeng-920 256核/2.0Ti 内存，Tier 1 预构建镜像",
+    "repo_url": "https://gitcode.com/openeuler/ubs-engine.git",
+    "start_time": "2026-10-13T06:03:13",
+    "total_steps": 15,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "宿主机页大小为 65536 (64K)，mockcpp 在非 4K 页环境下 mprotect 地址对齐失败导致 UT 无法执行",
+      "solution": "项目已内置跳过策略：CMake add_ut/add_independent_exec_ut 宏在配置阶段通过 getconf PAGESIZE 检测页大小，非 4K 页时自动将 UT 执行命令替换为跳过 echo 提示，编译不受影响。UT 编译全部通过（5 个二进制），执行被跳过。这是文档记录的已知限制（单元测试开发指南 §5），无需额外处理。",
+      "source": "docs/test/单元测试开发指南.md §5 + 实际执行验证",
+      "timestamp": "2026-10-13T06:14:27"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "glm-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}
