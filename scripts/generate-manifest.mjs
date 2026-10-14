@@ -48,7 +48,7 @@ const REPO_COMMUNITY_MAP = {
   'ubs-atomic': 'UBSCore',
   'kunpeng-extension-for-pytorch': 'HPCKit',
   'vllm-ascend': 'MindIE', 'vllm': 'MindIE', 'pymotor': 'MindIE',
-  'triton-ascend': 'triton',
+  'triton-ascend': 'Triton-ascend',
   'polymind': 'openEuler', 'witty-service': 'openEuler',
   'kpex': 'HPCKit',
   'brotli4j': 'BoostKit', 'lowlatencylib': 'BoostKit', 'pandas': 'BoostKit',
