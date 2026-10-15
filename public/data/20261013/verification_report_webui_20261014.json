@@ -1,0 +1,1048 @@
+{
+  "document_reading_summary": {
+    "architecture": {
+      "source": "webui README.md 系统要求 + manifest README 1.1 操作系统要求",
+      "value": "webui README 表格标注 x86-64(amd64)；manifest README 1.1 注明 Ubuntu 验证基线为 x86-64(amd64)、openEuler 验证基线为 aarch64(Kunpeng)。init.py 仅按 os-release 的系统 ID 识别分支，不校验版本/SP/CPU 架构。当前远程机器为 aarch64，对应 openEuler aarch64 基线。"
+    },
+    "build_commands": {
+      "source": "webui README.md 构建章节 + conanfile.py build() 方法",
+      "value": "仓库提供构建入口：cd /home/workspace/webui \u0026\u0026 bingo build --stage=dev（Conan 包装，build() 内部执行 npm install + npm run build）。npm run build = node --max_old_space_size=4096 vite build \u0026\u0026 npm run post-build（gzip + post-build.config.js）。bingo build 需 init.py 完成 + Conan 社区账号登录 openubmc_opensource 远程仓库。"
+    },
+    "dependencies": {
+      "source": "webui README.md 系统要求 + manifest README 2.6.1 工具安装清单 + package.json",
+      "value": [
+        "Node.js \u003e= 18 LTS（前端开发依赖，bingo build 的 npm install/npm run build 必需）",
+        "npm \u003e= 8（package.json engines 要求）",
+        "Python \u003e= 3.10（init.py 运行依赖）",
+        "bingo 构建工具（由 manifest init.py 一键安装，禁止手动 pip install conan）",
+        "Conan 2.3.0（由 init.py 安装，需社区账号登录 openubmc_opensource 远程仓库）",
+        "gcc-9/g++-9（apt，仅 Ubuntu 分支；openEuler 走 dnf）",
+        "libcurl4t64/libcurl4-openssl-dev/pkg-config（signer 运行时依赖，仅 Ubuntu）",
+        "pre-commit（pip，CONTRIBUTING.md 要求，非构建必需）",
+        "npm 依赖：vue 3.5.13 / element-plus 2.8.1 / vite 4.5.14 / vitest 0.28.5 / vue-tsc 0.34.11 等（package.json）"
+      ]
+    },
+    "dockerfile_dependencies": {
+      "source": "manifest/dockerfile（仓库内无独立 webui Dockerfile，构建入口为 conanfile.py）",
+      "value": [
+        {
+          "original": "FROM swr.cn-north-4.myhuaweicloud.com/openubmc/ubuntu:24.04.2（Tier 1 预构建镜像，非基础 OS）",
+          "target_equivalent": "Tier 1 镜像，aarch64 远程机器上预计无对应 manifest（dockerfile 下载 gcm-linux_amd64.deb / otelcol_linux_amd64 / openjdk linux-x64 / prometheus linux-amd64 / grafana linux_amd64 / elasticsearch linux-x86_64，均为 amd64 二进制）"
+        },
+        {
+          "original": "apt-get install -y python3 sudo make locales wget",
+          "target_equivalent": "openEuler: dnf install -y python3 sudo make wget locales"
+        },
+        {
+          "original": "wget gcm-linux_amd64.deb 并 dpkg -i",
+          "target_equivalent": "amd64 专属 deb，aarch64 不可用"
+        },
+        {
+          "original": "python3 init.py -user \u003cConan账号\u003e -psw \u003c密码\u003e（需 --secret 注入凭据）",
+          "target_equivalent": "需 openUBMC 社区账号 Conan 凭据，验证环境无此凭据"
+        },
+        {
+          "original": "conanfile.py build(): npm install + npm run build",
+          "target_equivalent": "前端构建核心仅需 Node.js\u003e=18 + npm，与 OS 解耦"
+        }
+      ]
+    },
+    "recommended_image": {
+      "source": "webui README.md 系统要求章节 + .devcontainer/devcontainer.json image 字段 + manifest README 1.4 Docker 容器环境",
+      "value": "Tier 1 业务预构建镜像 swr.cn-north-4.myhuaweicloud.com/openubmc/ubuntu:24.04.2_26.06（webui README 与 devcontainer.json 一致）；manifest README 另给出 swr.cn-north-4.myhuaweicloud.com/openubmc/ubuntu:24.04.2。Tier 2 候选：manifest/dockerfile（FROM 上述 Tier 1 镜像，需 Conan 凭据 secret 且下载 amd64 二进制）。Tier 3 回退：openEuler 24.03 LTS（aarch64/Kunpeng 基线）。"
+    },
+    "special_dependencies": {
+      "source": "webui README.md + manifest README 2.5/2.6 + .devcontainer/devcontainer.json",
+      "value": [
+        "openUBMC 社区账号（https://usercenter.openubmc.cn/register）— Conan 远程仓库认证必需，bingo build 拉取 openubmc_sdk/组件包依赖此凭据",
+        "init.py 一键初始化（manifest 仓库，安装 bingo/Conan/Node.js/pre-commit，配置 Conan 远程 + APT 源）",
+        "openubmc_sdk 由 manifest.yml 的 conan 字段在构建时自动通过 Conan 拉取（交叉编译器、工具链）",
+        "/opt/RTOS 与 /opt/hcc_arm64le 交叉编译器目录（init.py install_sdk 生成，bingo 构建 profile 依据）",
+        "openUBMC APT 源 https://openubmc-apt-repo.obs.cn-north-4.myhuaweicloud.com/Ubuntu/（arch=amd64，aarch64 不可用）",
+        "网络访问白名单：mirrors.huaweicloud.com / registry.npmmirror.com / conan.openubmc.cn / repo.openubmc.cn / gitcode.com"
+      ]
+    },
+    "ut_commands": {
+      "source": "webui README.md 测试章节 + package.json scripts + vite.config.ts test 配置 + tests/unit 目录",
+      "value": "README 测试章节：npm run lint（eslint src/**/*.{js,ts,vue,jsx,tsx} --fix）+ npx vue-tsc --noEmit（TypeScript 类型检查）。package.json 另提供 test: vitest；tests/unit 下有 11 个 spec 文件（utils/*.spec + pages/system-info-dpu.spec）。vite.config.ts 配置 vitest（happy-dom 环境、junit 报告输出 ./tests/reports/js_test.xml）。"
+    }
+  },
+  "documentation_gaps": [
+    {
+      "body": "README 顶部引言声明『本组件目前已支持 Ubuntu 24.04 LTS 和 openEuler 24.03 LTS(Kunpeng)，推荐使用 Ubuntu 24.04 LTS』，但下方『系统要求』表格仅标注『操作系统: Ubuntu 24.04 LTS（仅支持此版本）』『芯片架构: x86-64（amd64）』，未反映 openEuler 24.03 LTS(aarch64/Kunpeng) 支持路径。manifest README 1.1 明确 Ubuntu 验证基线为 x86-64、openEuler 验证基线为 aarch64(Kunpeng)。aarch64 机器验证者读 webui README 表格会误以为不支持，需交叉阅读 manifest README 才能确认 openEuler/aarch64 为支持基线。",
+      "source": "webui/README.md 系统要求章节 vs 引言 vs manifest/README.md 1.1",
+      "time": "2026-10-14T21:53:53",
+      "title": "webui README 系统要求表与引言架构描述不一致"
+    },
+    {
+      "body": "README『测试』章节仅给出 `npm run lint`（eslint）与 `npx vue-tsc --noEmit`（TS 类型检查），未提及 vitest。但 package.json 定义 `test: vitest`，仓库 tests/unit 下有 11 个 .spec.ts/.spec.js 测试文件，vite.config.ts 配置了 vitest（environment=happy-dom、junit 报告输出 ./tests/reports/js_test.xml、coverage html）。验证者仅按 README 会漏跑单元测试。",
+      "source": "webui/README.md 测试章节 vs package.json scripts vs tests/unit + vite.config.ts test 配置",
+      "time": "2026-10-14T21:53:53",
+      "title": "webui README 测试章节未提及 vitest，与 package.json/scripts 不一致"
+    },
+    {
+      "body": "bingo build 实际执行的 conanfile.py build() 会动态注入 echarts-gl@2.1.0+claygl@1.3.0 到 package.json 并生成 configure.generated.ts/feature-routes.generated.ts 源文件，这些是 vite build 成功的隐含前提。README『构建』章节仅写 `bingo build --stage=dev`，未说明这些前置代码生成与依赖注入逻辑，导致脱离 bingo/Conan 环境复现构建时易遗漏（如本验证 Tier3 直接 npm run build 初次失败）。",
+      "source": "webui/conanfile.py build()/generate_configure_file/_add_echarts_gl_to_dev",
+      "time": "2026-10-14T21:53:53",
+      "title": "conanfile.py build() 前置步骤未在 README 文档化"
+    }
+  ],
+  "execution_log": [
+    {
+      "action": "WebFetch gitcode webui 仓库页面（代码托管链接）",
+      "command": "WebFetch https://gitcode.com/openUBMC/webui",
+      "details": {
+        "fallback": "git clone 到本地",
+        "url": "https://gitcode.com/openUBMC/webui"
+      },
+      "duration_seconds": 8,
+      "error": "WebFetch 无法取得 gitcode 渲染页面的 README 原文",
+      "note": "代码托管链接 WebFetch 失败，按闭包规则回退 git clone",
+      "output": "返回页面导航/Star/Fork 等元信息，README 正文未渲染",
+      "result": "部分成功（页面 JS 渲染，未取得 README 正文）",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": false,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "git clone webui 仓库到本地（WebFetch 回退）",
+      "command": "git clone --depth 1 --branch main https://gitcode.com/openUBMC/webui.git /tmp/opencode/webui-docs/webui",
+      "details": {
+        "branch": "main",
+        "commit": "97368acf3ddceba26e936c845b8d0d328425adb8"
+      },
+      "duration_seconds": 12,
+      "error": "",
+      "note": "本地副本用于完整阅读所有文档与配置文件",
+      "output": "Cloning into 'webui'... 完成，commit 97368acf",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "读取 webui/README.md（验证唯一指导文档）",
+      "command": "cat /tmp/opencode/webui-docs/webui/README.md",
+      "details": {
+        "build": "bingo build --stage=dev",
+        "next_hop": "https://gitcode.com/openUBMC/manifest/blob/main/README.md",
+        "tier1_image": "swr.cn-north-4.myhuaweicloud.com/openubmc/ubuntu:24.04.2_26.06",
+        "ut": "npm run lint + npx vue-tsc --noEmit"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "README 顶部声明本文件为构建与测试唯一指导文档，docs/ 仅为特性说明",
+      "output": "webui 是 openUBMC Web 前端组件，基于 Vue3+ElementPlus+OpenDesign V2。支持 Ubuntu 24.04 LTS 与 openEuler 24.03 LTS(Kunpeng)，推荐 Ubuntu 24.04。系统要求表标注 Ubuntu 24.04/x86-64。Tier1 镜像 swr.cn-north-4.myhuaweicloud.com/ope",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "读取 webui/CONTRIBUTING.md（贡献指南闭包）",
+      "command": "cat /tmp/opencode/webui-docs/webui/CONTRIBUTING.md",
+      "details": {
+        "has_build_info": false,
+        "has_ut_info": false
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "贡献指南无构建/UT 流程，仅代码规范钩子",
+      "output": "仅 pre-commit 钩子使用说明（conventional-commit/add-signoff/check-sr/prettier 等），无构建/UT 命令。指向 openUBMC/pre-commit-hooks 仓库。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "读取 webui/.devcontainer/devcontainer.json（Tier1 信号探测）",
+      "command": "cat /tmp/opencode/webui-docs/webui/.devcontainer/devcontainer.json",
+      "details": {
+        "image": "swr.cn-north-4.myhuaweicloud.com/openubmc/ubuntu:24.04.2_26.06",
+        "tier1_hit": true
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "devcontainer.json image 字段与 README docker pull 命令一致，确认 Tier1",
+      "output": "image 字段 = swr.cn-north-4.myhuaweicloud.com/openubmc/ubuntu:24.04.2_26.06（非基础 OS 镜像，命中 Tier1 信号）。workspaceMount 挂载到 /workspace，forwardPorts 8000/8080。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "读取 webui/package.json（构建/测试脚本与依赖）",
+      "command": "cat /tmp/opencode/webui-docs/webui/package.json",
+      "details": {
+        "build_script": "vite build \u0026\u0026 post-build",
+        "node_engine": "\u003e=18",
+        "test_script": "vitest"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "package.json test 脚本为 vitest，README 测试章节未提及但仓库提供",
+      "output": "scripts: build=node --max_old_space_size=4096 vite build \u0026\u0026 post-build; test=vitest; lint=eslint --fix; build:test=vue-tsc --noEmit \u0026\u0026 vite build。deps: vue3.5.13/element-plus2.8.1/vite4.5.14。devDeps: ",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "读取 webui/vite.config.ts（vitest 配置）",
+      "command": "cat /tmp/opencode/webui-docs/webui/vite.config.ts",
+      "details": {
+        "ut_env": "happy-dom",
+        "ut_report": "tests/reports/js_test.xml"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "test 配置: environment=happy-dom, reporter=[default,verbose,junit], junit 输出 ./tests/reports/js_test.xml, coverage html 到 ./tests/reports。build target es2015，cssTarget chrome64。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "读取 webui/conanfile.py（bingo build 构建定义）",
+      "command": "cat /tmp/opencode/webui-docs/webui/conanfile.py",
+      "details": {
+        "build_core": "npm install + npm run build",
+        "needs_conan": true,
+        "needs_conanbase": true
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "bingo build 核心是前端 npm 构建，Conan 做包装与打包",
+      "output": "WebUIConan(ConanBase): build() 生成 feature 配置后执行 self.run('npm install') + self.run('npm run build')。package() 复制 dist 到 opt/bmc/web/htdocs。required_conan_version\u003e=1.60.0，依赖 conanbase（openUBMC Conan 环境",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "枚举 webui/tests/unit 测试文件",
+      "command": "find tests -type f",
+      "details": {
+        "dirs": [
+          "utils",
+          "pages"
+        ],
+        "spec_count": 11
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "",
+      "output": "11 个 spec: tests/unit/utils/{watchSwitch,utils,regular,language,kvm-init,i18n-init,date,crypto,composition,common-service}.spec.{ts,js} + tests/unit/pages/system-info-dpu.spec.ts",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "git clone manifest 仓库（webui README 指向的环境初始化文档闭包）",
+      "command": "git clone --depth 1 --branch main https://gitcode.com/openUBMC/manifest.git /tmp/opencode/webui-docs/manifest",
+      "details": {
+        "next_hop": "manifest/README.md"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "note": "webui README 环境依赖章节明确要求参阅 manifest README 做完整初始化",
+      "output": "Cloning into 'manifest'... 完成",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "读取 manifest/README.md（openUBMC 26.06 构建指导书，环境闭包核心）",
+      "command": "cat /tmp/opencode/webui-docs/manifest/README.md",
+      "details": {
+        "apt_repo_arch": "amd64",
+        "init_needs_account": true,
+        "openeuler_baseline": "aarch64(Kunpeng)",
+        "ubuntu_baseline": "x86-64"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "note": "确认 aarch64 对应 openEuler 基线；Ubuntu APT 源 arch=amd64 不适用 aarch64",
+      "output": "1.1: Ubuntu 24.04(x86-64)/openEuler 24.03 LTS-SP4(aarch64 Kunpeng) 双基线；init.py 按 os-release ID 分支不校验架构。1.4 Docker 推荐 docker pull swr.../openubmc/ubuntu:24.04.2。2.6 init.py -user -psw 一键安装 bingo/Conan/",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "读取 manifest/dockerfile（Tier2 候选：基于 Tier1 镜像构建）",
+      "command": "cat /tmp/opencode/webui-docs/manifest/dockerfile",
+      "details": {
+        "amd64_only_binaries": true,
+        "from": "swr.../openubmc/ubuntu:24.04.2",
+        "needs_conan_secret": true
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "Tier2 不可行：FROM 依赖 Tier1 镜像 + 需 Conan 凭据 + amd64 二进制在 aarch64 构建失败",
+      "output": "FROM swr.../openubmc/ubuntu:24.04.2（Tier1 镜像）。下载 gcm-linux_amd64.deb / otelcol_linux_amd64 / openjdk-17.0.1_linux-x64 / prometheus linux-amd64 / grafana linux_amd64 / elasticsearch linux-x86_64（全 amd6",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "读取 manifest/build_image.py（镜像构建脚本）",
+      "command": "cat /tmp/opencode/webui-docs/manifest/build_image.py",
+      "details": {
+        "requires_credentials": true
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "确认 Tier2 构建必须 Conan 凭据，验证环境无此凭据",
+      "output": "build_image.py 调用 docker build --secret id=openubmc_user,src=... --secret id=openubmc_pass,src=... ，强制要求 -u/-p Conan 账号密码（否则 raise ManifestException）。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "curl registry v2 API 列出 Tier1 镜像可用 tag（镜像仓库页面探测）",
+      "command": "curl -sk https://swr.cn-north-4.myhuaweicloud.com/v2/openubmc/ubuntu/tags/list",
+      "details": {
+        "auth": "IAM token required",
+        "registry": "swr.cn-north-4.myhuaweicloud.com"
+      },
+      "duration_seconds": 10,
+      "error": "SWR 需 IAM token 认证，/v2/ 根返回 404，匿名列 tag 不可用",
+      "note": "镜像仓库 API 需认证无法匿名列 tag；将在步骤 2 于远程机器直接 docker pull 探测全部候选 tag",
+      "output": "{\"errors\":[{\"code\":\"DENIED\",\"message\":\"Authenticate Error\"}]}",
+      "result": "失败（需认证）",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": false,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "读取 webui/docs/WebUI前端开发说明.md（特性文档闭包）",
+      "command": "cat /tmp/opencode/webui-docs/webui/docs/WebUI前端开发说明.md",
+      "details": {
+        "authoritative": "README.md"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "docs/ 为特性说明，不涉及构建流程，闭包完成",
+      "output": "文档顶部声明：旧版前端开发说明，仅作历史参考，当前开发流程以项目根 README.md 为准。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "document_reading",
+      "success": true,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "文档闭包完成 — 汇总 Tier 信号与候选路径",
+      "command": "汇总 document_reading_summary",
+      "details": {
+        "npu_required": false,
+        "tier1_tags": [
+          "24.04.2_26.06",
+          "24.04.2"
+        ],
+        "tier2_viable": false,
+        "tier3_os": "openeuler 24.03 LTS"
+      },
+      "duration_seconds": 1,
+      "error": "",
+      "note": "将在步骤 2 于远程 aarch64 机器逐一 docker pull 候选 tag，全部失败才降级 Tier3",
+      "output": "Tier1 候选 tag: 24.04.2_26.06 / 24.04.2（devcontainer+README 双重确认）。Tier2: manifest/dockerfile 需 Conan 凭据+amd64 二进制，aarch64 不可行。Tier3 回退: openEuler 24.03 LTS（manifest README 1.1 aarch64/Kunpeng 基线）。NPU 关键",
+      "result": "Tier1 命中（待远程 pull 验证），Tier2/3 候选已记录",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-10-14T21:01:25"
+    },
+    {
+      "action": "Tier1 候选 tag1 拉取: swr.../openubmc/ubuntu:24.04.2_26.06",
+      "command": "docker pull swr.cn-north-4.myhuaweicloud.com/openubmc/ubuntu:24.04.2_26.06",
+      "details": {
+        "cached": true,
+        "size": "15.9GB",
+        "tag": "24.04.2_26.06"
+      },
+      "duration_seconds": 8,
+      "error": "",
+      "note": "webui README + devcontainer.json 双重确认的主候选 tag",
+      "output": "Digest sha256:fb8475c8... Status: Image is up to date",
+      "result": "成功（镜像已本地缓存）",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-10-14T21:10:42"
+    },
+    {
+      "action": "检查 Tier1 候选 tag 镜像架构",
+      "command": "docker inspect ... --format {{.Architecture}}",
+      "details": {
+        "binfmt_available": true,
+        "tag1_arch": "amd64",
+        "tag2_arch": "amd64"
+      },
+      "duration_seconds": 3,
+      "error": "",
+      "note": "两候选 tag 均无架构后缀，无可去除/替换；registry v2 API 需 IAM 认证被阻",
+      "output": "24.04.2_26.06: Os=linux Arch=amd64（15.9GB）；24.04.2: Os=linux Arch=amd64（78.1MB 基础镜像）",
+      "result": "amd64（与远程 aarch64 不匹配，但宿主机有 qemu-x86_64 binfmt 可模拟）",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-10-14T21:10:42"
+    },
+    {
+      "action": "验证 amd64 镜像在 aarch64 宿主机可运行（QEMU binfmt 模拟）",
+      "command": "docker run --rm swr.../openubmc/ubuntu:24.04.2_26.06 sh -c 'uname -m; echo OK'",
+      "details": {
+        "emulation": "qemu-x86_64 user-mode",
+        "viable": true
+      },
+      "duration_seconds": 12,
+      "error": "",
+      "note": "宿主机 /proc/sys/fs/binfmt_misc/qemu-x86_64 已注册，Tier1 经 QEMU 模拟可用，不降级",
+      "output": "x86_64 / OK，EXIT=0",
+      "result": "成功（uname -m 返回 x86_64）",
+      "returncode": 0,
+      "step": "image_selection",
+      "success": true,
+      "timestamp": "2026-10-14T21:10:42"
+    },
+    {
+      "action": "启动 Tier1 容器 webui-ttfhw（非 NPU，挂载 webui-verify 到 /workspace）",
+      "command": "docker run -d --privileged --name webui-ttfhw -w /workspace -v /home/workspace/webui-verify:/workspace swr.../openubmc/ubuntu:24.04.2_26.06 sleep infinity",
+      "details": {
+        "container": "webui-ttfhw",
+        "mount": "/home/workspace/webui-verify:/workspace",
+        "startup_command_source": "default_非NPU"
+      },
+      "duration_seconds": 6,
+      "error": "",
+      "note": "README/devcontainer 未提供直接 docker run 命令，用技能默认非 NPU 参考命令；workspaceFolder 沿用 devcontainer.json 的 /workspace",
+      "output": "容器 ID 3cff80f7a1ed，状态 Up，镜像 swr.../openubmc/ubuntu:24.04.2_26.06",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-10-14T21:10:42"
+    },
+    {
+      "action": "Tier1 验证构建工具链已预装（node/npm/python/git）",
+      "command": "docker exec webui-ttfhw bash -lc 'node --version; npm --version; python3 --version; git --version'",
+      "details": {
+        "git": "2.43.0",
+        "node": "20.18.0",
+        "npm": "10.8.2",
+        "python3": "3.12.3",
+        "skipped_install": true
+      },
+      "duration_seconds": 4,
+      "error": "",
+      "note": "Tier1 镜像经 manifest init.py 预装，跳过工具链安装直接进入构建",
+      "output": "node v20.18.0 / npm 10.8.2 / python3 3.12.3 / git 2.43.0 全部就位，满足 README 要求(\u003e=18/\u003e=8/\u003e=3.10)",
+      "result": "成功（跳过安装）",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-10-14T21:10:42"
+    },
+    {
+      "action": "Tier1 验证 openUBMC 构建工具(bingo/Conan)与 SDK 已预装",
+      "command": "docker exec webui-ttfhw bash -lc 'bingo --version; conan --version; ls /opt/RTOS /opt/hcc_arm64le; ls ~/.conan2/profiles'",
+      "details": {
+        "bingo": "0.7.37",
+        "conan": "2.30.0",
+        "hcc": "aarch64-target-linux-gnu",
+        "rtos": "208.11.0",
+        "skipped_install": true
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "note": "SDK 与交叉编译器在镜像构建期由 init.py install_sdk 生成，禁止手动安装 bingo/Conan(README 要求)",
+      "output": "bingo 0.7.37 / conan 2.30.0；/opt/RTOS/208.11.0；/opt/hcc_arm64le/aarch64-target-linux-gnu；Conan profiles: default/profile.dt.ini/profile.ini/profile.luajit.ini",
+      "result": "成功（跳过安装）",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-10-14T21:10:42"
+    },
+    {
+      "action": "检查 webui 项目级 Conan 依赖本地缓存与远程认证状态",
+      "command": "conan list webui/*:* -c; conan list openubmc_sdk/*:* -c; conan search webui",
+      "details": {
+        "conan_remote_auth": "needed",
+        "openubmc_sdk_cached": false,
+        "webui_cached": false
+      },
+      "duration_seconds": 6,
+      "error": "Conan 远程 openubmc_opensource 需社区账号登录，镜像构建末尾已 conan remote logout；openubmc_sdk 需构建时从远程拉取",
+      "note": "潜在构建阻塞：bingo build 需拉取 openubmc_sdk 等 Conan 包，无社区账号凭据将失败；将在步骤3 实测确认",
+      "output": "webui 本地缓存 0 条；openubmc_sdk 本地缓存 0 条；conan search 远程: Remote needs authentication → EOF when reading a line",
+      "result": "部分成功（构建工具齐全，但 openubmc_sdk 未缓存且 Conan 远程需认证）",
+      "returncode": 0,
+      "step": "dependency_verification",
+      "success": false,
+      "timestamp": "2026-10-14T21:10:42"
+    },
+    {
+      "action": "Tier1 bingo build --stage=dev 首次尝试（amd64 镜像经 QEMU 模拟）",
+      "command": "docker exec -w /workspace webui-ttfhw bash -lc 'OPENUBMC_LICENSE=true; time bingo build --stage=dev'",
+      "details": {
+        "conan_ok": true,
+        "npm_install_ok": true,
+        "tier": "Tier1",
+        "vite_build": "esbuild_crash"
+      },
+      "duration_seconds": 970,
+      "error": "esbuild(amd64 Go 二进制)在 qemu-x86_64 用户态模拟下作为 vite 长驻 service 不稳定，service 进程崩溃",
+      "note": "real 16m10s（npm install 在 QEMU 下耗时长）",
+      "output": "Conan 依赖图成功（luajit/skynet 已缓存，webui 从源码构建）；npm install 成功(513M node_modules)；npm run build 阶段 esbuild 崩溃: error during build: Error: The service was stopped（Go 运行时 goroutine stack trace）",
+      "result": "失败（vite 构建阶段 esbuild service 崩溃）",
+      "returncode": 1,
+      "step": "build_attempt",
+      "success": false,
+      "timestamp": "2026-10-14T21:53:53"
+    },
+    {
+      "action": "esbuild 稳定性诊断（直接测 esbuild 在 QEMU 下行为）",
+      "command": "docker exec webui-ttfhw bash -lc 'cd /root/.conan2/p/b/webui2e31d7f3e42f3/b; ./node_modules/.bin/esbuild --version; echo let_x=1 | ./node_modules/.bin/esbuild --loader=js'",
+      "details": {
+        "service_mode": "crash",
+        "trivial_transform": "3/3 ok"
+      },
+      "duration_seconds": 15,
+      "error": "",
+      "note": "确认崩溃为 esbuild service 长驻模式在 QEMU 下偶发但确定性失败，非缺依赖",
+      "output": "esbuild 0.18.20；简单 transform 3/3 成功(exit 0)。但 vite 构建时 esbuild 作为长驻 service 处理复杂并行链接崩溃。",
+      "result": "部分成功（简单 transform 正常，复杂 service 模式崩溃）",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-10-14T21:53:53"
+    },
+    {
+      "action": "Tier1 针对性重试 npm run build（node_modules 已就绪，跳过 npm install）",
+      "command": "docker exec webui-ttfhw bash -lc 'cd /root/.conan2/p/b/webui2e31d7f3e42f3/b; time npm run build'",
+      "details": {
+        "retry": 2,
+        "same_root_cause": true,
+        "tier": "Tier1"
+      },
+      "duration_seconds": 28,
+      "error": "27s 快速失败，与首次同一根因；Tier1(amd64/QEMU) 构建确定性不可用",
+      "note": "两次重试同一 esbuild 崩溃，按技能降级规则：Tier2 需 Conan 凭据+同 QEMU 问题不可行 → 降级 Tier3 native aarch64",
+      "output": "vite 加载 vite.config.ts 阶段 esbuild service 即崩溃: error during build: Error: The service was stopped",
+      "result": "失败（同一 esbuild service 崩溃）",
+      "returncode": 1,
+      "step": "build_retry",
+      "success": false,
+      "timestamp": "2026-10-14T21:53:53"
+    },
+    {
+      "action": "Tier3 启动 native aarch64 openEuler 24.03 LTS 容器（Tier1 QEMU 降级回退）",
+      "command": "docker run -d --privileged --name webui-openeuler -w /workspace -v /home/workspace/webui-verify:/workspace hub.oepkgs.net/openeuler/openeuler:24.03-lts sleep infinity",
+      "details": {
+        "arch": "arm64 native",
+        "reason": "Tier1 QEMU esbuild 崩溃 + Tier2 需 Conan 凭据",
+        "tier3_image": "hub.oepkgs.net/openeuler/openeuler:24.03-lts"
+      },
+      "duration_seconds": 6,
+      "error": "",
+      "note": "manifest README 1.1 注明 openEuler 24.03 LTS(aarch64/Kunpeng) 为 aarch64 验证基线",
+      "output": "容器 webui-openeuler Up，镜像 hub.oepkgs.net/openeuler/openeuler:24.03-lts Arch=arm64（native）",
+      "result": "成功",
+      "returncode": 0,
+      "step": "container_setup",
+      "success": true,
+      "timestamp": "2026-10-14T21:53:53"
+    },
+    {
+      "action": "Tier3 native 安装构建工具链（dnf）",
+      "command": "docker exec webui-openeuler bash -lc 'dnf install -y nodejs npm git python3 python3-pip make gcc gcc-c++ tar'",
+      "details": {
+        "installer": "dnf",
+        "node": "20.18.2",
+        "npm": "10.8.2",
+        "python3": "3.11.6"
+      },
+      "duration_seconds": 60,
+      "error": "",
+      "note": "openEuler 24.03 dnf 源提供 nodejs 20，满足 README Node.js\u003e=18 LTS",
+      "output": "node v20.18.2 / npm 10.8.2 / python3 3.11.6 / git 2.43.0 全部满足 README 要求(\u003e=18/\u003e=8/\u003e=3.10)",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-10-14T21:53:53"
+    },
+    {
+      "action": "Tier3 配置 npm 镜像源（manifest README 1.3 网络要求）",
+      "command": "docker exec webui-openeuler bash -lc 'npm config set registry https://registry.npmmirror.com'",
+      "details": {
+        "registry": "https://registry.npmmirror.com"
+      },
+      "duration_seconds": 2,
+      "error": "",
+      "note": "manifest README 1.3 列出 registry.npmmirror.com 为必需网络白名单",
+      "output": "registry set to https://registry.npmmirror.com",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-10-14T21:53:53"
+    },
+    {
+      "action": "Tier3 native npm install（conanfile.py build() 核心第一步）",
+      "command": "docker exec webui-openeuler bash -lc 'cd /workspace \u0026\u0026 time npm install'",
+      "details": {
+        "native": true,
+        "node_modules_size": "492M",
+        "packages": 1032
+      },
+      "duration_seconds": 90,
+      "error": "",
+      "note": "native aarch64 安装比 QEMU(16m) 快约 10 倍",
+      "output": "added 1032 packages in 1m；real 1m29s；node_modules 492M/649包",
+      "result": "成功",
+      "returncode": 0,
+      "step": "dependency_installation",
+      "success": true,
+      "timestamp": "2026-10-14T21:53:53"
+    },
+    {
+      "action": "Tier3 直接 npm run build（漏 conanfile.py 前置步骤，echarts-gl 缺失）",
+      "command": "docker exec webui-openeuler bash -lc 'cd /workspace \u0026\u0026 time npm run build'",
+      "details": {
+        "cause": "未复现 conanfile.py build() 前置步骤",
+        "missing": "echarts-gl"
+      },
+      "duration_seconds": 51,
+      "error": "直接 npm run build 漏了 conanfile.py build() 的 _add_echarts_gl_to_dev() 注入步骤",
+      "note": "正是技能强调『禁止拆解仓库构建入口』的原因：conanfile.py build() 在 npm install 前注入 echarts-gl@2.1.0+claygl@1.3.0 并生成配置文件",
+      "output": "vite transformed 2113 modules, built in 44.98s，但 rollup 报: Rollup failed to resolve import 'echarts-gl' from src/pages/System/Fans/Sensor.vue → error during build",
+      "result": "失败（echarts-gl 未解析）",
+      "returncode": 1,
+      "step": "build_attempt",
+      "success": false,
+      "timestamp": "2026-10-14T21:53:53"
+    },
+    {
+      "action": "Tier3 忠实复现 conanfile.py build() 前置步骤（Python 脚本，stub conanbase）",
+      "command": "docker exec webui-openeuler bash -lc 'cd /workspace \u0026\u0026 python3 webui_gen.py'",
+      "details": {
+        "generated": [
+          "configure.generated.ts",
+          "feature-routes.generated.ts"
+        ],
+        "injected": [
+          "echarts-gl@2.1.0",
+          "claygl@1.3.0"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "note": "conanfile.py 的 generate_configure_file/generate_feature_routes_file/_add_echarts_gl_to_dev 仅依赖 json/os+模块常量，不依赖 conanbase；脚本 stub 掉 conanbase 导入即可执行",
+      "output": "已生成 src/model/configure.generated.ts + src/apps/app-bmc/router/feature-routes.generated.ts；已注入 echarts-gl@2.1.0+claygl@1.3.0 到 package.json devDependencies；校验通过",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-10-14T21:53:53"
+    },
+    {
+      "action": "Tier3 native 完整构建：npm install（装 echarts-gl）+ npm run build",
+      "command": "docker exec webui-openeuler bash -lc 'cd /workspace \u0026\u0026 time (npm install \u0026\u0026 npm run build)'",
+      "details": {
+        "dist_size": "14M",
+        "exit": 0,
+        "post_build_gzip": "426 files",
+        "vite_build": "2m12s"
+      },
+      "duration_seconds": 182,
+      "error": "",
+      "note": "Tier3 native aarch64 构建成功，esbuild native 运行无崩溃",
+      "output": "npm install added 2 packages(10s)；vite transformed 2113 modules, built in 2m12s；post-build: gzipper 压缩 426 文件；real 3m2s；FULLBUILD_EXIT=0；dist/ 14M 产出",
+      "result": "成功",
+      "returncode": 0,
+      "step": "build_retry",
+      "success": true,
+      "timestamp": "2026-10-14T21:53:53"
+    },
+    {
+      "action": "执行 npm run lint（README 测试章节文档化的 eslint 检查）",
+      "command": "docker exec webui-openeuler bash -lc 'cd /workspace \u0026\u0026 npm run lint'",
+      "details": {
+        "exit": 0,
+        "warning": "src/**/*.js 无匹配"
+      },
+      "duration_seconds": 12,
+      "error": "",
+      "note": "README 测试章节文档化的第一条命令",
+      "output": "ESLint 8.57.1；exit 0。提示 No files matching src/**/*.js were found（其他 .ts/.vue/.jsx/.tsx 模式正常匹配）。--fix 自动修复格式问题。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-10-14T22:18:35"
+    },
+    {
+      "action": "执行 npx vue-tsc --noEmit（README 测试章节文档化的 TS 类型检查）",
+      "command": "docker exec webui-openeuler bash -lc 'cd /workspace \u0026\u0026 npx vue-tsc --noEmit'",
+      "details": {
+        "deprecation": "TS5101 suppressImplicitAnyIndexErrors",
+        "exit": 0
+      },
+      "duration_seconds": 35,
+      "error": "",
+      "note": "README 测试章节文档化的第二条命令；项目用 typescript 5.5.2",
+      "output": "exit 0；仅 tsconfig.json(17,5) TS5101 弃用提示：suppressImplicitAnyIndexErrors 在 TypeScript 5.5 弃用，建议加 ignoreDeprecations:'5.0'。无真实类型错误。",
+      "result": "成功",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-10-14T22:18:35"
+    },
+    {
+      "action": "执行 npx vitest run（package.json test 脚本，vite.config.ts vitest 配置，默认 coverage 开启）",
+      "command": "docker exec webui-openeuler bash -lc 'cd /workspace \u0026\u0026 npx vitest run'",
+      "details": {
+        "coverage_hang": true,
+        "junit_written": false
+      },
+      "duration_seconds": 600,
+      "error": "coverage(c8)对 2113 模块插桩导致 teardown 挂起",
+      "note": "coverage 是 vite.config.ts 默认配置，非测试本身失败；挂起为环境性能问题",
+      "output": "vitest 0.28.5 + happy-dom；测试全部跑完（98 通过/14 失败的初步计数），但 vite.config.ts 默认 coverage.enabled=true 触发 c8 对 src/ 2113 模块插桩，进程在 teardown 阶段挂起（PromiseRejectionHandledWarning），junit 报告 0 字节未写出，需 kill。",
+      "result": "部分成功（测试跑完但 coverage 阶段挂起）",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": false,
+      "timestamp": "2026-10-14T22:18:35"
+    },
+    {
+      "action": "kill 挂起的 vitest 并临时关闭 coverage 重跑（vite.config.ts patch + 恢复）",
+      "command": "pkill vitest; patch vite.config.ts coverage.enabled=false; npx vitest run; restore vite.config.ts",
+      "details": {
+        "duration": 253.67,
+        "failed": 22,
+        "files_failed": 3,
+        "files_passed": 8,
+        "passed": 190,
+        "total": 212
+      },
+      "duration_seconds": 254,
+      "error": "",
+      "note": "vite.config.ts 已从 .ttfhw_bak 恢复（coverage.enabled=true, reporter=['default','verbose','junit']）",
+      "output": "Test Files 3 failed | 8 passed (11)；Tests 22 failed | 190 passed (212)；Duration 253.67s；FINAL_EXIT=0。11 个 spec：crypto(15✓)/regular(53✓)/date(17,1失败)/common-service(15,7失败)/watchSwitch(4✓)/composition(",
+      "result": "成功（获取干净汇总）",
+      "returncode": 0,
+      "step": "ut_execution",
+      "success": true,
+      "timestamp": "2026-10-14T22:18:35"
+    },
+    {
+      "action": "清理远程验证容器 webui-ttfhw 与 webui-openeuler",
+      "command": "docker rm -f webui-ttfhw webui-openeuler",
+      "details": {
+        "containers": [
+          "webui-ttfhw",
+          "webui-openeuler"
+        ]
+      },
+      "duration_seconds": 5,
+      "error": "",
+      "note": "校验通过后按技能要求清理远程容器",
+      "output": "webui-ttfhw / webui-openeuler 已移除；残留检查为空",
+      "result": "成功",
+      "returncode": 0,
+      "step": "cleanup",
+      "success": true,
+      "timestamp": "2026-10-14T22:20:37"
+    }
+  ],
+  "final_results": {
+    "build": {
+      "artifacts": [
+        {
+          "name": "dist/index.html",
+          "path": "dist/index.html",
+          "size": "1.5K",
+          "type": "html入口"
+        },
+        {
+          "name": "dist/assets（JS/CSS bundle，336 文件，261 个 gzip）",
+          "path": "dist/assets/",
+          "size": "约13M",
+          "type": "前端bundle"
+        },
+        {
+          "name": "dist/assets/vendor.cff2def7.js",
+          "path": "dist/assets/vendor.cff2def7.js",
+          "size": "2.7M(gzip 841K)",
+          "type": "第三方库chunk"
+        },
+        {
+          "name": "dist/assets/index-0e831a01.js",
+          "path": "dist/assets/index-0e831a01.js",
+          "size": "507.8K(gzip 113.9K)",
+          "type": "应用入口chunk"
+        },
+        {
+          "name": "dist/font",
+          "path": "dist/font/",
+          "type": "字体资源"
+        },
+        {
+          "name": "dist/image",
+          "path": "dist/image/",
+          "type": "图片资源"
+        },
+        {
+          "name": "dist/style",
+          "path": "dist/style/",
+          "type": "样式资源"
+        },
+        {
+          "name": "dist/style_config.json",
+          "path": "dist/style_config.json",
+          "size": "3B",
+          "type": "样式配置"
+        },
+        {
+          "name": "dist 整体产物",
+          "path": "dist/",
+          "size": "14M",
+          "type": "web前端产物包"
+        }
+      ],
+      "cmake": "无 CMake（webui 为 Vue3 前端项目；Conan 仅用 CMakeToolchain 生成 toolchain 文件，实际构建走 npm+vite）",
+      "compiler": "Node.js v20.18.2 + Vite 4.5.14 + esbuild 0.18.20 + rollup（前端工具链）",
+      "concurrency": 243,
+      "concurrency_ratio": "40%（608核×40%=243；vite/rollup 构建不直接使用 -j，并发由 esbuild/rollup 内部 worker 管理）",
+      "duration_seconds": 182,
+      "notes": "仓库构建入口 bingo build --stage=dev（Conan 包装 conanfile.py build()）。Tier1 预构建镜像为 amd64，远程 aarch64 机器经 qemu-x86_64 模拟运行，bingo build 在 vite 构建阶段 esbuild（amd64 Go 二进制）service 确定性崩溃（2 次重试同一崩溃），Tier1 不可用。降级 Tier3 native aarch64 openEuler 24.03 LTS：忠实复现 conanfile.py build() 前置步骤（generate_configure_file/generate_feature_routes_file 生成 configure.generated.ts 与 feature-routes.generated.ts，_add_echarts_gl_to_dev 注入 echarts-gl@2.1.0+claygl@1.3.0），再 native 执行 npm install + npm run build（= vite build \u0026\u0026 post-build）成功，产出 dist/。",
+      "status": "success"
+    },
+    "ut": {
+      "cpp": {
+        "failed": 0,
+        "note": "webui 为纯 Vue3 前端项目，无 C/C++ 与 Python 单元测试。UT 汇总：npm run lint exit0 通过；npx vue-tsc --noEmit exit0 通过（仅 TS5101 弃用提示）；npx vitest run 212 测 190 通过 22 失败（21 happy-dom 超时 + 1 时区断言）。",
+        "passed": 0,
+        "status": "not_run",
+        "total": 0
+      },
+      "duration_seconds": 254,
+      "failed": 22,
+      "failures": [
+        {
+          "error": "Test timed out in 5000ms（happy-dom 环境下载链接触发超时）",
+          "test_name": "common-service.spec.js \u003e downloadFileWithResponse \u003e 应该创建并触发下载链接"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "common-service.spec.js \u003e restDownloadFile \u003e 应该成功下载文件"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "common-service.spec.js \u003e restDownloadFile \u003e 应该处理下载失败"
+        },
+        {
+          "error": "Test timed out in 5000ms（store 依赖初始化超时）",
+          "test_name": "common-service.spec.js \u003e saveSessionData \u003e saveSessionData 应该调用 setStoreData 多次"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "common-service.spec.js \u003e saveSessionData \u003e 应该保存会话数据到 store"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "common-service.spec.js \u003e saveSessionData \u003e 应该处理没有 LoginTime 的情况"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "common-service.spec.js \u003e saveUserPermission \u003e 应该保存用户权限"
+        },
+        {
+          "error": "Test timed out in 5000ms（Pinia store 模块初始化超时）",
+          "test_name": "composition.spec.js \u003e getStoreData \u003e 应该获取 loct 模块的数据"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "composition.spec.js \u003e getStoreData \u003e 应该获取 event 模块的数据"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "composition.spec.js \u003e getStoreData \u003e 应该获取 glob 模块的数据"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "composition.spec.js \u003e getStoreData \u003e 应该返回 undefined 对于不存在的键"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "composition.spec.js \u003e setStoreData \u003e 应该调用 loct 模块的 setLoctState"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "composition.spec.js \u003e setStoreData \u003e 应该调用 event 模块的 setEventState"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "composition.spec.js \u003e setStoreData \u003e 应该调用 glob 模块的 setGlobState"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "composition.spec.js \u003e setStoreData \u003e 应该调用 theme 模块的 setThemeState"
+        },
+        {
+          "error": "Test timed out in 5000ms（消息组件依赖 store 超时）",
+          "test_name": "composition.spec.js \u003e showSuccessMessage \u003e 应该显示成功消息"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "composition.spec.js \u003e showSuccessMessage \u003e 应该使用默认成功消息"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "composition.spec.js \u003e showWarningMessage \u003e 应该显示警告消息"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "composition.spec.js \u003e showFailedMessage \u003e 应该显示失败消息"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "composition.spec.js \u003e showFailedMessage \u003e 应该使用默认失败消息"
+        },
+        {
+          "error": "Test timed out in 5000ms",
+          "test_name": "composition.spec.js \u003e findMainMenu \u003e 应该找到存在的菜单项"
+        },
+        {
+          "error": "AssertionError: expected '12' to be '20' // Object.is equality（时区/12-24 小时格式断言不符，疑似测试对宿主时区敏感）",
+          "test_name": "date.spec.ts \u003e Date.prototype.pattern Tests \u003e should format hour correctly"
+        }
+      ],
+      "passed": 190,
+      "python": {
+        "failed": 0,
+        "passed": 0,
+        "status": "not_run",
+        "total": 0
+      },
+      "skipped": 0,
+      "status": "partial_success",
+      "total": 212
+    }
+  },
+  "machine_spec": {
+    "container": {
+      "architecture": "aarch64 (arm64 native)",
+      "container_name": "webui-openeuler",
+      "cpu_cores": 608,
+      "memory": "1.0Ti",
+      "os": "openEuler 24.03 LTS（Tier3 native aarch64 基线，manifest README 1.1 注明 aarch64/Kunpeng 验证基线）"
+    },
+    "host_machine": {
+      "architecture": "aarch64",
+      "cpu_cores": 608,
+      "cpu_model": "Kunpeng 920 (HiSilicon, CPU part 0xd22)",
+      "disk": "根分区 492G(可用163G)；/home 分区 2.4T(可用2.0T)，webui-verify 工作目录位于 /home",
+      "docker_version": "Docker version 18.09.0, build 4fc3a92",
+      "memory": "1.0Ti",
+      "npu": {
+        "available": false,
+        "card_count": 0,
+        "mounted_card_id": null
+      }
+    },
+    "image_source": {
+      "dependency_mapping": {
+        "from_cmake": "无 CMakeLists.txt（webui 为 Vue 前端项目，构建走 conanfile.py 调用 npm install + npm run build）",
+        "from_dockerfile": "manifest/dockerfile: FROM swr.../openubmc/ubuntu:24.04.2(Tier1镜像)，apt-get install python3 sudo make locales wget；wget gcm-linux_amd64.deb；python3 init.py -user -psw(需Conan凭据)。该 dockerfile 下载全为 amd64 二进制，aarch64 不可直接构建，仅作 Tier1 镜像来源参考。",
+        "from_readme": "webui README: Node.js\u003e=18 LTS、npm\u003e=8、Python\u003e=3.10；构建工具 bingo/Conan 由 manifest init.py 一键安装，禁止手动 pip install conan；openUBMC APT 源 arch=amd64 不适用 aarch64。",
+        "mappings": [
+          {
+            "original": "apt: python3 sudo make locales wget",
+            "source": "manifest/dockerfile",
+            "target": "Tier1 镜像已预装 python3.12/sudo/make/wget；无需映射安装"
+          },
+          {
+            "original": "apt: gcc-9 g++-9 libcurl4t64 libcurl4-openssl-dev pkg-config",
+            "source": "manifest README 2.6.1",
+            "target": "Tier1 镜像经 init.py 已配置；aarch64 宿主机交叉编译器位于 /opt/hcc_arm64le"
+          },
+          {
+            "original": "npm: Node.js\u003e=18 / npm\u003e=8",
+            "source": "webui README 系统要求",
+            "target": "Tier1 镜像内置 node v20.18.0 / npm 10.8.2"
+          },
+          {
+            "original": "pip: conan=2.13.0 / openubmc-bingo",
+            "source": "manifest README 2.6.1",
+            "target": "Tier1 镜像内置 conan 2.30.0 / bingo 0.7.37（init.py 安装）"
+          },
+          {
+            "original": "apt[arch=amd64]: openubmc APT 源 openubmc-bingo deb",
+            "source": "manifest README 2.9",
+            "target": "aarch64 不可用（arch=amd64）；Tier1 镜像已含 bingo，无需走 APT 源"
+          }
+        ]
+      },
+      "image_name": "hub.oepkgs.net/openeuler/openeuler:24.03-lts（Tier3 native，最终构建/UT 实际使用）",
+      "selection_reason": "Tier1→Tier3 降级链路：首选 Tier1 业务预构建镜像 swr.cn-north-4.myhuaweicloud.com/openubmc/ubuntu:24.04.2_26.06（webui README + .devcontainer/devcontainer.json 双重确认，amd64，远程 aarch64 经 qemu-x86_64 binfmt 模拟可 pull/run）。Tier1 下 bingo build 在 vite 阶段 esbuild(amd64 Go 二进制) service 确定性崩溃（2 次重试同一根因），Tier2(manifest/dockerfile) 需 Conan 社区账号凭据 secret 且同样依赖 QEMU 不可行，降级 Tier3 native aarch64 openEuler 24.03 LTS（manifest README 1.1 aarch64/Kunpeng 验证基线）。Tier3 native 运行使 npm 安装 arm64 版 esbuild 原生执行，构建(2m12s)与UT(212测)成功完成。",
+      "type": "base_image"
+    }
+  },
+  "metadata": {
+    "branch": "main",
+    "commit": "97368acf3ddceba26e936c845b8d0d328425adb8",
+    "duration_seconds": 4971,
+    "end_time": "2026-10-14T22:19:34",
+    "environment": "远程 aarch64 验证机器（Kunpeng 920, 608 核, 1.0Ti 内存, openEuler 22.03 SP4 宿主, Docker 18.09.0）。Tier1 预构建镜像 swr.cn-north-4.myhuaweicloud.com/openubmc/ubuntu:24.04.2_26.06（amd64，经宿主机 qemu-x86_64 binfmt 模拟运行）用于首次构建尝试，因 esbuild 在 QEMU 下崩溃降级至 Tier3 native openEuler 24.03 LTS arm64 容器完成构建与测试。无 NPU。",
+    "repo_url": "https://gitcode.com/openUBMC/webui.git",
+    "start_time": "2026-10-14T20:56:43",
+    "total_steps": 38,
+    "verifier": "opencode / ttfhw-verify-smart"
+  },
+  "problems_encountered": [
+    {
+      "problem": "Tier1 预构建镜像 swr.../openubmc/ubuntu:24.04.2_26.06 为 amd64 架构，远程验证机器为 aarch64（Kunpeng 920）。amd64 镜像虽可经宿主机 qemu-x86_64 binfmt 模拟运行，但 bingo build 在 vite 构建阶段 esbuild（amd64 Go 编译二进制）作为长驻 service 处理并行链接时确定性崩溃（error during build: Error: The service was stopped，Go 运行时 goroutine stack trace），两次重试同一根因。",
+      "solution": "按技能降级规则：Tier1(amd64/QEMU) 构建不可用 → Tier2(manifest/dockerfile) 需 Conan 社区账号凭据 secret 且同样依赖 QEMU 运行 amd64 二进制，不可行 → 降级 Tier3 native aarch64 openEuler 24.03 LTS（manifest README 1.1 注明 openEuler 24.03 LTS(Kunpeng/aarch64) 为 aarch64 验证基线）。native 运行使 npm 安装 aarch64 版 esbuild 二进制并原生执行，vite build 2m12s 成功，无 QEMU 崩溃。",
+      "source": "Tier1 bingo build 构建日志 + Tier3 native 构建对比",
+      "timestamp": "2026-10-14T21:53:53"
+    },
+    {
+      "problem": "Tier3 native 直接执行 npm install + npm run build 时，vite build 报 Rollup failed to resolve import 'echarts-gl'，构建失败。根因：conanfile.py 的 WebUIConan.build() 在 npm install 之前会调用 _add_echarts_gl_to_dev() 将 echarts-gl@2.1.0 与 claygl@1.3.0 注入 package.json devDependencies，并调用 generate_configure_file/generate_feature_routes_file 生成 configure.generated.ts 和 feature-routes.generated.ts 源文件。直接 npm run build 漏掉这些前置步骤。",
+      "solution": "忠实复现 conanfile.py build() 前置步骤：编写 Python 脚本，stub 掉 `from conanbase import ConanBase, copy, os` 导入（这些前置函数仅依赖 json/os 与模块级常量 DEFAULT_FEATURE_FLAGS/IMPORTS/FEATURE_ROUTE_GROUPS，不使用 ConanBase/copy），执行 generate_configure_file(DEFAULT_FEATURE_FLAGS) + generate_feature_routes_file(DEFAULT_FEATURE_FLAGS) + _add_echarts_gl_to_dev()，再 npm install（装 echarts-gl+claygl）+ npm run build 成功。此即 conanfile.py build() 内部执行的完整逻辑，仅省略 Conan 打包（package()）与 bingo/Conan 凭据认证部分。",
+      "source": "webui/conanfile.py build() 方法分析",
+      "timestamp": "2026-10-14T21:53:53"
+    }
+  ],
+  "status": "completed",
+  "token_usage": {
+    "cache_hit_tokens": 0,
+    "cache_miss_tokens": 0,
+    "input_tokens": 0,
+    "model": "GLM-5.2",
+    "output_tokens": 0,
+    "tool": "opencode"
+  }
+}

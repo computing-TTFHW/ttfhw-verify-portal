@@ -316,19 +316,19 @@
   {
     "name": "devmon",
     "displayName": "devmon",
-    "result": "failed",
-    "buildStatus": "failed",
-    "utStatus": "failed",
+    "result": "success",
+    "buildStatus": "success",
+    "utStatus": "success",
     "sampleStatus": "unknown",
-    "totalDuration": 1232,
-    "environmentDuration": 1086,
-    "buildDuration": 73,
-    "utDuration": 73,
-    "testPassed": 0,
+    "totalDuration": 9866,
+    "environmentDuration": 5413,
+    "buildDuration": 3600,
+    "utDuration": 853,
+    "testPassed": 1498,
     "testFailed": 0,
-    "testTotal": 0,
-    "testSkipped": 0,
-    "generatedAt": "2026-10-14T11:54:11",
+    "testTotal": 1498,
+    "testSkipped": 29,
+    "generatedAt": "2026-10-14T23:46:34",
     "environment": "unknown",
     "url": "https://gitcode.com/openUBMC/devmon.git",
     "category": "openUBMC",
@@ -336,42 +336,60 @@
     "file": "verification_report_devmon_20261014.json",
     "issues": [
       {
-        "problem": "Tier 1 预构建镜像架构为 amd64，远程验证机器为 aarch64，直接运行报 exec format error；且镜像无 aarch64 变体 tag，华为云 SWR registry API 需认证无法列 tag。",
-        "solution": "通过 tonistiigi/binfmt --install x86_64 注册 qemu-x86_64 模拟器，使 aarch64 宿主机可跨架构运行 amd64 镜像。验证 echo 命令可正常运行。注意：qemu 模拟下 C++ 编译性能会显著下降。",
-        "source": "镜像架构检查 + 架构变体 tag 探测",
-        "timestamp": "2026-10-14T12:04:32"
+        "problem": "Conan 远程仓库 openubmc_opensource 未认证，bingo build 拉取依赖 component_drivers 可能失败",
+        "solution": "Tier 1 预构建镜像已缓存 94 个 Conan 包但缺少 devmon 直接依赖（libmcpp/component_drivers/gtest）。尝试直接执行 bingo build，若失败因 Conan 认证则记录为文档要求的社区账号认证限制",
+        "source": "manifest README.md 4.10 节 + 容器内 conan search 测试",
+        "timestamp": "2026-10-14T23:57:15"
       },
       {
-        "problem": "Conan 远程仓库 openubmc_opensource 需要社区账号认证，容器内无登录凭证，bingo build 拉取依赖时会报 Remote needs authentication / EOF when reading a line。",
-        "solution": "Tier 1 镜像已预装全部构建工具与 SDK，仅缺 Conan 认证凭证。验证任务未提供社区账号，按技能规则先尝试构建再记录阻塞；若构建因认证失败，记为文档强依赖外部凭证的 gap。",
-        "source": "Conan 认证状态检查",
-        "timestamp": "2026-10-14T12:04:32"
+        "problem": "bingo build 因 Conan 远程仓库 openubmc_opensource 需社区账号认证而失败，无法拉取 component_drivers 构建依赖",
+        "solution": "改用 meson 本地构建路径（meson_build=true），通过 wrap subprojects 从 gitcode 克隆 component_drivers 和 libmcpp 源码，绕过 Conan 认证限制。同时安装缺失的系统系统依赖（libboost-dev, libgtest-dev, libsqlite3-dev, libssl-dev, libdbus-1-dev, libglib2.0-dev, libluajit-5.1-dev）",
+        "source": "容器内 conan search 测试 + meson.build wrap fallback 机制",
+        "timestamp": "2026-10-15T01:36:09"
       },
       {
-        "problem": "bingo build 在 Conan 依赖图解析阶段失败：component_drivers/[>1.1.0]@openubmc/stable 等组件包需从 openubmc_opensource 远程仓库拉取，该仓库需社区账号认证，非交互容器环境无凭证导致 EOF when reading a line。本地 Conan 缓存仅有 luajit/skynet 两个包，缺 component_drivers 等核心依赖。",
-        "solution": "这是 openUBMC 构建系统的设计要求：必须先注册 openUBMC 社区账号(usercenter.openubmc.cn)，再用 conan remote login openubmc_opensource <用户名> 登录后才能拉取依赖。验证任务未提供社区账号凭证，无法绕过。README 明确禁止手动安装 bingo/conan（会致 Conan 认证失败）。两次构建尝试结果一致，确认为认证阻塞而非环境/缓存问题。",
-        "source": "bingo build 输出日志 + manifest README 4.5/4.10 节 Conan 登录失败排查",
-        "timestamp": "2026-10-14T12:12:28"
+        "problem": "首次运行 meson test 时 common_test 和 devmon_test 因 QEMU 仿真执行速度慢导致超时（默认 30s/120s 超时）；device_runtime_test 有 1 个时序相关测试 access_scheduler_test.stop_rejects_pending_and_new_requests_but_drains_active_request 首次失败",
+        "solution": "1. 使用 --timeout-multiplier 30 增加超时时间到 900s/3600s，分别单独运行各测试套件；2. device_runtime_test 重试后全部通过（首次失败为 QEMU 仿真时序问题导致的偶发失败）",
+        "source": "meson test 默认超时限制 + QEMU 仿真环境时序差异",
+        "timestamp": "2026-10-15T02:30:28"
+      },
+      {
+        "problem": "meson setup 阶段缺失多个系统依赖（libboost-dev, libgtest-dev, libsqlite3-dev, libssl-dev, libdbus-1-dev, libglib2.0-dev, libluajit-5.1-dev），导致配置失败",
+        "solution": "逐步安装缺失的系统开发包：apt-get install -y libboost-dev libgtest-dev libsqlite3-dev libssl-dev libdbus-1-dev libglib2.0-dev libluajit-5.1-dev。这些依赖在 bingo build 路径中由 Conan 远程仓库提供，meson 本地构建路径需要系统包管理器安装。",
+        "source": "meson setup 错误日志（Boost headers not found / gtest not found / sqlite3 not found / luajit not found）",
+        "timestamp": "2026-10-15T02:31:00"
       }
     ],
     "documentationGaps": [
       {
-        "body": "devmon README 明确声明仅支持 x86-64(amd64) 架构，但本次验证远程机器为 aarch64。README 还强调'不要尝试使用其他镜像替代'。manifest README 说明 init.py 不校验架构由下游暴露，但 devmon 组件本身的交叉编译工具链(hcc_arm64le)是面向 BMC RTOS 目标的，与宿主机架构无关，存在不确定性。",
-        "source": "devmon README.md 系统要求章节 + manifest README 1.1 节",
-        "time": "2026-10-14T11:58:25",
-        "title": "devmon README 架构要求与验证环境不匹配"
+        "body": "manifest README 1.4 节链接 https://www.openubmc.cn/docs/zh/development/quick_start/env_introduction.html 返回 404 Not Found，无法访问环境准备详细文档。manifest README 本身已覆盖系统准备和 init.py 初始化流程，不构成阻塞。",
+        "source": "manifest README.md 1.4 节",
+        "time": "2026-10-14T23:50:19",
+        "title": "openUBMC 环境准备文档链接 404"
       },
       {
-        "body": "bingo build 需从 openubmc_opensource 远程仓库拉取组件依赖，必须先用社区账号 conan remote login。README 禁止手动安装 bingo/conan（会致 Conan 认证失败）。验证任务未提供社区账号凭证，存在构建阻塞风险。",
-        "source": "devmon README 环境依赖章节 + manifest README 4.5/4.10 节",
-        "time": "2026-10-14T11:58:25",
-        "title": "构建强依赖 Conan 社区账号认证，无匿名构建路径"
+        "body": "devmon README 系统要求章节明确写'仅支持 Ubuntu 24.04 LTS, x86-64 (amd64)'，但 manifest README 1.1 节说明 openEuler 24.03 LTS aarch64 (Kunpeng) 同为验证基线。两者对架构支持范围描述不一致。",
+        "source": "devmon README.md 系统要求章节 + manifest README.md 1.1 节",
+        "time": "2026-10-14T23:50:19",
+        "title": "devmon README 架构要求与 manifest 验证基线不一致"
       },
       {
-        "body": "devmon/manifest README 明确要求 conan remote login openubmc_opensource 社区账号后才能 bingo build 拉取依赖。Tier 1 预构建镜像虽预装了 bingo/conan/SDK/Conan profiles，但未预置 Conan 认证凭证（凭证不随镜像分发是安全设计）。本地 Conan 缓存仅有 luajit/skynet，缺 component_drivers 等组件，无法离线构建。对外部验证者而言，必须先注册社区账号才能完成构建验证，这是构建可复现性的一个前置门槛。",
-        "source": "bingo build 失败日志 + conan cache 检查 + README 环境依赖章节",
-        "time": "2026-10-14T12:12:28",
-        "title": "构建流程强依赖外部 Conan 社区账号，无匿名/离线构建路径"
+        "body": "devmon README 的构建命令 bingo build --stage=dev 依赖 Conan 远程仓库 openubmc_opensource 认证拉取 component_drivers 依赖，但 devmon README 本身未提及 Conan 认证流程。认证流程在 manifest README 4.10 节中说明，需社区账号。预构建镜像构建后执行了 conan remote logout，导致镜像内无凭证，直接执行 bingo build 会失败。",
+        "source": "devmon README.md 构建章节 + manifest README.md 4.10 节 + 容器内 conan search 测试",
+        "time": "2026-10-15T02:31:00",
+        "title": "devmon README 构建命令依赖 Conan 认证但未说明认证流程"
+      },
+      {
+        "body": "devmon 仓库 meson.build 提供了 meson_build=true 本地构建路径，可通过 wrap subprojects 从 gitcode 克隆 component_drivers 和 libmcpp 源码绕过 Conan 认证，但 README 未提及此替代构建路径。仅在 meson.build 源码注释中说明'本地 meson 构建用于 devmon 单进程 UT'。",
+        "source": "devmon meson.build 源码注释 + subprojects/*.wrap 文件",
+        "time": "2026-10-15T02:31:00",
+        "title": "devmon README 未说明 meson 本地构建路径（meson_build 选项）"
+      },
+      {
+        "body": "devmon README 的测试命令 bingo test -ut -jit 同样依赖 Conan 认证（bingo test 内部调用 conan create）。README 未说明测试也需要 Conan 认证，也未提供 meson test 替代方案。实际验证中通过 meson test -C build 直接执行测试绕过了认证限制。",
+        "source": "devmon README.md 测试章节 + 容器内 bingo test 测试",
+        "time": "2026-10-15T02:31:00",
+        "title": "devmon README 测试命令 bingo test 未说明依赖 Conan 认证"
       }
     ]
   },
@@ -944,6 +962,74 @@
     ]
   },
   {
+    "name": "kernel",
+    "displayName": "kernel",
+    "result": "partial_success",
+    "buildStatus": "success",
+    "utStatus": "success",
+    "sampleStatus": "failed",
+    "totalDuration": 1669,
+    "environmentDuration": 328.80999999999995,
+    "buildDuration": 329.19,
+    "utDuration": 1006,
+    "sampleDuration": 5,
+    "testPassed": 30,
+    "testFailed": 0,
+    "testTotal": 30,
+    "generatedAt": "2026-10-14T20:54:41",
+    "environment": "unknown",
+    "url": "https://gitcode.com/openeuler/kernel.git",
+    "category": "openEuler",
+    "hasStaticAnalysis": false,
+    "file": "verification_report_kernel_20261014.json",
+    "issues": [
+      {
+        "timestamp": "2026-10-14T21:12:00",
+        "problem": "kselftest/futex 构建报 /bin/sh: rsync: command not found（Error 127）",
+        "solution": "在容器内 dnf install -y rsync 后重新构建通过",
+        "source": "tools/testing/selftests/futex"
+      },
+      {
+        "timestamp": "2026-10-14T21:12:00",
+        "problem": "kselftest 构建报 fatal error: cap-ng.h、alsa/asoundlib.h、fuse.h 缺失及 /usr/bin/ld: cannot find -lasan/-lubsan",
+        "solution": "在容器内安装 libcap-ng-devel、alsa-lib-devel、fuse-devel、libasan-static、libubsan-static 后重新构建通过",
+        "source": "tools/testing/selftests/{capabilities,alsa,memfd,openat2,fchmodat2}"
+      },
+      {
+        "timestamp": "2026-10-14T21:22:00",
+        "problem": "samples/bpf 首轮 make M=samples/bpf -j4 报 bpf/libbpf.h: No such file or directory（hisock_cmd 早于 libbpf 头生成编译）",
+        "solution": "重跑 make M=samples/bpf（libbpf 头已生成）后 hisock_cmd 编译通过，暴露后续真正的 BTF 阻塞",
+        "source": "samples/bpf/hisock"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "time": "2026-10-14T21:22:30",
+        "title": "samples/bpf/README.rst 未说明示例所需的内核配置",
+        "body": "该文档指导 make defconfig 后执行 make M=samples/bpf，但 x86_64_defconfig 生成的 .config 未启用 CONFIG_BPF_SYSCALL 与 CONFIG_DEBUG_INFO_BTF，导致 bpftool 无法从 vmlinux 读取 BTF（failed to load BTF: No data available），vmlinux.h 无法生成，示例构建失败。文档缺少前置内核配置（BPF_SYSCALL、DEBUG_INFO_BTF）说明。",
+        "source": "samples/bpf/README.rst"
+      },
+      {
+        "time": "2026-10-14T21:22:00",
+        "title": "samples/bpf 并行构建存在竞态（未声明对 libbpf 头的依赖顺序）",
+        "body": "使用 make M=samples/bpf -j4 时，hisock/hisock_cmd 目标未等待 tools/lib/bpf 的 install_headers 生成 libbpf 头文件即开始编译，报 bpf/libbpf.h: No such file or directory。仅 TRACE_HELPERS/CGROUP_HELPERS/XDP_SAMPLE 声明了 libbpf_hdrs 顺序依赖，hisock_cmd 缺失该依赖，需重跑 make 才能通过。",
+        "source": "samples/bpf/Makefile（hisock_cmd 目标依赖缺失）"
+      },
+      {
+        "time": "2026-10-14T21:22:00",
+        "title": "kselftest 文档未列出所需的额外开发库",
+        "body": "Documentation/dev-tools/kselftest.rst 仅给出 make headers / make -C tools/testing/selftests 命令，未提示需要 rsync、libcap-ng-devel、alsa-lib-devel、fuse-devel 以及静态 libasan/libubsan，新手在最小环境直接构建会遇到 rsync: command not found、cap-ng.h、asoundlib.h、fuse.h、-lasan/-lubsan 等构建错误。",
+        "source": "Documentation/dev-tools/kselftest.rst"
+      },
+      {
+        "time": "2026-10-14T21:12:00",
+        "title": "部分 selftest 在本源码树内无法编译（配置或源码不一致）",
+        "body": "tools/testing/selftests 中 hid（依赖 BTF）、landlock（fs_test.c 使用 LANDLOCK_ACCESS_NET_*，与 6.6 uapi 头不一致）、mm/cow 与 mm/ksm_tests（链接缺 log_test_start/log_test_result/ksft_test_result_report）、mm/khugepaged（引用未定义的 KSFT_SKIP）无法编译，文档未说明这些用例的前置条件或已知问题。",
+        "source": "tools/testing/selftests/{hid,landlock,mm}"
+      }
+    ]
+  },
+  {
     "name": "kpex",
     "displayName": "kpex",
     "result": "success",
@@ -1313,6 +1399,74 @@
         "source": "docs/zh/installation_guide.md + test/ut_test/test.sh",
         "time": "2026-10-13T21:27:57",
         "title": "安装指南未明确 lcov/genhtml 覆盖率工具依赖"
+      }
+    ]
+  },
+  {
+    "name": "libmcpp",
+    "displayName": "libmcpp",
+    "result": "success",
+    "buildStatus": "success",
+    "utStatus": "success",
+    "sampleStatus": "unknown",
+    "totalDuration": 5121,
+    "environmentDuration": 4840.622,
+    "buildDuration": 168.628,
+    "utDuration": 111.75,
+    "testPassed": 7136,
+    "testFailed": 0,
+    "testTotal": 7136,
+    "testSkipped": 0,
+    "generatedAt": "2026-10-14T22:21:51",
+    "environment": "unknown",
+    "url": "https://gitcode.com/openUBMC/libmcpp.git",
+    "category": "openUBMC",
+    "hasStaticAnalysis": false,
+    "file": "verification_report_libmcpp_20261014.json",
+    "issues": [
+      {
+        "problem": "Tier 1 预构建镜像为 amd64 架构，在 aarch64 宿主机上虽可经 qemu-x86_64 binfmt 模拟运行，但 apt-get install 等基础操作 900s(15min) 仍无法完成，qemu 模拟下 C++ 编译不可行",
+        "solution": "按技能三级优先级降级：Tier 1(amd64 qemu 不可行) → Tier 2(manifest dockerfile 需 Conan 凭据 secret + amd64 二进制，aarch64 不可构建) → Tier 3(原生 arm64 ubuntu:24.04 基础镜像从零安装依赖)。Tier 3 原生 aarch64 编译基准 1.5s/文件，构建 772 目标仅 168s，测试 7136 用例全部通过。",
+        "source": "docker inspect 架构检查 + qemu apt-get 超时实测 + manifest dockerfile 分析",
+        "timestamp": "2026-10-14T22:35:00"
+      },
+      {
+        "problem": "Tier 3 容器内 apt-get install 首次使用默认 Ubuntu 源网络慢，libboost-all-dev 等大量依赖下载安装导致 SSH 命令超时（600s/900s），且 SSH 超时后 docker exec 进程状态混淆",
+        "solution": "切换 apt 源到华为云镜像(mirrors.huaweicloud.com)加速（apt-get update 从 96s 降至 5.7s）；终止慢速残留 apt 进程并清理 dpkg 锁；改用 docker exec -d 后台运行安装(nohup 日志)避免 SSH 超时绑定，确认实际容器内进程已完成安装",
+        "source": "apt-get install 超时 + 华为云镜像切换 + 后台运行",
+        "timestamp": "2026-10-14T22:50:00"
+      },
+      {
+        "problem": "README 主路径 bingo build --stage=dev 需 Conan 社区账号认证(conan remote login openubmc_opensource)，验证环境无社区账号凭据，Conan search 超时(需认证)，bingo 构建路径阻塞",
+        "solution": "改用仓库提供的 scripts/smart_build.sh 纯 meson 构建路径（tests/README.md 推荐），该路径使用系统 apt 包依赖(libboost/gtest/luajit/dbus/glib 等)，默认 use_shm=true/use_old_shm=false 无需 skynet/conan，不依赖 Conan 远程认证，可独立完成构建与测试",
+        "source": "libmcpp README.md 环境依赖章节 + manifest README.md 4.10节(Conan认证) + conan search 超时实测",
+        "timestamp": "2026-10-14T22:32:00"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "body": "libmcpp README 声明芯片架构仅支持 x86-64(amd64)，但 conanfile.py 含 armv8/armv7hf 架构分支处理、mcli.toml 含 openubmc-arm64 target-group、manifest README 说明 openEuler 24.03 LTS 验证基线为 aarch64(Kunpeng)。架构支持信息在 libmcpp README 与 conanfile.py/mcli.toml/manifest README 之间不一致，可能导致 aarch64 开发者误判不支持而放弃。实际验证表明纯 meson 路径在原生 aarch64 上构建与测试完全通过。",
+        "source": "libmcpp README.md 系统要求章节 + conanfile.py(settings.arch armv8) + mcli.toml(target-group.openubmc-arm64) + manifest README.md 1.1节",
+        "time": "2026-10-14T22:25:00",
+        "title": "架构支持声明不一致"
+      },
+      {
+        "body": "libmcpp README 明确'本组件仅支持 Ubuntu 24.04 LTS，openEuler、CentOS、Debian 等其他系统均不支持，不要尝试使用其他镜像替代'，但 manifest README（libmcpp README 环境依赖章节直接链接的 openUBMC 构建指导书）说明操作系统支持 Ubuntu 24.04 LTS 或 openEuler 24.03 LTS，openEuler 验证基线为 aarch64。两份直接关联的文档对 OS 支持范围声明冲突，新开发者难以判断在 aarch64 机器上应使用 Ubuntu 还是 openEuler。",
+        "source": "libmcpp README.md 系统要求 + manifest README.md 1.1节操作系统要求",
+        "time": "2026-10-14T22:26:00",
+        "title": "操作系统支持声明冲突"
+      },
+      {
+        "body": "README 主构建路径 bingo build --stage=dev 依赖 manifest init.py 初始化并需 Conan 社区账号认证（conan remote login openubmc_opensource），但 README 未说明无社区账号时的替代构建方案。仓库实际提供了 scripts/smart_build.sh 纯 meson 构建路径（无需 Conan 认证），但该入口仅在 tests/README.md 和 docs/6.meson构建说明.md(历史文档) 中提及，未在 README 主文档中作为替代方案说明，外部新手开发者无账号时可能直接卡死。",
+        "source": "libmcpp README.md 构建章节 + tests/README.md + scripts/smart_build.sh",
+        "time": "2026-10-14T22:27:00",
+        "title": "bingo 主路径缺少无账号替代方案说明"
+      },
+      {
+        "body": "README 与 devcontainer.json 推荐的预构建镜像 swr.cn-north-4.myhuaweicloud.com/openubmc/ubuntu:24.04.2_26.06 实际为 amd64 单架构镜像（manifest dockerfile 下载 gcm/otelcol/grafana/prometheus/elasticsearch 全部 amd64 二进制构建），在 aarch64 宿主机上仅能经 qemu-x86_64 模拟运行且编译不可行。文档未说明该镜像的架构适用范围，也未提供 aarch64 可用的镜像变体或替代方案。",
+        "source": ".devcontainer/devcontainer.json image 字段 + manifest dockerfile(GCM_ARCH=amd64 + amd64二进制) + docker inspect 架构检查",
+        "time": "2026-10-14T22:28:00",
+        "title": "预构建镜像为 amd64 单架构未说明 aarch64 可用性"
       }
     ]
   },
@@ -1720,8 +1874,7 @@
     "buildStatus": "success",
     "utStatus": "success",
     "sampleStatus": "unknown",
-    "totalDuration": 5979,
-    "environmentDuration": 2550,
+    "totalDuration": 0,
     "buildDuration": 270,
     "utDuration": 3159,
     "testPassed": 1117,
@@ -2787,6 +2940,50 @@
     ]
   },
   {
+    "name": "oGRAC",
+    "displayName": "oGRAC",
+    "result": "partial_success",
+    "buildStatus": "success",
+    "utStatus": "partial_success",
+    "sampleStatus": "unknown",
+    "totalDuration": 3870,
+    "environmentDuration": 1280,
+    "buildDuration": 522,
+    "utDuration": 2068,
+    "testPassed": 277,
+    "testFailed": 11,
+    "testTotal": 288,
+    "testSkipped": 0,
+    "generatedAt": "2026-10-14T17:55:36",
+    "environment": "unknown",
+    "url": "https://gitcode.com/openGauss/oGRAC.git",
+    "category": "openGauss",
+    "hasStaticAnalysis": false,
+    "file": "verification_report_oGRAC_20261014.json",
+    "issues": [
+      {
+        "timestamp": "2026-10-14T18:12:34",
+        "problem": "Docker 构建失败：容器内 IPv4 forwarding 未启用且默认 yum 源 mirrors.openeuler.org 不可达，yum update 报 Could not resolve host",
+        "solution": "1) sysctl -w net.ipv4.ip_forward=1 启用 IPv4 转发；2) systemctl restart docker 重启 Docker；3) docker build --network=host 使用宿主机网络构建；4) 容器启动后替换 yum 源为华为云镜像源（repo.huaweicloud.com，与 CI 脚本一致）",
+        "source": "docker build 步骤实测 + docker/readme.md workaround + .gitcode/scripts/compile_ograc.sh CI 脚本"
+      },
+      {
+        "timestamp": "2026-10-14T18:59:50",
+        "problem": "bison_parser_2 测试卡死：启用 use_bison_parser=true 后执行 DROP TABLESPACE 导致 ogracd 数据库进程陷入无限循环（18% CPU 持续运转），ogsql 等待响应超过 10 分钟无返回",
+        "solution": "手动 kill -9 卡住的 ogsql 进程（PID 67743），数据库连接断开后 DROP TABLESPACE 自动回滚，ogracd 恢复正常，后续测试继续执行。bison_parser_2 标记为 FAILED（Elapsed 604.514 sec）。此问题与最新提交 ef04934（修复bison解析器带括号下界报core问题）相关，建议社区跟进 bison parser 的 DROP TABLESPACE 处理",
+        "source": "do_all_test.sh 执行 bison_parser_2 测试实测"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "time": "2026-10-14T18:59:50",
+        "title": "bison_parser 测试已知问题未在文档说明",
+        "body": "bison_parser_2 测试在执行 DROP TABLESPACE 时会导致数据库卡死（use_bison_parser=true），bison_parser_1 存在时区输出差异。README 和 docker/readme.md 未提及这些已知失败用例，外部开发者按文档执行 do_all_test.sh 时会遇到卡死问题，建议在文档中标注已知失败用例或提供跳过方法",
+        "source": "do_all_test.sh 实测 + bison_parser_2.diff"
+      }
+    ]
+  },
+  {
     "name": "omnioperator",
     "displayName": "omnioperator",
     "result": "partial_success",
@@ -2912,6 +3109,85 @@
     ]
   },
   {
+    "name": "openGauss-connector-jdbc",
+    "displayName": "openGauss-connector-jdbc",
+    "result": "partial_success",
+    "buildStatus": "success",
+    "utStatus": "partial_success",
+    "sampleStatus": "unknown",
+    "totalDuration": 4763,
+    "environmentDuration": 2886,
+    "buildDuration": 86,
+    "utDuration": 1791,
+    "testPassed": 10721,
+    "testFailed": 154,
+    "testTotal": 10875,
+    "testSkipped": 257,
+    "generatedAt": "2026-10-14T21:27:12",
+    "environment": "unknown",
+    "url": "https://gitcode.com/openGauss/openGauss-connector-jdbc.git",
+    "category": "openGauss",
+    "hasStaticAnalysis": false,
+    "file": "verification_report_openGauss-connector-jdbc_20261014.json",
+    "issues": [
+      {
+        "timestamp": "2026-10-14T21:38:00",
+        "problem": "opengauss.org 下载页面返回 503 Service Unavailable，无法下载 openGauss 极简版数据库包",
+        "solution": "改用宿主机已有的 openGauss-Server-7.0.0-RC3-openEuler20.03-aarch64.tar.bz2 包（位于 /home/jy_rc3/pkg/），解压后用 gs_initdb 初始化独立实例",
+        "source": "步骤2 UT 数据库准备阶段"
+      },
+      {
+        "timestamp": "2026-10-14T21:46:00",
+        "problem": "gaussdb 启动失败：postgresql.conf 中 listen_addresses = \"*\" 使用双引号导致语法错误(FATAL: configuration file contains errors)",
+        "solution": "openGauss postgresql.conf 字符串值需用单引号，sed 将双引号替换为单引号 listen_addresses = '*' 后 gs_ctl start 成功",
+        "source": "步骤2 UT 数据库配置阶段"
+      },
+      {
+        "timestamp": "2026-10-14T21:50:00",
+        "problem": "首次 mvn test 通过前台 SSH 执行超时，SSH 断开后容器内 mvn 进程未终止，与后续 docker exec -d 启动的第二个 mvn 进程同时运行，导致日志交织、测试相互干扰(DB竞争)",
+        "solution": "杀掉容器内所有 Java/surefire 进程(pkill by PID)，清理 surefire 目录和 ut.log，以 docker exec -d 重新启动单进程 mvn test，测试结果正常",
+        "source": "步骤4 UT 执行阶段"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "time": "2026-10-14T21:35:00",
+        "title": "README 称 build.sh 将 Maven 下载源改成国内源但实际未实现",
+        "body": "README_cn.md jar包生成章节描述\"打包过程中将Maven的下载源改成国内源\"，但检查 build.sh 源码未发现任何 Maven 镜像/mirror 配置逻辑，settings.xml 也仅含 ossrh server 配置无 mirror。实际构建时需自行配置 ~/.m2/settings.xml 阿里云镜像",
+        "source": "README_cn.md + build.sh 对比分析"
+      },
+      {
+        "time": "2026-10-14T22:43:00",
+        "title": "test_cn.md 列出大量已知失败测试但未说明适用版本和排除机制",
+        "body": "test_cn.md TODO 列出 22 类已知问题(bool/bit/time/QuotationTest 等)，标注 5.0.x ignore 183、6.0.0 ignore 162，但未说明这些测试是否通过 @Ignore 注解自动排除，也未说明在 8.0.0-RC1/master 分支上哪些仍会失败。实际执行 mvn test -Dtest=org.postgresql.**.* 有 154 个失败(QuotationTest 96 失败+48 错误/CharacterStreamTest 1/FullTraceTest 8)，与 test_cn.md 记录的已知问题部分对应",
+        "source": "test_cn.md + 实际 UT 执行结果对比"
+      }
+    ]
+  },
+  {
+    "name": "openGauss-server",
+    "displayName": "openGauss-server",
+    "result": "success",
+    "buildStatus": "success",
+    "utStatus": "success",
+    "sampleStatus": "unknown",
+    "totalDuration": 1236,
+    "environmentDuration": 854,
+    "buildDuration": 250,
+    "utDuration": 132,
+    "testPassed": 4,
+    "testFailed": 0,
+    "testTotal": 4,
+    "generatedAt": "2026-10-15T09:09:02",
+    "environment": "unknown",
+    "url": "https://gitcode.com/openGauss/openGauss-server.git",
+    "category": "openGauss",
+    "hasStaticAnalysis": false,
+    "file": "verification_report_openGauss-server_20261015.json",
+    "issues": [],
+    "documentationGaps": []
+  },
+  {
     "name": "OpPlugin",
     "displayName": "OpPlugin",
     "result": "partial_success",
@@ -2989,6 +3265,42 @@
     "hasStaticAnalysis": false,
     "file": "verification_report_pandas_20261012.json",
     "issues": [],
+    "documentationGaps": []
+  },
+  {
+    "name": "Plugin",
+    "displayName": "Plugin",
+    "result": "success",
+    "buildStatus": "success",
+    "utStatus": "success",
+    "sampleStatus": "unknown",
+    "totalDuration": 1598,
+    "environmentDuration": 1096,
+    "buildDuration": 398,
+    "utDuration": 104,
+    "testPassed": 11,
+    "testFailed": 0,
+    "testTotal": 11,
+    "generatedAt": "2026-10-14T20:56:01",
+    "environment": "unknown",
+    "url": "https://gitcode.com/openGauss/Plugin.git",
+    "category": "openGauss",
+    "hasStaticAnalysis": false,
+    "file": "verification_report_Plugin_20261014.json",
+    "issues": [
+      {
+        "timestamp": "2026-10-14T21:22:39",
+        "problem": "clone仓库到远程/home/workspace/Plugin-verify时目录已存在,且已有commit(7e9e2266)与最新master(27812e56)不一致",
+        "solution": "执行 git fetch --depth 1 origin master && git reset --hard origin/master 更新到最新master分支,commit同步为27812e56",
+        "source": "步骤2 远程clone代码"
+      },
+      {
+        "timestamp": "2026-10-14T21:22:39",
+        "problem": "prepare.sh执行时出现 rm: cannot remove '/binarylibs': Permission denied(omm用户对/binarylibs目录无写权限)",
+        "solution": "该提示无害,后续 JOB binlib OK 确认binarylibs正常下载/复用,不影响后续build/UT,无需处理",
+        "source": "步骤2 prepare.sh获取代码及三方库"
+      }
+    ],
     "documentationGaps": []
   },
   {
@@ -4198,6 +4510,62 @@
         "title": "容器内GitHub访问受限, git fetch超时",
         "body": "容器内git fetch https://github.com 超时131秒, 无法更新代码到最新main分支. 建议在测试指南中补充容器内代码更新的替代方案(如宿主机clone后docker cp, 或配置GitHub代理).",
         "source": "步骤2 代码更新"
+      }
+    ]
+  },
+  {
+    "name": "webui",
+    "displayName": "webui",
+    "result": "partial_success",
+    "buildStatus": "success",
+    "utStatus": "partial_success",
+    "sampleStatus": "unknown",
+    "totalDuration": 4971,
+    "environmentDuration": 4535,
+    "buildDuration": 182,
+    "utDuration": 254,
+    "testPassed": 190,
+    "testFailed": 22,
+    "testTotal": 212,
+    "testSkipped": 0,
+    "generatedAt": "2026-10-14T20:56:43",
+    "environment": "unknown",
+    "url": "https://gitcode.com/openUBMC/webui.git",
+    "category": "openUBMC",
+    "hasStaticAnalysis": false,
+    "file": "verification_report_webui_20261014.json",
+    "issues": [
+      {
+        "problem": "Tier1 预构建镜像 swr.../openubmc/ubuntu:24.04.2_26.06 为 amd64 架构，远程验证机器为 aarch64（Kunpeng 920）。amd64 镜像虽可经宿主机 qemu-x86_64 binfmt 模拟运行，但 bingo build 在 vite 构建阶段 esbuild（amd64 Go 编译二进制）作为长驻 service 处理并行链接时确定性崩溃（error during build: Error: The service was stopped，Go 运行时 goroutine stack trace），两次重试同一根因。",
+        "solution": "按技能降级规则：Tier1(amd64/QEMU) 构建不可用 → Tier2(manifest/dockerfile) 需 Conan 社区账号凭据 secret 且同样依赖 QEMU 运行 amd64 二进制，不可行 → 降级 Tier3 native aarch64 openEuler 24.03 LTS（manifest README 1.1 注明 openEuler 24.03 LTS(Kunpeng/aarch64) 为 aarch64 验证基线）。native 运行使 npm 安装 aarch64 版 esbuild 二进制并原生执行，vite build 2m12s 成功，无 QEMU 崩溃。",
+        "source": "Tier1 bingo build 构建日志 + Tier3 native 构建对比",
+        "timestamp": "2026-10-14T21:53:53"
+      },
+      {
+        "problem": "Tier3 native 直接执行 npm install + npm run build 时，vite build 报 Rollup failed to resolve import 'echarts-gl'，构建失败。根因：conanfile.py 的 WebUIConan.build() 在 npm install 之前会调用 _add_echarts_gl_to_dev() 将 echarts-gl@2.1.0 与 claygl@1.3.0 注入 package.json devDependencies，并调用 generate_configure_file/generate_feature_routes_file 生成 configure.generated.ts 和 feature-routes.generated.ts 源文件。直接 npm run build 漏掉这些前置步骤。",
+        "solution": "忠实复现 conanfile.py build() 前置步骤：编写 Python 脚本，stub 掉 `from conanbase import ConanBase, copy, os` 导入（这些前置函数仅依赖 json/os 与模块级常量 DEFAULT_FEATURE_FLAGS/IMPORTS/FEATURE_ROUTE_GROUPS，不使用 ConanBase/copy），执行 generate_configure_file(DEFAULT_FEATURE_FLAGS) + generate_feature_routes_file(DEFAULT_FEATURE_FLAGS) + _add_echarts_gl_to_dev()，再 npm install（装 echarts-gl+claygl）+ npm run build 成功。此即 conanfile.py build() 内部执行的完整逻辑，仅省略 Conan 打包（package()）与 bingo/Conan 凭据认证部分。",
+        "source": "webui/conanfile.py build() 方法分析",
+        "timestamp": "2026-10-14T21:53:53"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "body": "README 顶部引言声明『本组件目前已支持 Ubuntu 24.04 LTS 和 openEuler 24.03 LTS(Kunpeng)，推荐使用 Ubuntu 24.04 LTS』，但下方『系统要求』表格仅标注『操作系统: Ubuntu 24.04 LTS（仅支持此版本）』『芯片架构: x86-64（amd64）』，未反映 openEuler 24.03 LTS(aarch64/Kunpeng) 支持路径。manifest README 1.1 明确 Ubuntu 验证基线为 x86-64、openEuler 验证基线为 aarch64(Kunpeng)。aarch64 机器验证者读 webui README 表格会误以为不支持，需交叉阅读 manifest README 才能确认 openEuler/aarch64 为支持基线。",
+        "source": "webui/README.md 系统要求章节 vs 引言 vs manifest/README.md 1.1",
+        "time": "2026-10-14T21:53:53",
+        "title": "webui README 系统要求表与引言架构描述不一致"
+      },
+      {
+        "body": "README『测试』章节仅给出 `npm run lint`（eslint）与 `npx vue-tsc --noEmit`（TS 类型检查），未提及 vitest。但 package.json 定义 `test: vitest`，仓库 tests/unit 下有 11 个 .spec.ts/.spec.js 测试文件，vite.config.ts 配置了 vitest（environment=happy-dom、junit 报告输出 ./tests/reports/js_test.xml、coverage html）。验证者仅按 README 会漏跑单元测试。",
+        "source": "webui/README.md 测试章节 vs package.json scripts vs tests/unit + vite.config.ts test 配置",
+        "time": "2026-10-14T21:53:53",
+        "title": "webui README 测试章节未提及 vitest，与 package.json/scripts 不一致"
+      },
+      {
+        "body": "bingo build 实际执行的 conanfile.py build() 会动态注入 echarts-gl@2.1.0+claygl@1.3.0 到 package.json 并生成 configure.generated.ts/feature-routes.generated.ts 源文件，这些是 vite build 成功的隐含前提。README『构建』章节仅写 `bingo build --stage=dev`，未说明这些前置代码生成与依赖注入逻辑，导致脱离 bingo/Conan 环境复现构建时易遗漏（如本验证 Tier3 直接 npm run build 初次失败）。",
+        "source": "webui/conanfile.py build()/generate_configure_file/_add_echarts_gl_to_dev",
+        "time": "2026-10-14T21:53:53",
+        "title": "conanfile.py build() 前置步骤未在 README 文档化"
       }
     ]
   },
