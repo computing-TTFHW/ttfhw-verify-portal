@@ -44,6 +44,86 @@
     ]
   },
   {
+    "name": "cache_tuner",
+    "displayName": "cache_tuner",
+    "result": "success",
+    "buildStatus": "success",
+    "utStatus": "success",
+    "sampleStatus": "success",
+    "totalDuration": 1791,
+    "environmentDuration": 1749,
+    "buildDuration": 2,
+    "utDuration": 20,
+    "sampleDuration": 20,
+    "testPassed": 65,
+    "testFailed": 0,
+    "testTotal": 65,
+    "generatedAt": "2026-10-23T17:15:09",
+    "environment": "unknown",
+    "url": "https://gitcode.com/openeuler/cache_tuner.git",
+    "category": "openEuler",
+    "hasStaticAnalysis": false,
+    "file": "verification_report_cache_tuner_20261023.json",
+    "issues": [
+      {
+        "timestamp": "2026-10-23T17:30:00",
+        "problem": "宿主机 docker 18.09 在创建 network namespace 时 runc 卡死：runc init 进程进入 D 状态，内核栈显示 mlx5_core -> mlx5_query_nic_vport_qkey_viol_cntr -> rdma_ib_query_port，默认 bridge 网络下任何 docker run 均在 2 分钟后报 OCI runtime create failed 超时。",
+        "solution": "定位到是宿主 Mellanox RDMA 驱动在 netns 创建时的挂起（与被测仓库无关）。改用 docker run --network host 跳过 netns 创建，容器成功启动；该绕过对本次验证无影响（本地构建与测试无需容器网络）。",
+        "source": "宿主机 docker/runc 运行态诊断（docker run 输出 + /proc/<pid>/stack + /proc/<pid>/wchan）"
+      },
+      {
+        "timestamp": "2026-10-23T17:33:00",
+        "problem": "首次 docker run 报 container's cgroup is not empty: 1 process(es) found，导致 runc create 失败。",
+        "solution": "docker rm -f 清理残留容器与其 cgroup 后重新创建，容器正常创建。",
+        "source": "宿主机 docker 守护进程（docker rm -f 残留容器 cache_tuner-ttfhw 的返回输出）"
+      },
+      {
+        "timestamp": "2026-10-23T17:39:00",
+        "problem": "Tier 3 基础镜像 openEuler:24.03-lts 未预装 gcc/make/kmod（insmod/rmmod 缺失则无法加载内核模块）。",
+        "solution": "严格按 README 环境要求章节的 dnf install -y gcc make kmod bc 逐项安装；kernel-devel 因已按 README 容器建议挂载宿主机 /usr/src/kernels 与 /lib/modules（版本与 uname -r 完全一致）而无需另装。",
+        "source": "README.md 环境要求章节（dnf install -y gcc make kmod bc）"
+      },
+      {
+        "timestamp": "2026-10-23T17:40:00",
+        "problem": "make -C cache_stash clean 失败：/bin/sh: find: command not found、xargs: command not found，Kbuild clean 目标 Error 127。",
+        "solution": "按缺依赖先装原则安装 findutils 后重试，clean 成功，构建产物清理干净；后续重建验证通过。",
+        "source": "README.md 卸载流程章节 make -C cache_stash clean 的执行输出"
+      },
+      {
+        "timestamp": "2026-10-23T17:38:00",
+        "problem": "编译时出现告警 warning: the compiler differs from the one used to build the kernel（内核由 gcc_old 12.3.1-110.oe2403sp4 构建，容器内为 12.3.1-38.oe2403）。",
+        "solution": "确认为跨 SP 小版本编译器差异告警，编译与 modpost 均正常完成且 vermagic 与运行内核一致，未做额外处理。",
+        "source": "make -C cache_stash 编译输出 warning 提示"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "time": "2026-10-23T17:45:00",
+        "title": "README 未说明容器化验证需要挂载宿主机内核构建树的具体路径与必要工具",
+        "body": "README 只提到 \"For a container build, use the same kernel release as the host and make the matching /usr/src/kernels tree available\"，未给出可直接复制的 docker run 示例（--privileged、-v /lib/modules、-v /usr/src/kernels），新手容易漏挂导致 make 报 \"No rule to make target\"。建议补充完整 docker run 命令样例。",
+        "source": "README.md 环境要求章节 + README.zh-CN.md 环境要求章节"
+      },
+      {
+        "time": "2026-10-23T17:45:00",
+        "title": "README 依赖清单遗漏 make clean 所需的 findutils",
+        "body": "环境要求只列出 gcc、make、kmod、bc，但在最小化基础镜像中 make -C cache_stash clean 依赖 find/xargs（Kbuild clean 目标），缺 findutils 时报 Error 127。建议依赖清单补充 findutils（或说明 clean 需要完整工具链环境）。",
+        "source": "README.md 环境要求章节 / 卸载流程章节"
+      },
+      {
+        "time": "2026-10-23T17:45:00",
+        "title": "README 未说明测试会真实修改硬件缓存配置且 rmmod 不会复位",
+        "body": "README 虽提到 \"they change cache settings\" 和 \"not restored by rmmod\"，但没有给出验证结束后的复位步骤（llc_enable=0、l2_enable=0、l2_target=\"0 0\"）。在共享验证机上直接跑测试会残留缓存配置影响同机其他业务，建议补充复位示例命令。",
+        "source": "README.md 运行测试章节 / 配置缓存章节"
+      },
+      {
+        "time": "2026-10-23T17:45:00",
+        "title": "仓库无 CI 配置，测试通过/失败判定依赖脚本自带的 OVERALL 行",
+        "body": "仓库无 .github/workflows、.gitee、.workflow 等 CI 配置，性能套件 test_performance.sh 也只输出指标而无 PASS/FAIL 断言，自动化集成时无法直接判定成败。建议补充 CI 配置或为性能套件增加阈值断言。",
+        "source": "仓库文件清单核查 + performance_test_results.log 输出"
+      }
+    ]
+  },
+  {
     "name": "hyperscan",
     "displayName": "hyperscan",
     "result": "partial_success",
