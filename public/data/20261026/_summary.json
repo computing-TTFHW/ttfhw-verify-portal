@@ -94,6 +94,99 @@
     ]
   },
   {
+    "name": "TorchAir",
+    "displayName": "TorchAir",
+    "result": "success",
+    "buildStatus": "success",
+    "utStatus": "success",
+    "sampleStatus": "success",
+    "totalDuration": 685,
+    "environmentDuration": 477,
+    "buildDuration": 67,
+    "utDuration": 99,
+    "sampleDuration": 42,
+    "testPassed": 20,
+    "testFailed": 0,
+    "testTotal": 20,
+    "testSkipped": 0,
+    "generatedAt": "2026-10-27T15:38:10",
+    "environment": "unknown",
+    "url": "https://gitcode.com/Ascend/torchair.git",
+    "category": "PyTorch",
+    "hasStaticAnalysis": false,
+    "file": "verification_report_TorchAir_20261027.json",
+    "issues": [
+      {
+        "timestamp": "2026-10-27T15:44:20",
+        "problem": "Tier 1 预构建 dev 镜像（torch-npu-devel:2.13.0-cann9.1.0-a3-manylinux_2_28）未预装 torch_npu，与 docker/README.md「dev = builder + torch_npu + CANN」及 Dockerfile builder 阶段 pip install torch_npu 的描述不符。",
+        "solution": "按安装指南步骤6 执行 pip3 install torch_npu==2.13（2.13.0，未触发 torch 2.13.0+cpu 重装）与 pip3 install \"protobuf>=3.13,<4\"（3.20.3）；source set_env.sh 后验证 npu.is_available()=True、device_count=2。",
+        "source": "容器内 pip3 list / python3 验证输出"
+      },
+      {
+        "timestamp": "2026-10-27T15:47:45",
+        "problem": "README「安装后验证」样例首次执行失败：GEInitializeV2 failed / OpsManager initialize failed，根因 Environment_Error_Import_Python_Module_Failed(EC0010): No module named 'attr'（CANN TBE/AOE Python 侧依赖缺失），文档依赖清单未包含 attrs。",
+        "solution": "pip3 install attrs（26.1.0）后原样重跑 RC=0；带 print 复跑输出 SAMPLE_OK torch.Size([2, 2]) npu:0，确认真实 NPU 执行。",
+        "source": "容器内 /tmp/sample_v.log（失败）、/tmp/sample_v2.log、/tmp/sample_p.log（成功）"
+      },
+      {
+        "timestamp": "2026-10-27T15:46:00",
+        "problem": "pip3 install output/torchair-0.1-py3-none-any.whl 时由 install_requires 拉起 decorator/cloudpickle/psutil/scipy，scipy 1.15.3 的 numpy 约束导致镜像内 numpy 1.23.2 被卸载并升级为 2.2.6，与 Dockerfile（PY_VERSION=3.10 → numpy==1.23.2）固定版本漂移，文档无提示。",
+        "solution": "本次未做锁版本（升级后单用例 ST 与 README 样例均正常通过），作为版本漂移风险记入文档缺陷。",
+        "source": "pip 安装输出（Successfully uninstalled numpy-1.23.2 / Successfully installed … numpy-2.2.6）；python/setup.py:11-17"
+      }
+    ],
+    "documentationGaps": [
+      {
+        "time": "2026-10-27T15:44:20",
+        "title": "预构建 dev 镜像未预装 torch_npu，与镜像分层说明不一致",
+        "body": "docker/README.md 说明 dev 阶段 = builder + torch_npu + CANN，Dockerfile builder 阶段也执行 pip install torch_npu；但拉取的 torch-npu-devel:2.13.0-cann9.1.0-a3-manylinux_2_28 内 pip3 list 无 torch_npu（仅 torch 2.13.0+cpu、numpy、PyYAML、setuptools、wheel、sympy）。建议文档明确「预构建镜像需自行 pip3 install torch_npu==2.13」或修正镜像。",
+        "source": "docker/README.md:3-20；docker/Dockerfile:80-95；docs/zh/installation_guide/building_from_source.md:138-146；容器内 pip3 list"
+      },
+      {
+        "time": "2026-10-27T15:47:45",
+        "title": "「安装后验证」样例缺少 CANN GE/TBE 运行所需 Python 依赖（attrs）",
+        "body": "严格按 README 与安装指南步骤6 安装依赖后执行样例，GE 初始化失败 Environment_Error_Import_Python_Module_Failed(EC0010): No module named 'attr'，继发 OpsManager initialize failed / GEInitializeV2 failed。镜像内实测 attr/decorator/cloudpickle/psutil/scipy/cffi 全部缺失（CANN .run 以 --quiet 安装，Python 依赖未落地），而文档依赖清单只有 numpy/pyyaml/setuptools/protobuf/torch_npu。建议补充 attrs 并说明其余依赖缺失时的报错特征。",
+        "source": "README.md:17-42；docs/zh/installation_guide/building_from_source.md:138-146；docker/Dockerfile:104-116；容器内样例日志"
+      },
+      {
+        "time": "2026-10-27T15:46:00",
+        "title": "安装 whl 会隐式升级 numpy（1.23.2 → 2.2.6），文档未提示",
+        "body": "python/setup.py 的 install_requires 为 protobuf/decorator/cloudpickle/psutil/scipy（未声明 numpy），但 pip3 install output/torchair-0.1-py3-none-any.whl 时 scipy 1.15.3 的 numpy 约束触发 numpy 1.23.2 被卸载升级为 2.2.6，覆盖 Dockerfile 中 PY_VERSION=3.10 → numpy==1.23.2 的固定版本；安装指南步骤6 只写「pip3 install numpy」。建议明确 numpy 版本策略或在 setup.py 约束。",
+        "source": "python/setup.py:11-17；docker/Dockerfile:80-95；pip 安装输出"
+      },
+      {
+        "time": "2026-10-27T15:46:05",
+        "title": "build.sh 单用例 ST 入口与安装指南的 TARGET_PYTHON_PATH 用法冲突",
+        "body": "README 推荐 bash build.sh -s torchair_eager_st.py 做单用例验证，安装指南/AGENTS.md 又推荐用 TARGET_PYTHON_PATH 指定解释器；但 build.sh 只在 TARGET_PYTHON_PATH 为空时才给 PYTHON_BIN_PATH 赋值（build.sh:136-139、159），导出该变量后 run_test 中 ${PYTHON_BIN_PATH} -m unittest 拿到空值，报 'build.sh: line 106: -m: command not found' 并以 RC=1 结束（在 glf2016/torchair2025 readme_v2 分支实测复现）。本次未设置该变量，单用例 ST 一次通过。建议 PYTHON_BIN_PATH=\"${TARGET_PYTHON_PATH:-$(which python3 || which python3.8)}\" 并增加有效性校验。",
+        "source": "README.md:44-56；build.sh:92,99-110,136-139,159；docs/zh/installation_guide/building_from_source.md:101-107；AGENTS.md"
+      },
+      {
+        "time": "2026-10-27T15:43:55",
+        "title": "NPU 容器挂载路径与实际环境不符（npu-smi / add-ons / /var/log/npu）",
+        "body": "安装指南、docker/README.md 与 .devcontainer/devcontainer.json 均要求 -v /usr/local/sbin/npu-smi:/usr/local/bin/npu-smi、-v /usr/local/Ascend/add-ons、-v /var/log/npu:/usr/slog；本次验证机上 npu-smi 在 /usr/local/bin/npu-smi，/usr/local/sbin/npu-smi、/usr/local/Ascend/add-ons、/var/log/npu、/usr/local/Ascend/firmware 均不存在，照抄会得到无效挂载。建议按宿主机实际路径挂载并给出检查命令。",
+        "source": "docs/zh/installation_guide/building_from_source.md:44-55,77-88；docker/README.md:133-174；.devcontainer/devcontainer.json"
+      },
+      {
+        "time": "2026-10-27T15:39:30",
+        "title": "昇腾镜像仓库 tag 清单不可获取，非 910b 产品需自行推断 tag",
+        "body": "安装指南只给出 910b 示例 tag 并链接昇腾镜像仓库详情页；该页 JS 渲染（WebFetch 仅得导航），SWR registry v2 API 匿名返回 401 DENIED。Atlas A3 用户需按 CANN 产品映射自行推断（实测 …-a3-manylinux_2_28 可用；文档表格写大写 A3，实际 tag 为小写 a3）。建议列出各产品完整 tag。",
+        "source": "docs/zh/installation_guide/building_from_source.md:29-35；docker/README.md:69-79；WebFetch/curl 输出；docker pull 实测"
+      },
+      {
+        "time": "2026-10-27T15:39:20",
+        "title": "README「UT验证」章节标题与内容不一致，缺少可复现的 UT 说明",
+        "body": "README 第 44-56 行标题为「UT验证」，正文只给 ST 单用例命令，并声明完整 -u/-s 不作推荐入口，也未给 UT 替代入口（python -m unittest discover、C++ gtest 只出现在 AGENTS.md/CONTRIBUTING.md）。建议改名或补充 UT 轻量入口与 ASCEND_HOME_PATH 前置条件。",
+        "source": "README.md:44-56；CONTRIBUTING.md；AGENTS.md「测试」"
+      },
+      {
+        "time": "2026-10-27T15:39:20",
+        "title": "PyTorch/TORCH_VERSION 版本口径在文档间不一致",
+        "body": "COMPATIBILITY.md「推荐版本组合」写 PyTorch 2.13.0，同文件「详细配套表」master 行写 2.12.0；.devcontainer/devcontainer.json args TORCH_VERSION=2.12.0，docker/README.md 与 Dockerfile 默认 2.13.0，安装指南示例 torch==2.13。建议统一口径。",
+        "source": "COMPATIBILITY.md:7-27,44；.devcontainer/devcontainer.json；docker/README.md:20,36；docker/Dockerfile:49；building_from_source.md:111-115"
+      }
+    ]
+  },
+  {
     "name": "Ultrascan",
     "displayName": "Ultrascan",
     "result": "success",
