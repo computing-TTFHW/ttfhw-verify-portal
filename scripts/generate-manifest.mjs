@@ -49,7 +49,7 @@ const REPO_COMMUNITY_MAP = {
   'kunpeng-extension-for-pytorch': 'HPCKit',
   'vllm-ascend': 'MindIE', 'vllm': 'MindIE', 'pymotor': 'MindIE',
   'triton-ascend': 'Triton-ascend',
-  'polymind': 'openEuler', 'witty-service': 'openEuler',
+  'polymind': 'openEuler', 'witty-service': 'openEuler', 'wittyhub-cli': 'openEuler',
   'kpex': 'HPCKit',
   'brotli4j': 'BoostKit', 'lowlatencylib': 'BoostKit', 'pandas': 'BoostKit',
   'snappy': 'BoostKit', 'vllm-router': 'BoostKit', 'zlib': 'BoostKit', 'zstd': 'BoostKit',
